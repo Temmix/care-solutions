@@ -10,8 +10,8 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException('No authenticated user');
     }
 
-    // SUPER_ADMIN can switch tenant context via header
-    if (user.role === 'SUPER_ADMIN') {
+    // SUPER_ADMIN and TENANT_ADMIN can switch tenant context via header
+    if (user.role === 'SUPER_ADMIN' || user.role === 'TENANT_ADMIN') {
       const headerTenantId = request.headers['x-tenant-id'];
       request.tenantId = headerTenantId || null;
       return true;

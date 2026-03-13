@@ -73,6 +73,32 @@ describe('TenantGuard', () => {
     expect(result).toBe(true);
     expect(request.tenantId).toBe('user-tenant-456');
   });
+
+  it('should set tenantId from header for TENANT_ADMIN', () => {
+    const request: Record<string, unknown> = {
+      user: { role: 'TENANT_ADMIN' },
+      headers: { 'x-tenant-id': 'tenant-789' },
+    };
+    const ctx = createMockContext(request);
+
+    const result = guard.canActivate(ctx);
+
+    expect(result).toBe(true);
+    expect(request.tenantId).toBe('tenant-789');
+  });
+
+  it('should set tenantId to null for TENANT_ADMIN with no x-tenant-id header', () => {
+    const request: Record<string, unknown> = {
+      user: { role: 'TENANT_ADMIN' },
+      headers: {},
+    };
+    const ctx = createMockContext(request);
+
+    const result = guard.canActivate(ctx);
+
+    expect(result).toBe(true);
+    expect(request.tenantId).toBeNull();
+  });
 });
 
 describe('RolesGuard', () => {
@@ -136,6 +162,27 @@ describe('RolesGuard', () => {
 
     expect(guard.canActivate(ctx)).toBe(false);
   });
+
+  it('should return true for TENANT_ADMIN when ADMIN is in required roles', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(['ADMIN']);
+    const ctx = createMockContext({ user: { role: 'TENANT_ADMIN' } });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  it('should return false for TENANT_ADMIN when only SUPER_ADMIN is required', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(['SUPER_ADMIN']);
+    const ctx = createMockContext({ user: { role: 'TENANT_ADMIN' } });
+
+    expect(guard.canActivate(ctx)).toBe(false);
+  });
+
+  it('should return false for TENANT_ADMIN when only clinical roles are required', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(['CLINICIAN', 'NURSE']);
+    const ctx = createMockContext({ user: { role: 'TENANT_ADMIN' } });
+
+    expect(guard.canActivate(ctx)).toBe(false);
+  });
 });
 
 describe('SubscriptionGuard', () => {
@@ -162,6 +209,15 @@ describe('SubscriptionGuard', () => {
 
   it('should allow SUPER_ADMIN to bypass subscription check', async () => {
     const request = { user: { role: 'SUPER_ADMIN' }, tenantId: 'tenant-1' };
+    const ctx = createMockContext(request);
+
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+    expect(prisma.subscription.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('should allow TENANT_ADMIN to bypass subscription check', async () => {
+    const request = { user: { role: 'TENANT_ADMIN' }, tenantId: 'tenant-1' };
     const ctx = createMockContext(request);
 
     const result = await guard.canActivate(ctx);

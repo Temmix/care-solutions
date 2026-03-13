@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateSuperAdminDto } from './dto/create-super-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
+import { CreateTenantAdminDto } from './dto/create-tenant-admin.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 const USER_SELECT = {
@@ -89,8 +90,8 @@ export class UsersService {
   // ── Tenant user creation ───────────────────────────────
 
   async createTenantUser(dto: CreateTenantUserDto, tenantId: string) {
-    if (dto.role === 'SUPER_ADMIN') {
-      throw new ForbiddenException('Cannot create a super admin via this endpoint');
+    if (dto.role === 'SUPER_ADMIN' || dto.role === 'TENANT_ADMIN') {
+      throw new ForbiddenException('Cannot create a super admin or tenant admin via this endpoint');
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -220,6 +221,88 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('Super admin not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: true },
+      select: USER_SELECT,
+    });
+  }
+
+  // ── Tenant Admin management ──────────────────────────────
+
+  async findAllTenantAdmins(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where: Prisma.UserWhereInput = { role: 'TENANT_ADMIN' };
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: USER_SELECT,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data: users, total, page, limit };
+  }
+
+  async createTenantAdmin(dto: CreateTenantAdminDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    return this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        role: 'TENANT_ADMIN',
+        tenantId: null,
+      },
+      select: USER_SELECT,
+    });
+  }
+
+  async deactivateTenantAdmin(id: string, currentUserId: string) {
+    if (id === currentUserId) {
+      throw new ForbiddenException('Cannot deactivate your own account');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id, role: 'TENANT_ADMIN' },
+      select: USER_SELECT,
+    });
+
+    if (!user) {
+      throw new NotFoundException('Tenant admin not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+      select: USER_SELECT,
+    });
+  }
+
+  async reactivateTenantAdmin(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, role: 'TENANT_ADMIN' },
+      select: USER_SELECT,
+    });
+
+    if (!user) {
+      throw new NotFoundException('Tenant admin not found');
     }
 
     return this.prisma.user.update({

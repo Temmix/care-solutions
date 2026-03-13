@@ -24,6 +24,11 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
+    // TENANT_ADMIN inherits ADMIN privileges (but not SUPER_ADMIN)
+    if (user?.role === 'TENANT_ADMIN') {
+      return requiredRoles.some((role) => role === 'TENANT_ADMIN' || role === 'ADMIN');
+    }
+
     return requiredRoles.some((role) => user?.role === role);
   }
 }

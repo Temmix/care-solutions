@@ -25,6 +25,8 @@ interface AuthContextType extends AuthState {
   selectedTenant: SelectedTenant | null;
   selectTenant: (tenant: SelectedTenant | null) => void;
   isSuperAdmin: boolean;
+  isTenantAdmin: boolean;
+  isPlatformAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -38,6 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [selectedTenant, setSelectedTenant] = useState<SelectedTenant | null>(null);
 
   const isSuperAdmin = state.user?.role === 'SUPER_ADMIN';
+  const isTenantAdmin = state.user?.role === 'TENANT_ADMIN';
+  const isPlatformAdmin = isSuperAdmin || isTenantAdmin;
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -101,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         selectedTenant,
         selectTenant,
         isSuperAdmin,
+        isTenantAdmin,
+        isPlatformAdmin,
       }}
     >
       {children}

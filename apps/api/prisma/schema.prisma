@@ -11,6 +11,7 @@ generator client {
 
 enum Role {
   SUPER_ADMIN
+  TENANT_ADMIN
   ADMIN
   CLINICIAN
   NURSE

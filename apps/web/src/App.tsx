@@ -11,6 +11,7 @@ import { PatientDetailPage } from './features/patients/PatientDetailPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
 import { PractitionersPage } from './features/practitioners/PractitionersPage';
 import { SuperAdminsPage } from './features/super-admins/SuperAdminsPage';
+import { TenantAdminsPage } from './features/tenant-admins/TenantAdminsPage';
 import { BillingPage } from './features/billing/BillingPage';
 import { CarePlanListPage } from './features/care-plans/CarePlanListPage';
 import { CarePlanCreatePage } from './features/care-plans/CarePlanCreatePage';
@@ -46,6 +47,7 @@ export function App(): React.ReactElement {
             <Route path="practitioners" element={<PractitionersPage />} />
             <Route path="tenants" element={<TenantsPage />} />
             <Route path="super-admins" element={<SuperAdminsPage />} />
+            <Route path="tenant-admins" element={<TenantAdminsPage />} />
             <Route path="care-plans" element={<CarePlanListPage />} />
             <Route path="care-plans/new" element={<CarePlanCreatePage />} />
             <Route path="care-plans/:id" element={<CarePlanDetailPage />} />
