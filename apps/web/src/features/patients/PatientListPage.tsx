@@ -38,7 +38,7 @@ export function PatientListPage(): React.ReactElement {
   useEffect(() => {
     if (isSuperAdmin && !selectedTenant) return;
     doSearch();
-  }, [selectedTenant]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedTenant]); // eslint-disable-line
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();

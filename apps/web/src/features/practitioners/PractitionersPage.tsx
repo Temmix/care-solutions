@@ -258,7 +258,7 @@ export function PractitionersPage(): React.ReactElement {
 
   useEffect(() => {
     loadPractitioners();
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page]); // eslint-disable-line
 
   if (isSuperAdmin && !selectedTenant) {
     return (
