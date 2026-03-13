@@ -107,6 +107,7 @@ describe('ApiClient', () => {
       await api.delete('/items/1');
 
       expect(mockFetch).toHaveBeenCalledWith('/api/items/1', {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },

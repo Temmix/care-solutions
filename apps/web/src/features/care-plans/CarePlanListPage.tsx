@@ -23,11 +23,12 @@ export function CarePlanListPage(): React.ReactElement {
   const limit = 20;
 
   useEffect(() => {
-    const params: Record<string, unknown> = { page, limit };
-    if (status) params.status = status;
-    if (category) params.category = category;
-
-    searchCarePlans(params as any)
+    searchCarePlans({
+      page,
+      limit,
+      status: status || undefined,
+      category: category || undefined,
+    })
       .then((result) => {
         setCarePlans(
           (result.entry ?? []).map((e) => e.resource).filter((r): r is FhirCarePlan => !!r),
