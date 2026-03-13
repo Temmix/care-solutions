@@ -1,0 +1,590 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Enums ────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CLINICIAN
+  NURSE
+  CARER
+  PATIENT
+  SYSTEM
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+}
+
+enum IdentifierType {
+  NHS_NUMBER
+  MRN
+  PASSPORT
+  OTHER
+}
+
+enum ContactRelationship {
+  NEXT_OF_KIN
+  EMERGENCY
+  CARER
+  GUARDIAN
+  OTHER
+}
+
+enum PatientEventType {
+  CREATED
+  UPDATED
+  ADMISSION
+  DISCHARGE
+  TRANSFER
+  NOTE
+  ASSESSMENT
+  REFERRAL
+  DEMOGRAPHIC_CHANGE
+  CARE_PLAN_CREATED
+  CARE_PLAN_UPDATED
+}
+
+enum OrganizationType {
+  HOSPITAL
+  GP_PRACTICE
+  CARE_HOME
+  COMMUNITY_SERVICE
+  MENTAL_HEALTH_TRUST
+  OTHER
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+}
+
+enum CarePlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  ENTERED_IN_ERROR
+}
+
+enum CarePlanCategory {
+  NURSING
+  PHYSIOTHERAPY
+  MENTAL_HEALTH
+  PALLIATIVE
+  GENERAL
+}
+
+enum GoalStatus {
+  PROPOSED
+  ACCEPTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ActivityType {
+  MEDICATION
+  EXERCISE
+  APPOINTMENT
+  OBSERVATION
+  EDUCATION
+  REFERRAL
+  OTHER
+}
+
+enum ActivityStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssessmentStatus {
+  DRAFT
+  COMPLETED
+  REVIEWED
+  CANCELLED
+  ENTERED_IN_ERROR
+}
+
+enum RiskLevel {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+// ─── Auth & System ────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role               Role     @default(PATIENT)
+  isActive           Boolean  @default(true)
+  mustChangePassword Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenantId String?
+  tenant   Organization? @relation("TenantUsers", fields: [tenantId], references: [id])
+
+  auditLogs      AuditLog[]
+  patient        Patient?
+  practitioner   Practitioner?
+  recordedEvents PatientEvent[] @relation("PatientEventRecorder")
+
+  authoredCarePlans CarePlan[]     @relation("CarePlanAuthor")
+  carePlanNotes     CarePlanNote[] @relation("CarePlanNoteAuthor")
+
+  performedAssessments Assessment[] @relation("AssessmentPerformer")
+  reviewedAssessments  Assessment[] @relation("AssessmentReviewer")
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  tenantId String?
+  tenant   Organization? @relation("TenantAuditLogs", fields: [tenantId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@index([tenantId])
+  @@map("audit_logs")
+}
+
+// ─── EPR: Organization ────────────────────────────────
+
+model Organization {
+  id           String           @id @default(uuid())
+  active       Boolean          @default(true)
+  name         String
+  type         OrganizationType
+  odsCode      String?          @unique
+  phone        String?
+  email        String?
+  addressLine1 String?
+  city         String?
+  postalCode   String?
+  country      String?          @default("GB")
+
+  // Stripe billing
+  stripeCustomerId String? @unique
+
+  parentId String?
+  parent   Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children Organization[] @relation("OrgHierarchy")
+
+  // Managing organization relation (FHIR semantics)
+  patients      Patient[]
+  practitioners Practitioner[]
+
+  // Tenant back-relations
+  users               User[]           @relation("TenantUsers")
+  tenantPatients      Patient[]        @relation("TenantPatients")
+  tenantPractitioners Practitioner[]   @relation("TenantPractitioners")
+  tenantPatientEvents PatientEvent[]   @relation("TenantPatientEvents")
+  tenantAuditLogs     AuditLog[]       @relation("TenantAuditLogs")
+  tenantCarePlans     CarePlan[]       @relation("TenantCarePlans")
+  tenantAssessments     Assessment[]           @relation("TenantAssessments")
+  tenantAssessmentTypes AssessmentTypeConfig[] @relation("TenantAssessmentTypes")
+  tenantSpecialtyTypes  SpecialtyConfig[]      @relation("TenantSpecialtyTypes")
+
+  subscription Subscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@map("organizations")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  organizationId       String             @unique
+  organization         Organization       @relation(fields: [organizationId], references: [id])
+  tier                 SubscriptionTier   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialEndsAt          DateTime?
+  patientLimit         Int                @default(10)
+  userLimit            Int                @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+// ─── EPR: Practitioner ────────────────────────────────
+
+model Practitioner {
+  id                 String  @id @default(uuid())
+  active             Boolean @default(true)
+  givenName          String
+  familyName         String
+  gender             Gender?
+  phone              String?
+  email              String?
+  specialty          String?
+  registrationNumber String?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantPractitioners", fields: [tenantId], references: [id])
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  gpPatients         Patient[]          @relation("PatientGP")
+  assignedActivities CarePlanActivity[] @relation("ActivityAssignee")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyName, givenName])
+  @@index([organizationId])
+  @@index([tenantId])
+  @@map("practitioners")
+}
+
+// ─── EPR: Patient ─────────────────────────────────────
+
+model Patient {
+  id           String        @id @default(uuid())
+  active       Boolean       @default(true)
+  status       PatientStatus @default(ACTIVE)
+  givenName    String
+  middleName   String?
+  familyName   String
+  prefix       String?
+  gender       Gender
+  birthDate    DateTime      @db.Date
+  deceasedDate DateTime?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  district     String?
+  postalCode   String?
+  country      String?       @default("GB")
+  phone        String?
+  email        String?
+  maritalStatus String?
+  careSetting  String?
+
+  managingOrganizationId String?
+  managingOrganization   Organization? @relation(fields: [managingOrganizationId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantPatients", fields: [tenantId], references: [id])
+
+  gpPractitionerId String?
+  gpPractitioner   Practitioner? @relation("PatientGP", fields: [gpPractitionerId], references: [id])
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  identifiers  PatientIdentifier[]
+  contacts     PatientContact[]
+  events       PatientEvent[]
+  carePlans    CarePlan[]
+  assessments  Assessment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([familyName, givenName])
+  @@index([birthDate])
+  @@index([managingOrganizationId])
+  @@index([tenantId])
+  @@map("patients")
+}
+
+model PatientIdentifier {
+  id        String         @id @default(uuid())
+  patientId String
+  type      IdentifierType
+  system    String
+  value     String
+  isPrimary Boolean        @default(false)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([type, value])
+  @@index([patientId])
+  @@index([value])
+  @@map("patient_identifiers")
+}
+
+model PatientContact {
+  id           String              @id @default(uuid())
+  patientId    String
+  relationship ContactRelationship
+  givenName    String
+  familyName   String
+  phone        String?
+  email        String?
+  addressLine1 String?
+  city         String?
+  postalCode   String?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@map("patient_contacts")
+}
+
+model PatientEvent {
+  id           String           @id @default(uuid())
+  patientId    String
+  eventType    PatientEventType
+  summary      String
+  detail       Json?
+  careSetting  String?
+  occurredAt   DateTime         @default(now())
+  recordedAt   DateTime         @default(now())
+  recordedById String
+
+  tenantId String
+  tenant   Organization @relation("TenantPatientEvents", fields: [tenantId], references: [id])
+
+  patient    Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation("PatientEventRecorder", fields: [recordedById], references: [id])
+
+  @@index([patientId, occurredAt])
+  @@index([patientId, eventType])
+  @@index([careSetting])
+  @@index([tenantId])
+  @@map("patient_events")
+}
+
+// ─── EPR: Care Plans ─────────────────────────────────
+
+model CarePlan {
+  id             String           @id @default(uuid())
+  title          String
+  description    String?
+  status         CarePlanStatus   @default(DRAFT)
+  category       CarePlanCategory @default(GENERAL)
+  startDate      DateTime         @db.Date
+  endDate        DateTime?        @db.Date
+  nextReviewDate DateTime?        @db.Date
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation("CarePlanAuthor", fields: [authorId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantCarePlans", fields: [tenantId], references: [id])
+
+  goals      CarePlanGoal[]
+  activities CarePlanActivity[]
+  notes      CarePlanNote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, status])
+  @@index([tenantId])
+  @@index([authorId])
+  @@index([nextReviewDate])
+  @@map("care_plans")
+}
+
+model CarePlanGoal {
+  id          String     @id @default(uuid())
+  carePlanId  String
+  carePlan    CarePlan   @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  description String
+  status      GoalStatus @default(PROPOSED)
+  targetDate  DateTime?  @db.Date
+  measure     String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([carePlanId])
+  @@map("care_plan_goals")
+}
+
+model CarePlanActivity {
+  id          String         @id @default(uuid())
+  carePlanId  String
+  carePlan    CarePlan       @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  type        ActivityType   @default(OTHER)
+  status      ActivityStatus @default(NOT_STARTED)
+  description String
+  scheduledAt DateTime?
+  notes       String?
+
+  assigneeId String?
+  assignee   Practitioner? @relation("ActivityAssignee", fields: [assigneeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([carePlanId])
+  @@index([assigneeId])
+  @@index([scheduledAt])
+  @@map("care_plan_activities")
+}
+
+model CarePlanNote {
+  id         String   @id @default(uuid())
+  carePlanId String
+  carePlan   CarePlan @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  content    String
+  authorId   String
+  author     User     @relation("CarePlanNoteAuthor", fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([carePlanId, createdAt])
+  @@map("care_plan_notes")
+}
+
+// ─── EPR: Assessment Type Config ─────────────────────
+
+model AssessmentTypeConfig {
+  id          String  @id @default(uuid())
+  code        String
+  name        String
+  description String?
+  category    String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  tenantId String?
+  tenant   Organization? @relation("TenantAssessmentTypes", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, tenantId])
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("assessment_type_configs")
+}
+
+// ─── EPR: Specialty Config ──────────────────────────
+
+model SpecialtyConfig {
+  id          String  @id @default(uuid())
+  code        String
+  name        String
+  description String?
+  category    String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  tenantId String?
+  tenant   Organization? @relation("TenantSpecialtyTypes", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, tenantId])
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("specialty_configs")
+}
+
+// ─── EPR: Assessments ───────────────────────────────
+
+model Assessment {
+  id                  String           @id @default(uuid())
+  title               String
+  description         String?
+  assessmentType      String
+  toolName            String?
+  status              AssessmentStatus @default(COMPLETED)
+  score               Int?
+  maxScore            Int?
+  scoreInterpretation String?
+  riskLevel           RiskLevel?
+  performedAt         DateTime         @default(now())
+  notes               String?
+  recommendedActions  String?
+  responses           Json?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  performedById String
+  performedBy   User @relation("AssessmentPerformer", fields: [performedById], references: [id])
+
+  reviewedById String?
+  reviewedBy   User?    @relation("AssessmentReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  tenantId String
+  tenant   Organization @relation("TenantAssessments", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, performedAt])
+  @@index([patientId, assessmentType])
+  @@index([assessmentType, riskLevel])
+  @@index([tenantId])
+  @@map("assessments")
+}
