@@ -15,7 +15,7 @@ import { Role } from '@prisma/client';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto, UpdatePatientDto, SearchPatientDto, CreatePatientEventDto } from './dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
-import { RolesGuard, TenantGuard, SubscriptionGuard } from '../../../common/guards';
+import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
   id: string;

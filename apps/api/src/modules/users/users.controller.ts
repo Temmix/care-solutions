@@ -19,7 +19,7 @@ import { CreateTenantAdminDto } from './dto/create-tenant-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
-import { RolesGuard, TenantGuard, SubscriptionGuard } from '../../common/guards';
+import { RolesGuard, TenantGuard } from '../../common/guards';
 
 // ── Super Admin management (no tenant required) ──────────
 

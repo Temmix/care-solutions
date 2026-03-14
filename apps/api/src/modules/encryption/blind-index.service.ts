@@ -107,7 +107,7 @@ export class BlindIndexService {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // strip diacritics
-      .replace(/['\-]/g, '') // strip apostrophes and hyphens
+      .replace(/['-]/g, '') // strip apostrophes and hyphens
       .trim();
   }
 
