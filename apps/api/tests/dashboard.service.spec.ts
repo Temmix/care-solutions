@@ -7,6 +7,9 @@ describe('DashboardService', () => {
     user: { count: jest.Mock };
     practitioner: { count: jest.Mock };
     patientEvent: { count: jest.Mock; findMany: jest.Mock };
+    shift: { count: jest.Mock };
+    encounter: { count: jest.Mock };
+    bed: { count: jest.Mock };
   };
 
   beforeEach(() => {
@@ -24,6 +27,9 @@ describe('DashboardService', () => {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      shift: { count: jest.fn().mockResolvedValue(0) },
+      encounter: { count: jest.fn().mockResolvedValue(0) },
+      bed: { count: jest.fn().mockResolvedValue(0) },
     };
 
     service = new DashboardService(prisma as any);
@@ -34,6 +40,9 @@ describe('DashboardService', () => {
     prisma.user.count.mockResolvedValue(5);
     prisma.practitioner.count.mockResolvedValue(3);
     prisma.patientEvent.count.mockResolvedValue(20);
+    prisma.shift.count.mockResolvedValue(8);
+    prisma.encounter.count.mockResolvedValue(4);
+    prisma.bed.count.mockResolvedValue(12);
     prisma.patient.findMany.mockResolvedValue([]);
     prisma.patientEvent.findMany.mockResolvedValue([]);
     prisma.patient.groupBy.mockResolvedValue([]);
@@ -45,6 +54,9 @@ describe('DashboardService', () => {
       users: 5,
       practitioners: 3,
       events: 20,
+      shifts: 8,
+      encounters: 4,
+      availableBeds: 12,
     });
 
     // Verify tenantId scoping
@@ -81,6 +93,9 @@ describe('DashboardService', () => {
       users: 0,
       practitioners: 0,
       events: 0,
+      shifts: 0,
+      encounters: 0,
+      availableBeds: 0,
     });
     expect(result.recentPatients).toEqual([]);
     expect(result.recentEvents).toEqual([]);

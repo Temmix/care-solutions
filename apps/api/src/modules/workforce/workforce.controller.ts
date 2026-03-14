@@ -116,6 +116,13 @@ export class WorkforceController {
     return this.workforceService.deleteShift(id, tenantId);
   }
 
+  @Get('shifts/:id/assignable-staff')
+  @Roles(Role.ADMIN)
+  getAssignableStaff(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getAssignableStaff(id, tenantId);
+  }
+
   @Post('shifts/:id/assign')
   @Roles(Role.ADMIN)
   assignShift(

@@ -94,7 +94,7 @@ describe('PatientsController', () => {
 
   it('should call patientsService.create with dto, user.id, and tenantId', async () => {
     const dto = { givenName: 'John', familyName: 'Doe' };
-    const user = { id: 'user-1', email: 'u@e.com', role: 'ADMIN' };
+    const user = { id: 'user-1', email: 'u@e.com', globalRole: 'ADMIN' };
     const tenantId = 'tenant-1';
     const expected = { id: 'p1', resourceType: 'Patient' };
     patientsService.create.mockResolvedValue(expected);
@@ -118,7 +118,7 @@ describe('PatientsController', () => {
   });
 
   it('should call patientsService.findOne with id, tenantId, user.id, and user.role', async () => {
-    const user = { id: 'user-1', email: 'u@e.com', role: 'CLINICIAN' };
+    const user = { id: 'user-1', email: 'u@e.com', globalRole: 'CLINICIAN' };
     const tenantId = 'tenant-1';
     const expected = { id: 'p1', resourceType: 'Patient' };
     patientsService.findOne.mockResolvedValue(expected);

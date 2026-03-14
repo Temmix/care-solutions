@@ -5,6 +5,10 @@ export class CreateAvailabilityDto {
   @IsDateString()
   date!: string;
 
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
   @IsEnum(AvailabilityType)
   type!: AvailabilityType;
 

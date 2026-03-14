@@ -35,9 +35,21 @@ export interface Shift {
   assignments: ShiftAssignment[];
 }
 
+export interface AssignableStaffMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  membershipRole: string;
+  status: 'available' | 'warning' | 'blocked';
+  reasons: string[];
+  alreadyAssigned: boolean;
+}
+
 export interface StaffAvailability {
   id: string;
   date: string;
+  endDate: string | null;
   type: string;
   startTime: string | null;
   endTime: string | null;
@@ -136,6 +148,12 @@ export function useWorkforce() {
     [wrap],
   );
 
+  const getAssignableStaff = useCallback(
+    (shiftId: string) =>
+      wrap(() => api.get<AssignableStaffMember[]>(`/shifts/${shiftId}/assignable-staff`)),
+    [wrap],
+  );
+
   // Availability
   const createAvailability = useCallback(
     (data: Record<string, unknown>) =>
@@ -183,6 +201,7 @@ export function useWorkforce() {
     assignShift,
     deleteShift,
     removeAssignment,
+    getAssignableStaff,
     createAvailability,
     listAvailability,
     getMyAvailability,

@@ -949,7 +949,8 @@ model ShiftAssignment {
 
 model StaffAvailability {
   id        String           @id @default(uuid())
-  date      DateTime         @db.Date
+  date      DateTime         @db.Date               // start date
+  endDate   DateTime?        @db.Date               // end date (null = single day)
   type      AvailabilityType
   startTime String?          // HH:mm, null = all day
   endTime   String?          // HH:mm, null = all day

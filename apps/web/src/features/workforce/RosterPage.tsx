@@ -1,16 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useWorkforce, type Shift, type ShiftPattern } from './hooks/use-workforce';
+import {
+  useWorkforce,
+  type Shift,
+  type ShiftPattern,
+  type AssignableStaffMember,
+} from './hooks/use-workforce';
 import { useAuth } from '../../hooks/use-auth';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api-client';
 import { ErrorAlert, WarningList } from '../../components/ErrorAlert';
-
-interface TeamUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-}
 
 interface LocationOption {
   id: string;
@@ -83,13 +81,13 @@ export function RosterPage(): React.ReactElement {
     deleteShift,
     removeAssignment,
     updateShift,
+    getAssignableStaff,
     loading,
     error,
   } = useWorkforce();
   const [weekOffset, setWeekOffset] = useState(0);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
-  const [users, setUsers] = useState<TeamUser[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [createPatternId, setCreatePatternId] = useState('');
@@ -105,6 +103,8 @@ export function RosterPage(): React.ReactElement {
   ]);
   const [assignShiftId, setAssignShiftId] = useState<string | null>(null);
   const [assignUserId, setAssignUserId] = useState('');
+  const [assignableStaff, setAssignableStaff] = useState<AssignableStaffMember[]>([]);
+  const [assignableLoading, setAssignableLoading] = useState(false);
   const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(new Set());
   const [warnings, setWarnings] = useState<string[]>([]);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -127,19 +127,9 @@ export function RosterPage(): React.ReactElement {
     }
   };
 
-  const loadUsers = async () => {
-    try {
-      const result = await api.get<{ data: TeamUser[] }>('/users?limit=100');
-      setUsers(result.data);
-    } catch {
-      // ignore
-    }
-  };
-
   useEffect(() => {
     if (isSuperAdmin && !selectedTenant) return;
     load();
-    loadUsers();
   }, [selectedTenant, weekOffset]); // eslint-disable-line
 
   // ── Date helpers ──────────────────────────────────────
@@ -361,9 +351,20 @@ export function RosterPage(): React.ReactElement {
         )}
         <div className="flex gap-2 pt-0.5 pl-3">
           <button
-            onClick={() => {
+            onClick={async () => {
               setAssignShiftId(shift.id);
               setAssignUserId('');
+              setAssignError(null);
+              setAssignableStaff([]);
+              setAssignableLoading(true);
+              try {
+                const staff = await getAssignableStaff(shift.id);
+                setAssignableStaff(staff);
+              } catch {
+                // fallback handled by error state
+              } finally {
+                setAssignableLoading(false);
+              }
             }}
             className="text-accent text-[0.6rem] bg-transparent border-none cursor-pointer p-0 hover:underline"
           >
@@ -775,29 +776,171 @@ export function RosterPage(): React.ReactElement {
       {/* ── Assign modal ─────────────────────────────────── */}
       {assignShiftId && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-lg">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg max-h-[80vh] flex flex-col">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Assign Staff</h3>
             <ErrorAlert
               message={assignError}
               onDismiss={() => setAssignError(null)}
               className="mb-4"
             />
-            <select
-              value={assignUserId}
-              onChange={(e) => {
-                setAssignUserId(e.target.value);
-                setAssignError(null);
-              }}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white mb-4"
-            >
-              <option value="">Select staff member...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.firstName} {u.lastName} ({u.role})
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-3">
+
+            {assignableLoading ? (
+              <div className="text-center py-8 text-slate-400 text-sm">Loading staff...</div>
+            ) : assignableStaff.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">No staff members found</div>
+            ) : (
+              <div className="overflow-y-auto -mx-6 px-6 flex-1 min-h-0">
+                <div className="space-y-1">
+                  {assignableStaff.map((staff) => {
+                    const isBlocked = staff.status === 'blocked';
+                    const isWarning = staff.status === 'warning';
+                    const isSelected = assignUserId === staff.id;
+
+                    return (
+                      <button
+                        key={staff.id}
+                        onClick={() => {
+                          if (isBlocked || staff.alreadyAssigned) return;
+                          setAssignUserId(staff.id);
+                          setAssignError(null);
+                        }}
+                        disabled={isBlocked || staff.alreadyAssigned}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors flex items-center gap-3 ${
+                          staff.alreadyAssigned
+                            ? 'bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed'
+                            : isBlocked
+                              ? 'bg-red-50/50 border-red-100 opacity-60 cursor-not-allowed'
+                              : isSelected
+                                ? 'bg-accent/5 border-accent ring-1 ring-accent cursor-pointer'
+                                : isWarning
+                                  ? 'bg-amber-50/50 border-amber-200 hover:border-amber-300 cursor-pointer'
+                                  : 'bg-white border-slate-200 hover:border-accent/50 cursor-pointer'
+                        }`}
+                      >
+                        {/* Status indicator */}
+                        <span className="shrink-0">
+                          {staff.alreadyAssigned ? (
+                            <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center">
+                              <svg
+                                className="w-3 h-3 text-slate-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4.5 12.75l6 6 9-13.5"
+                                />
+                              </svg>
+                            </span>
+                          ) : isBlocked ? (
+                            <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center">
+                              <svg
+                                className="w-3 h-3 text-red-500"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </span>
+                          ) : isWarning ? (
+                            <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+                              <svg
+                                className="w-3 h-3 text-amber-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                                />
+                              </svg>
+                            </span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                              <svg
+                                className="w-3 h-3 text-emerald-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4.5 12.75l6 6 9-13.5"
+                                />
+                              </svg>
+                            </span>
+                          )}
+                        </span>
+
+                        {/* Staff info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-slate-900 truncate">
+                              {staff.firstName} {staff.lastName}
+                            </span>
+                            <span className="text-[0.65rem] text-slate-400 uppercase shrink-0">
+                              {staff.membershipRole}
+                            </span>
+                            {staff.alreadyAssigned && (
+                              <span className="text-[0.6rem] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full shrink-0">
+                                Assigned
+                              </span>
+                            )}
+                          </div>
+                          {staff.reasons.length > 0 && (
+                            <div className="mt-0.5 space-y-0.5">
+                              {staff.reasons.map((reason, i) => (
+                                <div
+                                  key={i}
+                                  className={`text-[0.65rem] ${isBlocked ? 'text-red-500' : 'text-amber-600'}`}
+                                >
+                                  {reason}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Selection indicator */}
+                        {isSelected && !isBlocked && !staff.alreadyAssigned && (
+                          <span className="w-4 h-4 rounded-full bg-accent flex items-center justify-center shrink-0">
+                            <svg
+                              className="w-2.5 h-2.5 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4.5 12.75l6 6 9-13.5"
+                              />
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-4 pt-4 border-t border-slate-100">
               <button
                 onClick={handleAssign}
                 disabled={!assignUserId || loading}
@@ -808,7 +951,9 @@ export function RosterPage(): React.ReactElement {
               <button
                 onClick={() => {
                   setAssignShiftId(null);
+                  setAssignUserId('');
                   setAssignError(null);
+                  setAssignableStaff([]);
                 }}
                 className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm cursor-pointer hover:bg-slate-50 transition-colors"
               >

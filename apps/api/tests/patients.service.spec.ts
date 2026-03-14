@@ -42,7 +42,11 @@ describe('PatientsService', () => {
       $transaction: jest.fn((cb: (tx: any) => Promise<unknown>) => cb(prisma)),
     };
 
-    service = new PatientsService(prisma as any);
+    const limits = {
+      enforcePatientLimit: jest.fn(),
+      enforceUserLimit: jest.fn(),
+    };
+    service = new PatientsService(prisma as any, limits as any);
   });
 
   describe('search', () => {

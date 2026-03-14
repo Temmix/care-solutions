@@ -5,9 +5,11 @@ describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
   let mockResponse: { status: jest.Mock; json: jest.Mock };
   let mockHost: ArgumentsHost;
+  let mockLogger: { logException: jest.Mock };
 
   beforeEach(() => {
-    filter = new GlobalExceptionFilter();
+    mockLogger = { logException: jest.fn() };
+    filter = new GlobalExceptionFilter(mockLogger as any);
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
@@ -15,6 +17,12 @@ describe('GlobalExceptionFilter', () => {
     mockHost = {
       switchToHttp: () => ({
         getResponse: () => mockResponse,
+        getRequest: () => ({
+          method: 'GET',
+          url: '/test',
+          user: { id: 'user-1' },
+          headers: {},
+        }),
       }),
     } as unknown as ArgumentsHost;
   });
@@ -96,6 +104,18 @@ describe('GlobalExceptionFilter', () => {
         statusCode: HttpStatus.FORBIDDEN,
         message: 'Forbidden',
       }),
+    );
+  });
+
+  it('should call logger.logException for every caught exception', () => {
+    const exception = new Error('Test error');
+
+    filter.catch(exception, mockHost);
+
+    expect(mockLogger.logException).toHaveBeenCalledWith(
+      exception,
+      expect.objectContaining({ service: 'HttpExceptionFilter' }),
+      expect.objectContaining({ userId: 'user-1' }),
     );
   });
 });

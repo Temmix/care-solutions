@@ -327,12 +327,13 @@ export class WorkforceService {
     const shiftDateStr = shiftDate.toISOString().split('T')[0];
     const thisRange = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
 
-    // ── P0: Check availability/leave conflicts ──
+    // ── P0: Check availability/leave conflicts (supports date ranges) ──
     const availability = await this.prisma.staffAvailability.findMany({
       where: {
         userId: dto.userId,
-        date: shiftDate,
         type: { in: BLOCKING_AVAILABILITY },
+        date: { lte: shiftDate },
+        OR: [{ endDate: { gte: shiftDate } }, { endDate: null, date: shiftDate }],
       },
     });
     if (availability.length > 0) {
@@ -477,12 +478,13 @@ export class WorkforceService {
       );
     }
 
-    // Training day warning (soft, not blocked)
+    // Training day warning (soft, not blocked) — supports date ranges
     const trainingAvail = await this.prisma.staffAvailability.findFirst({
       where: {
         userId: dto.userId,
-        date: shiftDate,
         type: AvailabilityType.TRAINING,
+        date: { lte: shiftDate },
+        OR: [{ endDate: { gte: shiftDate } }, { endDate: null, date: shiftDate }],
       },
     });
     if (trainingAvail) {
@@ -528,9 +530,17 @@ export class WorkforceService {
   // ── Availability ────────────────────────────────────
 
   async createAvailability(dto: CreateAvailabilityDto, userId: string, tenantId: string) {
+    const startDate = new Date(dto.date);
+    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+
+    if (endDate && endDate < startDate) {
+      throw new BadRequestException('End date cannot be before start date');
+    }
+
     return this.prisma.staffAvailability.create({
       data: {
-        date: new Date(dto.date),
+        date: startDate,
+        endDate,
         type: dto.type,
         startTime: dto.startTime,
         endTime: dto.endTime,
@@ -552,10 +562,20 @@ export class WorkforceService {
     const where: Prisma.StaffAvailabilityWhereInput = {};
     if (tenantId) where.tenantId = tenantId;
     if (filters.userId) where.userId = filters.userId;
+
+    // Range overlap: record overlaps [from, to] when date <= to AND (endDate ?? date) >= from
     if (filters.from || filters.to) {
-      where.date = {};
-      if (filters.from) (where.date as Prisma.DateTimeFilter).gte = new Date(filters.from);
-      if (filters.to) (where.date as Prisma.DateTimeFilter).lte = new Date(filters.to);
+      const conditions: Prisma.StaffAvailabilityWhereInput[] = [];
+      if (filters.to) {
+        conditions.push({ date: { lte: new Date(filters.to) } });
+      }
+      if (filters.from) {
+        const fromDate = new Date(filters.from);
+        conditions.push({
+          OR: [{ endDate: { gte: fromDate } }, { endDate: null, date: { gte: fromDate } }],
+        });
+      }
+      where.AND = conditions;
     }
 
     const [items, total] = await Promise.all([
@@ -581,16 +601,217 @@ export class WorkforceService {
   ) {
     const where: Prisma.StaffAvailabilityWhereInput = { userId };
     if (tenantId) where.tenantId = tenantId;
+
     if (filters.from || filters.to) {
-      where.date = {};
-      if (filters.from) (where.date as Prisma.DateTimeFilter).gte = new Date(filters.from);
-      if (filters.to) (where.date as Prisma.DateTimeFilter).lte = new Date(filters.to);
+      const conditions: Prisma.StaffAvailabilityWhereInput[] = [];
+      if (filters.to) {
+        conditions.push({ date: { lte: new Date(filters.to) } });
+      }
+      if (filters.from) {
+        const fromDate = new Date(filters.from);
+        conditions.push({
+          OR: [{ endDate: { gte: fromDate } }, { endDate: null, date: { gte: fromDate } }],
+        });
+      }
+      where.AND = conditions;
     }
 
     return this.prisma.staffAvailability.findMany({
       where,
       orderBy: { date: 'asc' },
     });
+  }
+
+  // ── Assignable Staff ──────────────────────────────────
+
+  async getAssignableStaff(shiftId: string, tenantId: string) {
+    const shift = await this.prisma.shift.findFirst({
+      where: { id: shiftId, tenantId },
+      include: { shiftPattern: true, assignments: true },
+    });
+    if (!shift) throw new NotFoundException('Shift not found');
+
+    const shiftDate = shift.date;
+    const thisRange = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
+
+    // Get all active tenant members
+    const members = await this.prisma.userTenantMembership.findMany({
+      where: { organizationId: tenantId, status: 'ACTIVE' },
+      include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+    });
+
+    // Already-assigned user IDs
+    const assignedIds = new Set(shift.assignments.map((a) => a.userId));
+
+    // Batch-fetch availability and same-day assignments for all users
+    const userIds = members.map((m) => m.userId);
+
+    const [allAvailability, allSameDayAssignments, allAdjacentAssignments] = await Promise.all([
+      this.prisma.staffAvailability.findMany({
+        where: {
+          userId: { in: userIds },
+          date: { lte: shiftDate },
+          OR: [{ endDate: { gte: shiftDate } }, { endDate: null, date: shiftDate }],
+        },
+      }),
+      this.prisma.shiftAssignment.findMany({
+        where: {
+          userId: { in: userIds },
+          shift: { date: shiftDate, status: { not: 'CANCELLED' } },
+        },
+        include: { shift: { include: { shiftPattern: true } } },
+      }),
+      (() => {
+        const prevDay = new Date(shiftDate);
+        prevDay.setDate(prevDay.getDate() - 1);
+        const nextDay = new Date(shiftDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        return this.prisma.shiftAssignment.findMany({
+          where: {
+            userId: { in: userIds },
+            shift: { date: { in: [prevDay, nextDay] }, status: { not: 'CANCELLED' } },
+          },
+          include: { shift: { include: { shiftPattern: true } } },
+        });
+      })(),
+    ]);
+
+    // Index by userId
+    const availByUser = new Map<string, typeof allAvailability>();
+    for (const a of allAvailability) {
+      const list = availByUser.get(a.userId) ?? [];
+      list.push(a);
+      availByUser.set(a.userId, list);
+    }
+
+    const sameDayByUser = new Map<string, typeof allSameDayAssignments>();
+    for (const a of allSameDayAssignments) {
+      const list = sameDayByUser.get(a.userId) ?? [];
+      list.push(a);
+      sameDayByUser.set(a.userId, list);
+    }
+
+    const adjacentByUser = new Map<string, typeof allAdjacentAssignments>();
+    for (const a of allAdjacentAssignments) {
+      const list = adjacentByUser.get(a.userId) ?? [];
+      list.push(a);
+      adjacentByUser.set(a.userId, list);
+    }
+
+    const prevDay = new Date(shiftDate);
+    prevDay.setDate(prevDay.getDate() - 1);
+
+    const result = members.map((m) => {
+      const userId = m.userId;
+      const status: 'available' | 'warning' | 'blocked' = 'available';
+      const reasons: string[] = [];
+
+      // Already assigned
+      if (assignedIds.has(userId)) {
+        return {
+          ...m.user,
+          membershipRole: m.role,
+          status: 'blocked' as const,
+          reasons: ['Already assigned to this shift'],
+          alreadyAssigned: true,
+        };
+      }
+
+      // Check blocking availability
+      const userAvail = availByUser.get(userId) ?? [];
+      const blockingAvail = userAvail.filter((a) => BLOCKING_AVAILABILITY.includes(a.type));
+      if (blockingAvail.length > 0) {
+        const a = blockingAvail[0];
+        const typeLabel = a.type.replace(/_/g, ' ').toLowerCase();
+        const dateRange = a.endDate
+          ? `${a.date.toISOString().split('T')[0]} to ${a.endDate.toISOString().split('T')[0]}`
+          : a.date.toISOString().split('T')[0];
+        return {
+          ...m.user,
+          membershipRole: m.role,
+          status: 'blocked' as const,
+          reasons: [`On ${typeLabel} (${dateRange})`],
+          alreadyAssigned: false,
+        };
+      }
+
+      // Check overlapping shifts
+      const sameDayShifts = sameDayByUser.get(userId) ?? [];
+      for (const existing of sameDayShifts) {
+        const existingRange = shiftTimeRange(
+          existing.shift.shiftPattern.startTime,
+          existing.shift.shiftPattern.endTime,
+        );
+        if (timesOverlap(thisRange, existingRange)) {
+          return {
+            ...m.user,
+            membershipRole: m.role,
+            status: 'blocked' as const,
+            reasons: [
+              `Overlaps with "${existing.shift.shiftPattern.name}" (${existing.shift.shiftPattern.startTime}–${existing.shift.shiftPattern.endTime})`,
+            ],
+            alreadyAssigned: false,
+          };
+        }
+      }
+
+      // Check rest periods
+      const adjacentShifts = adjacentByUser.get(userId) ?? [];
+      for (const adj of adjacentShifts) {
+        const adjRange = shiftTimeRange(
+          adj.shift.shiftPattern.startTime,
+          adj.shift.shiftPattern.endTime,
+        );
+        const adjDateStr = adj.shift.date.toISOString().split('T')[0];
+        const isPrevDay = adjDateStr === prevDay.toISOString().split('T')[0];
+
+        let restHours: number;
+        if (isPrevDay) {
+          restHours = (24 * 60 - adjRange.endMin + thisRange.startMin) / 60;
+          if (adjRange.overnight) {
+            restHours = (thisRange.startMin - (adjRange.endMin - 24 * 60)) / 60;
+          }
+        } else {
+          restHours = (24 * 60 - thisRange.endMin + adjRange.startMin) / 60;
+          if (thisRange.overnight) {
+            restHours = (adjRange.startMin - (thisRange.endMin - 24 * 60)) / 60;
+          }
+        }
+
+        if (restHours < MIN_REST_HOURS) {
+          const direction = isPrevDay ? 'after' : 'before';
+          return {
+            ...m.user,
+            membershipRole: m.role,
+            status: 'blocked' as const,
+            reasons: [
+              `Only ${Math.round(restHours)}h rest ${direction} "${adj.shift.shiftPattern.name}" on ${adjDateStr}`,
+            ],
+            alreadyAssigned: false,
+          };
+        }
+      }
+
+      // Check training (warning, not blocked)
+      const trainingAvail = userAvail.filter((a) => a.type === AvailabilityType.TRAINING);
+      if (trainingAvail.length > 0) {
+        reasons.push('Has training scheduled on this date');
+      }
+
+      return {
+        ...m.user,
+        membershipRole: m.role,
+        status: reasons.length > 0 ? ('warning' as const) : status,
+        reasons,
+        alreadyAssigned: false,
+      };
+    });
+
+    // Sort: available first, then warnings, then blocked
+    const order = { available: 0, warning: 1, blocked: 2 };
+    result.sort((a, b) => order[a.status] - order[b.status]);
+
+    return result;
   }
 
   async deleteAvailability(id: string, userId: string) {

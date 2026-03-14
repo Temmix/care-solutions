@@ -27,6 +27,7 @@ export function AvailabilityPage(): React.ReactElement {
   const [items, setItems] = useState<StaffAvailability[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [type, setType] = useState('AVAILABLE');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -63,6 +64,7 @@ export function AvailabilityPage(): React.ReactElement {
     try {
       await createAvailability({
         date,
+        endDate: endDate || undefined,
         type,
         startTime: startTime || undefined,
         endTime: endTime || undefined,
@@ -70,6 +72,7 @@ export function AvailabilityPage(): React.ReactElement {
       });
       setShowForm(false);
       setDate('');
+      setEndDate('');
       setType('AVAILABLE');
       setStartTime('');
       setEndTime('');
@@ -166,12 +169,22 @@ export function AvailabilityPage(): React.ReactElement {
           <h2 className="text-sm font-semibold text-slate-900 mb-4">Set Availability</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-slate-600 mb-1">Date</label>
+              <label className="block text-sm text-slate-600 mb-1">Start Date</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">End Date (optional)</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={date}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
               />
             </div>
@@ -269,6 +282,7 @@ export function AvailabilityPage(): React.ReactElement {
               <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-3.5 text-sm text-slate-900">
                   {new Date(item.date).toLocaleDateString()}
+                  {item.endDate && ` – ${new Date(item.endDate).toLocaleDateString()}`}
                 </td>
                 {viewMode === 'team' && item.user && (
                   <td className="px-6 py-3.5 text-sm text-slate-600">
