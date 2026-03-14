@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LoggerService } from '@care/logger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -18,7 +20,9 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  const loggerService = app.get(LoggerService);
+  app.useGlobalFilters(new GlobalExceptionFilter(loggerService));
+  app.useGlobalInterceptors(new LoggingInterceptor(loggerService));
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('API_PORT', 3000);

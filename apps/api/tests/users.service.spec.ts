@@ -18,6 +18,11 @@ describe('UsersService', () => {
       update: jest.Mock;
       count: jest.Mock;
     };
+    userTenantMembership: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      count: jest.Mock;
+    };
   };
 
   beforeEach(() => {
@@ -32,25 +37,51 @@ describe('UsersService', () => {
         update: jest.fn(),
         count: jest.fn(),
       },
+      userTenantMembership: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        count: jest.fn(),
+      },
     };
 
-    service = new UsersService(prisma as any);
+    const limits = {
+      enforceUserLimit: jest.fn(),
+      enforcePatientLimit: jest.fn(),
+    };
+    const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+    const blindIndex = {
+      computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+    };
+    service = new UsersService(prisma as any, limits as any, encryption as any, blindIndex as any);
   });
 
   // ── Tenant-scoped methods ───────────────────────────────
 
   describe('findAll', () => {
-    it('returns paginated users filtered by tenant', async () => {
-      const users = [{ id: 'u1' }, { id: 'u2' }];
-      prisma.user.findMany.mockResolvedValue(users);
-      prisma.user.count.mockResolvedValue(2);
+    it('returns paginated users filtered by tenant via membership', async () => {
+      const memberships = [
+        { role: 'ADMIN', user: { id: 'u1', email: 'a@test.com' } },
+        { role: 'CARER', user: { id: 'u2', email: 'b@test.com' } },
+      ];
+      prisma.userTenantMembership.findMany.mockResolvedValue(memberships);
+      prisma.userTenantMembership.count.mockResolvedValue(2);
 
       const result = await service.findAll('tenant-1', 1, 20);
 
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: 'tenant-1' } }),
+      expect(prisma.userTenantMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'tenant-1', status: 'ACTIVE' },
+        }),
       );
-      expect(result).toEqual({ data: users, total: 2, page: 1, limit: 20 });
+      expect(result).toEqual({
+        data: [
+          { id: 'u1', email: 'a@test.com', role: 'ADMIN' },
+          { id: 'u2', email: 'b@test.com', role: 'CARER' },
+        ],
+        total: 2,
+        page: 1,
+        limit: 20,
+      });
     });
 
     it('returns all users when tenantId is null', async () => {
@@ -59,27 +90,45 @@ describe('UsersService', () => {
 
       await service.findAll(null);
 
-      expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+      expect(prisma.user.findMany).toHaveBeenCalled();
+      expect(prisma.userTenantMembership.findMany).not.toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
-    it('returns a user by id and tenant', async () => {
-      const user = { id: 'u1', email: 'test@test.com' };
-      prisma.user.findFirst.mockResolvedValue(user);
+    it('returns a user by id and tenant via membership', async () => {
+      const membership = {
+        role: 'ADMIN',
+        user: { id: 'u1', email: 'test@test.com' },
+      };
+      prisma.userTenantMembership.findFirst.mockResolvedValue(membership);
 
       const result = await service.findOne('u1', 'tenant-1');
 
-      expect(prisma.user.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'u1', tenantId: 'tenant-1' } }),
+      expect(prisma.userTenantMembership.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'u1', organizationId: 'tenant-1', status: 'ACTIVE' },
+        }),
       );
-      expect(result).toEqual(user);
+      expect(result).toEqual({ id: 'u1', email: 'test@test.com', role: 'ADMIN' });
     });
 
-    it('throws NotFoundException when user not found', async () => {
-      prisma.user.findFirst.mockResolvedValue(null);
+    it('throws NotFoundException when membership not found', async () => {
+      prisma.userTenantMembership.findFirst.mockResolvedValue(null);
 
       await expect(service.findOne('u1', 'tenant-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns user directly when tenantId is null', async () => {
+      const user = { id: 'u1', email: 'test@test.com' };
+      prisma.user.findFirst.mockResolvedValue(user);
+
+      const result = await service.findOne('u1', null);
+
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'u1' } }),
+      );
+      expect(result).toEqual(user);
     });
   });
 
@@ -174,6 +223,40 @@ describe('UsersService', () => {
       await expect(service.deactivateSuperAdmin('nonexistent', 'sa-current')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('createSuperAdmin (encrypted)', () => {
+    it('should use global blind index for email uniqueness check', async () => {
+      const encEnabled = { isEnabled: jest.fn().mockReturnValue(true) };
+      const blindIdx = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'email-hash'),
+      };
+      const encService = new UsersService(
+        prisma as any,
+        { enforceUserLimit: jest.fn() } as any,
+        encEnabled as any,
+        blindIdx as any,
+      );
+
+      (prisma.user as any).findFirst = jest.fn().mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'sa-new',
+        email: 'admin@test.com',
+        role: 'SUPER_ADMIN',
+      });
+
+      await encService.createSuperAdmin({
+        email: 'admin@test.com',
+        password: 'Pass123!',
+        firstName: 'New',
+        lastName: 'Admin',
+      } as any);
+
+      expect(blindIdx.computeGlobalBlindIndex).toHaveBeenCalledWith('admin@test.com', 'email');
+      expect((prisma.user as any).findFirst).toHaveBeenCalledWith({
+        where: { emailIndex: 'email-hash' },
+      });
     });
   });
 

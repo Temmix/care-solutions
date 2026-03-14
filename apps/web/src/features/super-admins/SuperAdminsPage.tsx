@@ -5,6 +5,7 @@ import {
   type SuperAdmin,
   type CreateSuperAdminForm,
 } from './hooks/use-super-admins';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 // ── Validation ──────────────────────────────────────────────
 
@@ -260,16 +261,8 @@ export function SuperAdminsPage(): React.ReactElement {
       </div>
 
       {/* Error banners */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-      {actionError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {actionError}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
+      <ErrorAlert message={actionError} className="mb-4" />
 
       {/* Loading */}
       {loading && admins.length === 0 && (

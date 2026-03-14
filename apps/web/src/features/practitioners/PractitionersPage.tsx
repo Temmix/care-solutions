@@ -7,6 +7,7 @@ import {
   type PractitionerForm,
 } from './hooks/use-practitioners';
 import { useSpecialtyTypes, type SpecialtyTypeOption } from './hooks/use-specialty-types';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UK_PHONE_RE = /^(?:\+44|0)\s?\d[\d\s]{8,12}$/;
@@ -358,17 +359,7 @@ export function PractitionersPage(): React.ReactElement {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            onClick={() => setError('')}
-            className="text-red-400 hover:text-red-600 bg-transparent border-none cursor-pointer text-lg leading-none"
-          >
-            &times;
-          </button>
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
         <table className="w-full">

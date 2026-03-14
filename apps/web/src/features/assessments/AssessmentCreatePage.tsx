@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAssessments } from './hooks/use-assessments';
 import { useAssessmentTypes } from './hooks/use-assessment-types';
 import { api } from '../../lib/api-client';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 interface FhirPatientEntry {
   id: string;
@@ -123,11 +124,7 @@ export function AssessmentCreatePage(): React.ReactElement {
         <h1 className="text-2xl font-bold text-slate-900">New Assessment</h1>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-4">

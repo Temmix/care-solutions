@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/use-auth';
 import { api } from '../../lib/api-client';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 interface Props {
   forced?: boolean;
@@ -57,11 +58,7 @@ export function ChangePasswordPage({ forced }: Props): React.ReactElement {
             )}
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} className="mb-4" />
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

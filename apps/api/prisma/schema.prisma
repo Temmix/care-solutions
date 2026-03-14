@@ -11,6 +11,7 @@ generator client {
 
 enum Role {
   SUPER_ADMIN
+  TENANT_ADMIN
   ADMIN
   CLINICIAN
   NURSE
@@ -59,6 +60,8 @@ enum PatientEventType {
   DEMOGRAPHIC_CHANGE
   CARE_PLAN_CREATED
   CARE_PLAN_UPDATED
+  MEDICATION_PRESCRIBED
+  MEDICATION_ADMINISTERED
 }
 
 enum OrganizationType {
@@ -143,6 +146,154 @@ enum RiskLevel {
   VERY_HIGH
 }
 
+enum MedicationRequestStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  STOPPED
+  CANCELLED
+  ENTERED_IN_ERROR
+}
+
+enum MedicationAdminStatus {
+  IN_PROGRESS
+  COMPLETED
+  NOT_DONE
+  ENTERED_IN_ERROR
+}
+
+enum MedicationRoute {
+  ORAL
+  TOPICAL
+  INTRAVENOUS
+  INTRAMUSCULAR
+  SUBCUTANEOUS
+  INHALED
+  RECTAL
+  SUBLINGUAL
+  OTHER
+}
+
+enum MedicationForm {
+  TABLET
+  CAPSULE
+  LIQUID
+  INJECTION
+  CREAM
+  OINTMENT
+  INHALER
+  PATCH
+  DROPS
+  SUPPOSITORY
+  OTHER
+}
+
+// ─── Multi-Tenancy ──────────────────────────────────────
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model UserTenantMembership {
+  id             String           @id @default(uuid())
+  userId         String
+  organizationId String
+  role           Role             @default(CARER)
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+  leftAt         DateTime?
+
+  user         User         @relation("UserMemberships", fields: [userId], references: [id])
+  organization Organization @relation("TenantMemberships", fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("user_tenant_memberships")
+}
+
+// ─── Phase 3: Workforce Enums ──────────────────────────
+
+enum ShiftType {
+  EARLY
+  LATE
+  NIGHT
+  LONG_DAY
+  TWILIGHT
+  CUSTOM
+}
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AvailabilityType {
+  AVAILABLE
+  UNAVAILABLE
+  ANNUAL_LEAVE
+  SICK_LEAVE
+  TRAINING
+}
+
+// ─── Phase 3: Patient Flow Enums ───────────────────────
+
+enum EncounterStatus {
+  PLANNED
+  ARRIVED
+  IN_PROGRESS
+  ON_LEAVE
+  FINISHED
+  CANCELLED
+}
+
+enum EncounterClass {
+  INPATIENT
+  OUTPATIENT
+  EMERGENCY
+  HOME_HEALTH
+}
+
+enum AdmissionSource {
+  GP_REFERRAL
+  EMERGENCY
+  TRANSFER
+  SELF_REFERRAL
+  OTHER
+}
+
+enum DischargeDestination {
+  HOME
+  CARE_HOME
+  HOSPITAL_TRANSFER
+  DECEASED
+  OTHER
+}
+
+enum BedStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  CLOSED
+}
+
+enum LocationType {
+  WARD
+  ROOM
+  BED
+  DEPARTMENT
+  WING
+}
+
 // ─── Auth & System ────────────────────────────────────
 
 model User {
@@ -170,6 +321,23 @@ model User {
 
   performedAssessments Assessment[] @relation("AssessmentPerformer")
   reviewedAssessments  Assessment[] @relation("AssessmentReviewer")
+
+  prescribedMedications    MedicationRequest[]        @relation("MedicationPrescriber")
+  administeredMedications  MedicationAdministration[] @relation("MedicationAdministrator")
+
+  // Phase 3: Workforce
+  shiftAssignments   ShiftAssignment[]
+  staffAvailability  StaffAvailability[]
+  transfersPerformed Transfer[] @relation("TransferPerformer")
+
+  // Phase 3: Patient Flow
+  primaryEncounters Encounter[] @relation("EncounterPrimaryPractitioner")
+
+  // Multi-tenancy memberships
+  memberships UserTenantMembership[] @relation("UserMemberships")
+
+  // Encryption: blind index for email lookup
+  emailIndex String?
 
   @@index([tenantId])
   @@map("users")
@@ -233,6 +401,23 @@ model Organization {
   tenantAssessmentTypes AssessmentTypeConfig[] @relation("TenantAssessmentTypes")
   tenantSpecialtyTypes  SpecialtyConfig[]      @relation("TenantSpecialtyTypes")
 
+  tenantMedications       Medication[]               @relation("TenantMedications")
+  tenantMedicationRequests MedicationRequest[]        @relation("TenantMedicationRequests")
+  tenantMedicationAdmins  MedicationAdministration[] @relation("TenantMedicationAdmins")
+
+  // Phase 3: Workforce
+  tenantShiftPatterns    ShiftPattern[]      @relation("TenantShiftPatterns")
+  tenantShifts           Shift[]             @relation("TenantShifts")
+  tenantStaffAvailability StaffAvailability[] @relation("TenantStaffAvailability")
+
+  // Phase 3: Patient Flow
+  tenantLocations  Location[]  @relation("TenantLocations")
+  tenantBeds       Bed[]       @relation("TenantBeds")
+  tenantEncounters Encounter[] @relation("TenantEncounters")
+
+  // Multi-tenancy memberships
+  tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
+
   subscription Subscription?
 
   createdAt DateTime @default(now())
@@ -293,6 +478,10 @@ model Practitioner {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Encryption: blind indexes for name lookup
+  givenNameIndex  String?
+  familyNameIndex String?
+
   @@index([familyName, givenName])
   @@index([organizationId])
   @@index([tenantId])
@@ -341,6 +530,16 @@ model Patient {
   carePlans    CarePlan[]
   assessments  Assessment[]
 
+  medicationRequests       MedicationRequest[]
+  medicationAdministrations MedicationAdministration[]
+
+  // Phase 3: Patient Flow
+  encounters Encounter[]
+
+  // Encryption: blind index for postal code lookup, search index for name search
+  postalCodeIndex String?
+  searchIndexes   PatientSearchIndex[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -362,6 +561,9 @@ model PatientIdentifier {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  // Encryption: blind index for identifier lookup (NHS number, MRN)
+  valueIndex String?
 
   @@unique([type, value])
   @@index([patientId])
@@ -587,4 +789,356 @@ model Assessment {
   @@index([assessmentType, riskLevel])
   @@index([tenantId])
   @@map("assessments")
+}
+
+// ─── EPR: Medications (EPMA) ─────────────────────────
+
+model Medication {
+  id           String         @id @default(uuid())
+  name         String
+  genericName  String?
+  code         String?
+  form         MedicationForm @default(TABLET)
+  strength     String?
+  manufacturer String?
+  isActive     Boolean        @default(true)
+
+  tenantId String?
+  tenant   Organization? @relation("TenantMedications", fields: [tenantId], references: [id])
+
+  requests        MedicationRequest[]
+  administrations MedicationAdministration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([code])
+  @@index([tenantId])
+  @@map("medications")
+}
+
+model MedicationRequest {
+  id             String                  @id @default(uuid())
+  status         MedicationRequestStatus @default(DRAFT)
+  priority       String?
+  dosageText     String
+  dose           String?
+  frequency      String?
+  route          MedicationRoute         @default(ORAL)
+  startDate      DateTime                @db.Date
+  endDate        DateTime?               @db.Date
+  reasonText     String?
+  instructions   String?
+  asNeeded       Boolean                 @default(false)
+  asNeededReason String?
+  maxDosePerDay  String?
+
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  prescriberId String
+  prescriber   User @relation("MedicationPrescriber", fields: [prescriberId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantMedicationRequests", fields: [tenantId], references: [id])
+
+  administrations MedicationAdministration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, status])
+  @@index([medicationId])
+  @@index([tenantId])
+  @@index([prescriberId])
+  @@map("medication_requests")
+}
+
+model MedicationAdministration {
+  id             String               @id @default(uuid())
+  status         MedicationAdminStatus @default(COMPLETED)
+  occurredAt     DateTime             @default(now())
+  doseGiven      String?
+  route          MedicationRoute?
+  site           String?
+  notes          String?
+  notGivenReason String?
+
+  requestId String
+  request   MedicationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  performerId String
+  performer   User @relation("MedicationAdministrator", fields: [performerId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantMedicationAdmins", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+  @@index([patientId, occurredAt])
+  @@index([tenantId])
+  @@map("medication_administrations")
+}
+
+// ─── Phase 3: Workforce ─────────────────────────────────
+
+model ShiftPattern {
+  id           String    @id @default(uuid())
+  name         String
+  shiftType    ShiftType
+  startTime    String    // HH:mm format
+  endTime      String    // HH:mm format
+  breakMinutes Int       @default(0)
+  color        String?   // hex color for UI
+  isActive     Boolean   @default(true)
+
+  tenantId String
+  tenant   Organization @relation("TenantShiftPatterns", fields: [tenantId], references: [id])
+
+  shifts Shift[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("shift_patterns")
+}
+
+model Shift {
+  id     String      @id @default(uuid())
+  date   DateTime    @db.Date
+  status ShiftStatus @default(DRAFT)
+  notes  String?
+
+  shiftPatternId String
+  shiftPattern   ShiftPattern @relation(fields: [shiftPatternId], references: [id])
+
+  locationId String?
+  location   Location? @relation("ShiftLocation", fields: [locationId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantShifts", fields: [tenantId], references: [id])
+
+  assignments ShiftAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, date])
+  @@index([shiftPatternId])
+  @@index([locationId])
+  @@index([date, status])
+  @@map("shifts")
+}
+
+model ShiftAssignment {
+  id          String    @id @default(uuid())
+  role        String?   // role during this shift
+  confirmedAt DateTime?
+
+  shiftId String
+  shift   Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([shiftId, userId])
+  @@index([userId])
+  @@index([shiftId])
+  @@map("shift_assignments")
+}
+
+model StaffAvailability {
+  id        String           @id @default(uuid())
+  date      DateTime         @db.Date               // start date
+  endDate   DateTime?        @db.Date               // end date (null = single day)
+  type      AvailabilityType
+  startTime String?          // HH:mm, null = all day
+  endTime   String?          // HH:mm, null = all day
+  notes     String?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantStaffAvailability", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([tenantId, date])
+  @@map("staff_availability")
+}
+
+// ─── Phase 3: Patient Flow ──────────────────────────────
+
+model Location {
+  id       String       @id @default(uuid())
+  name     String
+  type     LocationType
+  ward     String?
+  floor    String?
+  status   String       @default("ACTIVE")
+  capacity Int          @default(0)
+
+  parentId String?
+  parent   Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children Location[] @relation("LocationHierarchy")
+
+  tenantId String
+  tenant   Organization @relation("TenantLocations", fields: [tenantId], references: [id])
+
+  beds              Bed[]
+  shifts            Shift[]      @relation("ShiftLocation")
+  encounters        Encounter[]  @relation("EncounterLocation")
+  transfersFrom     Transfer[]   @relation("TransferFromLocation")
+  transfersTo       Transfer[]   @relation("TransferToLocation")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([type])
+  @@map("locations")
+}
+
+model Bed {
+  id         String    @id @default(uuid())
+  identifier String
+  status     BedStatus @default(AVAILABLE)
+  notes      String?
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantBeds", fields: [tenantId], references: [id])
+
+  encounters    Encounter[]  @relation("EncounterBed")
+  transfersFrom Transfer[]   @relation("TransferFromBed")
+  transfersTo   Transfer[]   @relation("TransferToBed")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([locationId, identifier])
+  @@index([tenantId])
+  @@index([status])
+  @@map("beds")
+}
+
+model Encounter {
+  id                   String                @id @default(uuid())
+  status               EncounterStatus       @default(PLANNED)
+  class                EncounterClass        @default(INPATIENT)
+  admissionSource      AdmissionSource?
+  admissionDate        DateTime              @default(now())
+  dischargeDate        DateTime?
+  dischargeDestination DischargeDestination?
+  notes                String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  locationId String?
+  location   Location? @relation("EncounterLocation", fields: [locationId], references: [id])
+
+  bedId String?
+  bed   Bed?    @relation("EncounterBed", fields: [bedId], references: [id])
+
+  primaryPractitionerId String?
+  primaryPractitioner   User? @relation("EncounterPrimaryPractitioner", fields: [primaryPractitionerId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantEncounters", fields: [tenantId], references: [id])
+
+  transfers Transfer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([patientId])
+  @@index([locationId])
+  @@index([bedId])
+  @@map("encounters")
+}
+
+model Transfer {
+  id            String   @id @default(uuid())
+  transferredAt DateTime @default(now())
+  reason        String?
+
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  fromLocationId String?
+  fromLocation   Location? @relation("TransferFromLocation", fields: [fromLocationId], references: [id])
+
+  toLocationId String
+  toLocation   Location @relation("TransferToLocation", fields: [toLocationId], references: [id])
+
+  fromBedId String?
+  fromBed   Bed?   @relation("TransferFromBed", fields: [fromBedId], references: [id])
+
+  toBedId String?
+  toBed   Bed?   @relation("TransferToBed", fields: [toBedId], references: [id])
+
+  transferredById String
+  transferredBy   User @relation("TransferPerformer", fields: [transferredById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([encounterId])
+  @@index([transferredAt])
+  @@map("transfers")
+}
+
+// ─── Encryption: Patient Search Index ───────────────────
+
+model PatientSearchIndex {
+  id        String @id @default(uuid())
+  patientId String
+  tenantId  String
+  fieldName String
+  tokenHash String
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, tokenHash])
+  @@index([patientId])
+  @@map("patient_search_index")
+}
+
+// ─── Encryption Key Management ─────────────────────────
+
+model EncryptionKey {
+  id           String    @id @default(uuid())
+  tenantId     String
+  encryptedDek String
+  keyVersion   Int       @default(1)
+  isActive     Boolean   @default(true)
+  algorithm    String    @default("AES-256-GCM")
+  kmsKeyArn    String?
+  createdAt    DateTime  @default(now())
+  rotatedAt    DateTime?
+
+  @@unique([tenantId, keyVersion])
+  @@index([tenantId, isActive])
+  @@map("encryption_keys")
 }

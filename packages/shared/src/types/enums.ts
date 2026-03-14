@@ -1,4 +1,5 @@
 export enum Role {
+  TENANT_ADMIN = 'TENANT_ADMIN',
   ADMIN = 'ADMIN',
   CLINICIAN = 'CLINICIAN',
   NURSE = 'NURSE',

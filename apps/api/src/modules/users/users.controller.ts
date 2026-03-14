@@ -15,6 +15,7 @@ import { Role } from '@prisma/client';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateSuperAdminDto } from './dto/create-super-admin.dto';
+import { CreateTenantAdminDto } from './dto/create-tenant-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
@@ -49,6 +50,38 @@ export class SuperAdminsController {
   @Patch(':id/reactivate')
   reactivate(@Param('id') id: string) {
     return this.usersService.reactivateSuperAdmin(id);
+  }
+}
+
+// ── Tenant Admin management (SUPER_ADMIN only, no tenant required) ──
+
+@Controller('users/tenant-admins')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(Role.SUPER_ADMIN)
+export class TenantAdminsController {
+  constructor(@Inject(UsersService) private usersService: UsersService) {}
+
+  @Get()
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.usersService.findAllTenantAdmins(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+  }
+
+  @Post()
+  create(@Body() dto: CreateTenantAdminDto) {
+    return this.usersService.createTenantAdmin(dto);
+  }
+
+  @Patch(':id/deactivate')
+  deactivate(@Param('id') id: string, @CurrentUser() user: { id: string }) {
+    return this.usersService.deactivateTenantAdmin(id, user.id);
+  }
+
+  @Patch(':id/reactivate')
+  reactivate(@Param('id') id: string) {
+    return this.usersService.reactivateTenantAdmin(id);
   }
 }
 

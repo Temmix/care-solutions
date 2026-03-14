@@ -24,6 +24,7 @@ describe('AuthService', () => {
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock };
     organization: { create: jest.Mock };
+    userTenantMembership: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let jwtService: { sign: jest.Mock; verify: jest.Mock };
@@ -40,6 +41,9 @@ describe('AuthService', () => {
       organization: {
         create: jest.fn(),
       },
+      userTenantMembership: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       $transaction: jest.fn(),
     };
 
@@ -53,7 +57,17 @@ describe('AuthService', () => {
       get: jest.fn().mockReturnValue('15m'),
     };
 
-    service = new AuthService(prisma as any, jwtService as any, configService as any);
+    const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+    const blindIndex = {
+      computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+    };
+    service = new AuthService(
+      prisma as any,
+      jwtService as any,
+      configService as any,
+      encryption as any,
+      blindIndex as any,
+    );
   });
 
   describe('register', () => {
@@ -68,10 +82,12 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' });
 
       await expect(service.register(baseDto as any)).rejects.toThrow(ConflictException);
-      await expect(service.register(baseDto as any)).rejects.toThrow('Email already registered');
+      await expect(service.register(baseDto as any)).rejects.toThrow(
+        'An account with this email already exists',
+      );
     });
 
-    it('should register user without tenant', async () => {
+    it('should register user without tenant and return memberships', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       mockHash.mockResolvedValue('hashed-password');
       prisma.user.create.mockResolvedValue({
@@ -93,10 +109,14 @@ describe('AuthService', () => {
           role: 'PATIENT',
         }),
       });
-      expect(result).toEqual({ accessToken: 'mock-token', refreshToken: 'mock-token' });
+      expect(result).toEqual({
+        accessToken: 'mock-token',
+        refreshToken: 'mock-token',
+        memberships: [],
+      });
     });
 
-    it('should register user with tenant via transaction', async () => {
+    it('should register user with tenant via transaction and return membership', async () => {
       const dtoWithTenant = { ...baseDto, tenantName: 'My Org' };
       prisma.user.findUnique.mockResolvedValue(null);
       mockHash.mockResolvedValue('hashed-password');
@@ -108,6 +128,7 @@ describe('AuthService', () => {
         const tx = {
           organization: { create: jest.fn().mockResolvedValue(mockOrg) },
           user: { create: jest.fn().mockResolvedValue(mockUser) },
+          userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
         };
         return cb(tx);
       });
@@ -115,7 +136,17 @@ describe('AuthService', () => {
       const result = await service.register(dtoWithTenant as any);
 
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(result).toEqual({ accessToken: 'mock-token', refreshToken: 'mock-token' });
+      expect(result).toEqual({
+        accessToken: 'mock-token',
+        refreshToken: 'mock-token',
+        memberships: [
+          {
+            organizationId: 'org-1',
+            role: 'ADMIN',
+            organization: { id: 'org-1', name: 'My Org', type: 'CARE_HOME' },
+          },
+        ],
+      });
     });
 
     it('should use provided role when no tenantName', async () => {
@@ -140,7 +171,7 @@ describe('AuthService', () => {
   describe('login', () => {
     const loginDto = { email: 'test@example.com', password: 'password123' };
 
-    it('should return tokens on successful login', async () => {
+    it('should return tokens and memberships on successful login', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: loginDto.email,
@@ -148,12 +179,31 @@ describe('AuthService', () => {
         role: 'CLINICIAN',
         tenantId: 'tenant-1',
         isActive: true,
+        mustChangePassword: false,
       });
       mockCompare.mockResolvedValue(true);
+      prisma.userTenantMembership.findMany.mockResolvedValue([
+        {
+          organizationId: 'tenant-1',
+          role: 'CLINICIAN',
+          organization: { id: 'tenant-1', name: 'Test Org', type: 'CARE_HOME' },
+        },
+      ]);
 
       const result = await service.login(loginDto as any);
 
-      expect(result).toEqual({ accessToken: 'mock-token', refreshToken: 'mock-token' });
+      expect(result).toEqual({
+        accessToken: 'mock-token',
+        refreshToken: 'mock-token',
+        mustChangePassword: false,
+        memberships: [
+          {
+            organizationId: 'tenant-1',
+            role: 'CLINICIAN',
+            organization: { id: 'tenant-1', name: 'Test Org', type: 'CARE_HOME' },
+          },
+        ],
+      });
       expect(mockCompare).toHaveBeenCalledWith('password123', 'hashed');
     });
 
@@ -212,7 +262,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh('bad-token')).rejects.toThrow(UnauthorizedException);
-      await expect(service.refresh('bad-token')).rejects.toThrow('Invalid refresh token');
+      await expect(service.refresh('bad-token')).rejects.toThrow('Your session has expired');
     });
 
     it('should throw UnauthorizedException when user from token is inactive', async () => {
@@ -226,8 +276,42 @@ describe('AuthService', () => {
     });
   });
 
+  describe('login (encrypted)', () => {
+    it('should use global blind index for email lookup when encryption enabled', async () => {
+      const encryptionEnabled = { isEnabled: jest.fn().mockReturnValue(true) };
+      const blindIdx = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'email-hash-123'),
+      };
+      const encService = new AuthService(
+        prisma as any,
+        jwtService as any,
+        configService as any,
+        encryptionEnabled as any,
+        blindIdx as any,
+      );
+
+      prisma.user.findUnique.mockResolvedValue(null); // findUnique should NOT be called for email
+      (prisma as any).user.findFirst = jest.fn().mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        passwordHash: 'hashed',
+        isActive: true,
+        mustChangePassword: false,
+      });
+      mockCompare.mockResolvedValue(true);
+      prisma.userTenantMembership.findMany.mockResolvedValue([]);
+
+      await encService.login({ email: 'test@example.com', password: 'pass' } as any);
+
+      expect(blindIdx.computeGlobalBlindIndex).toHaveBeenCalledWith('test@example.com', 'email');
+      expect((prisma as any).user.findFirst).toHaveBeenCalledWith({
+        where: { emailIndex: 'email-hash-123' },
+      });
+    });
+  });
+
   describe('getProfile', () => {
-    it('should return user profile', async () => {
+    it('should return user profile with memberships', async () => {
       const mockUser = {
         id: 'user-1',
         email: 'test@example.com',
@@ -238,6 +322,7 @@ describe('AuthService', () => {
         createdAt: new Date(),
         tenantId: 'tenant-1',
         tenant: { id: 'tenant-1', name: 'Org', type: 'CARE_HOME' },
+        memberships: [],
       };
       prisma.user.findUnique.mockResolvedValue(mockUser);
 
@@ -253,6 +338,7 @@ describe('AuthService', () => {
           lastName: true,
           role: true,
           tenant: expect.any(Object),
+          memberships: expect.any(Object),
         }),
       });
     });

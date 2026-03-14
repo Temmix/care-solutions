@@ -15,6 +15,8 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1009.0",
+    "@care/logger": "*",
     "@care/shared": "*",
     "@nestjs/common": "^10.3.0",
     "@nestjs/config": "^3.2.0",

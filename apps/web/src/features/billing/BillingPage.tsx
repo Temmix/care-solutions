@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/use-auth';
 import { useBilling, type Plan, type Subscription } from './hooks/use-billing';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const tierOrder = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
 
@@ -112,11 +113,7 @@ export function BillingPage(): React.ReactElement {
       </div>
 
       {/* Error */}
-      {(error || subError) && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error || subError}
-        </div>
-      )}
+      <ErrorAlert message={error || subError} className="mb-6" />
 
       {/* Current Subscription Card */}
       {subscription && (

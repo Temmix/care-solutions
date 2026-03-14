@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 interface FhirOrganization {
   id: string;
@@ -17,6 +18,10 @@ interface OrgBundle {
   entry: Array<{ resource: FhirOrganization }>;
 }
 
+interface SubMap {
+  [orgId: string]: { tier: string; status: string };
+}
+
 function formatType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -29,20 +34,38 @@ const typeColors: Record<string, string> = {
   MENTAL_HEALTH_TRUST: 'bg-indigo-50 text-indigo-700 border-indigo-200',
 };
 
+const tierColors: Record<string, string> = {
+  FREE: 'bg-slate-100 text-slate-600',
+  STARTER: 'bg-blue-50 text-blue-700',
+  PROFESSIONAL: 'bg-violet-50 text-violet-700',
+  ENTERPRISE: 'bg-amber-50 text-amber-700',
+};
+
+const tierLabels: Record<string, string> = {
+  FREE: 'Free',
+  STARTER: 'Starter',
+  PROFESSIONAL: 'Professional',
+  ENTERPRISE: 'Enterprise',
+};
+
 export function TenantsPage(): React.ReactElement {
   const [orgs, setOrgs] = useState<FhirOrganization[]>([]);
   const [total, setTotal] = useState(0);
+  const [subs, setSubs] = useState<SubMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { selectTenant, selectedTenant } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    api
-      .get<OrgBundle>('/organizations?limit=100')
-      .then((bundle) => {
+    Promise.all([
+      api.get<OrgBundle>('/organizations?limit=100'),
+      api.get<SubMap>('/billing/subscriptions').catch(() => ({}) as SubMap),
+    ])
+      .then(([bundle, subMap]) => {
         setOrgs(bundle.entry.map((e) => e.resource));
         setTotal(bundle.total);
+        setSubs(subMap);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
@@ -63,11 +86,7 @@ export function TenantsPage(): React.ReactElement {
   }
 
   if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {error}
-      </div>
-    );
+    return <ErrorAlert message={error} className="mb-4" />;
   }
 
   return (
@@ -86,6 +105,8 @@ export function TenantsPage(): React.ReactElement {
           const email = org.telecom?.find((t) => t.system === 'email')?.value;
           const addr = org.address?.[0];
           const isSelected = selectedTenant?.id === org.id;
+          const sub = subs[org.id];
+          const tier = sub?.tier ?? 'FREE';
 
           return (
             <button
@@ -116,13 +137,20 @@ export function TenantsPage(): React.ReactElement {
                     </span>
                   </div>
                 </div>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    org.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-                  }`}
-                >
-                  {org.active ? 'Active' : 'Inactive'}
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      org.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                    }`}
+                  >
+                    {org.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span
+                    className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${tierColors[tier] ?? tierColors.FREE}`}
+                  >
+                    {tierLabels[tier] ?? tier}
+                  </span>
+                </div>
               </div>
 
               <div className="text-sm text-slate-500 space-y-1 mt-4">

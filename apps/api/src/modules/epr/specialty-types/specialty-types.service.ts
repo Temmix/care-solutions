@@ -139,7 +139,10 @@ export class SpecialtyTypesService {
     const existing = await this.prisma.specialtyConfig.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Specialty type not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Specialty type not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const updated = await this.prisma.specialtyConfig.update({
       where: { id },
@@ -164,7 +167,10 @@ export class SpecialtyTypesService {
     const existing = await this.prisma.specialtyConfig.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Specialty type not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Specialty type not found. It may have been deleted or belongs to another organisation.',
+      );
 
     await this.prisma.specialtyConfig.update({
       where: { id },

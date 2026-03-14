@@ -29,4 +29,29 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(OrganizationType)
   organizationType?: OrganizationType;
+
+  // Organisation contact & address (used when tenantName is provided)
+  @IsOptional()
+  @IsString()
+  orgPhone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  orgEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  addressLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
 }

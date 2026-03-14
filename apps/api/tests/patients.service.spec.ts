@@ -42,7 +42,26 @@ describe('PatientsService', () => {
       $transaction: jest.fn((cb: (tx: any) => Promise<unknown>) => cb(prisma)),
     };
 
-    service = new PatientsService(prisma as any);
+    const limits = {
+      enforcePatientLimit: jest.fn(),
+      enforceUserLimit: jest.fn(),
+    };
+    const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+    const blindIndex = {
+      computeBlindIndex: jest.fn(async (_v: string, _t: string, f: string) => `bi:${f}`),
+      computeGlobalBlindIndex: jest.fn(),
+    };
+    const patientSearch = {
+      searchByName: jest.fn().mockResolvedValue([]),
+      searchByPostalCode: jest.fn().mockResolvedValue([]),
+    };
+    service = new PatientsService(
+      prisma as any,
+      limits as any,
+      encryption as any,
+      blindIndex as any,
+      patientSearch as any,
+    );
   });
 
   describe('search', () => {
@@ -121,6 +140,100 @@ describe('PatientsService', () => {
 
       const callArgs = prisma.patient.findMany.mock.calls[0][0];
       expect(callArgs.where.tenantId).toBeUndefined();
+    });
+  });
+
+  describe('search (encrypted)', () => {
+    let encryptedService: PatientsService;
+    let mockEncryption: { isEnabled: jest.Mock };
+    let mockBlindIndex: { computeBlindIndex: jest.Mock };
+    let mockPatientSearch: { searchByName: jest.Mock; searchByPostalCode: jest.Mock };
+
+    beforeEach(() => {
+      mockEncryption = { isEnabled: jest.fn().mockReturnValue(true) };
+      mockBlindIndex = {
+        computeBlindIndex: jest.fn(
+          async (value: string, _t: string, field: string) => `bi:${field}:${value}`,
+        ),
+      };
+      mockPatientSearch = {
+        searchByName: jest.fn().mockResolvedValue(['p-1', 'p-2']),
+        searchByPostalCode: jest.fn().mockResolvedValue(['p-1']),
+      };
+      encryptedService = new PatientsService(
+        prisma as any,
+        { enforcePatientLimit: jest.fn() } as any,
+        mockEncryption as any,
+        mockBlindIndex as any,
+        mockPatientSearch as any,
+      );
+    });
+
+    it('should use PatientSearchService for name search when encrypted', async () => {
+      prisma.patient.findMany.mockResolvedValue([{ id: 'p-1' }, { id: 'p-2' }]);
+      prisma.patient.count.mockResolvedValue(2);
+
+      await encryptedService.search({ name: 'John' } as any, 'tenant-1');
+
+      expect(mockPatientSearch.searchByName).toHaveBeenCalledWith('John', 'tenant-1');
+      expect(prisma.patient.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['p-1', 'p-2'] },
+          }),
+        }),
+      );
+    });
+
+    it('should use blind index for NHS number search when encrypted', async () => {
+      prisma.patient.findMany.mockResolvedValue([]);
+      prisma.patient.count.mockResolvedValue(0);
+
+      await encryptedService.search({ nhsNumber: '1234567890' } as any, 'tenant-1');
+
+      expect(mockBlindIndex.computeBlindIndex).toHaveBeenCalledWith(
+        '1234567890',
+        'tenant-1',
+        'value',
+      );
+      expect(prisma.patient.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            identifiers: { some: { type: 'NHS_NUMBER', valueIndex: 'bi:value:1234567890' } },
+          }),
+        }),
+      );
+    });
+
+    it('should use PatientSearchService for postal code search when encrypted', async () => {
+      prisma.patient.findMany.mockResolvedValue([{ id: 'p-1' }]);
+      prisma.patient.count.mockResolvedValue(1);
+
+      await encryptedService.search({ postalCode: 'SW1A' } as any, 'tenant-1');
+
+      expect(mockPatientSearch.searchByPostalCode).toHaveBeenCalledWith('SW1A', 'tenant-1');
+    });
+
+    it('should return empty bundle when name search yields no matches', async () => {
+      mockPatientSearch.searchByName.mockResolvedValue([]);
+
+      const result = await encryptedService.search({ name: 'xyz' } as any, 'tenant-1');
+
+      expect(result).toEqual({ total: 0, entry: [] });
+      expect(prisma.patient.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should order by createdAt when encrypted', async () => {
+      prisma.patient.findMany.mockResolvedValue([]);
+      prisma.patient.count.mockResolvedValue(0);
+
+      await encryptedService.search({} as any, 'tenant-1');
+
+      expect(prisma.patient.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
     });
   });
 

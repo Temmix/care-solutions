@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const ORG_TYPES = [
   { value: 'CARE_HOME', label: 'Care Home' },
@@ -18,6 +19,11 @@ export function RegisterPage(): React.ReactElement {
   const [lastName, setLastName] = useState('');
   const [tenantName, setTenantName] = useState('');
   const [organizationType, setOrganizationType] = useState('CARE_HOME');
+  const [orgPhone, setOrgPhone] = useState('');
+  const [orgEmail, setOrgEmail] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
@@ -36,6 +42,11 @@ export function RegisterPage(): React.ReactElement {
         lastName,
         tenantName: tenantName || undefined,
         organizationType: tenantName ? organizationType : undefined,
+        orgPhone: tenantName && orgPhone ? orgPhone : undefined,
+        orgEmail: tenantName && orgEmail ? orgEmail : undefined,
+        addressLine1: tenantName && addressLine1 ? addressLine1 : undefined,
+        city: tenantName && city ? city : undefined,
+        postalCode: tenantName && postalCode ? postalCode : undefined,
       });
       navigate('/');
     } catch (err) {
@@ -106,11 +117,7 @@ export function RegisterPage(): React.ReactElement {
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Create your account</h2>
           <p className="text-slate-500 text-sm mb-8">Get started with Care Solutions in minutes</p>
 
-          {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} className="mb-6" />
 
           <form onSubmit={handleSubmit}>
             <div className="flex gap-3 mb-5">
@@ -184,22 +191,85 @@ export function RegisterPage(): React.ReactElement {
             </div>
 
             {tenantName && (
-              <div className="mb-6">
-                <label className="block mb-1.5 text-sm font-medium text-slate-700">
-                  Organisation type
-                </label>
-                <select
-                  value={organizationType}
-                  onChange={(e) => setOrganizationType(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white transition-colors appearance-none"
-                >
-                  {ORG_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className="mb-5">
+                  <label className="block mb-1.5 text-sm font-medium text-slate-700">
+                    Organisation type
+                  </label>
+                  <select
+                    value={organizationType}
+                    onChange={(e) => setOrganizationType(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white transition-colors appearance-none"
+                  >
+                    {ORG_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 mb-5">
+                  <div className="flex-1">
+                    <label className="block mb-1.5 text-sm font-medium text-slate-700">Phone</label>
+                    <input
+                      type="tel"
+                      value={orgPhone}
+                      onChange={(e) => setOrgPhone(e.target.value)}
+                      placeholder="0123 456 7890"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block mb-1.5 text-sm font-medium text-slate-700">
+                      Organisation email
+                    </label>
+                    <input
+                      type="email"
+                      value={orgEmail}
+                      onChange={(e) => setOrgEmail(e.target.value)}
+                      placeholder="info@organisation.nhs.uk"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <label className="block mb-1.5 text-sm font-medium text-slate-700">Address</label>
+                  <input
+                    type="text"
+                    value={addressLine1}
+                    onChange={(e) => setAddressLine1(e.target.value)}
+                    placeholder="Street address"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 mb-6">
+                  <div className="flex-1">
+                    <label className="block mb-1.5 text-sm font-medium text-slate-700">City</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="e.g. London"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block mb-1.5 text-sm font-medium text-slate-700">
+                      Postcode
+                    </label>
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="e.g. SW1A 1AA"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <button

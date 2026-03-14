@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 interface AssessmentTypeConfig {
   id: string;
@@ -147,11 +148,7 @@ export function AssessmentTypesSettingsPage(): React.ReactElement {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       {/* Create/Edit Form */}
       {showForm && (

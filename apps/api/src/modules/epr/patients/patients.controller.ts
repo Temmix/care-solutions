@@ -20,7 +20,7 @@ import { RolesGuard, TenantGuard } from '../../../common/guards';
 interface RequestUser {
   id: string;
   email: string;
-  role: string;
+  globalRole: string;
 }
 
 @Controller('patients')
@@ -50,7 +50,7 @@ export class PatientsController {
     @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.patientsService.findOne(id, tenantId, user.id, user.role);
+    return this.patientsService.findOne(id, tenantId, user.id, user.globalRole);
   }
 
   @Patch(':id')

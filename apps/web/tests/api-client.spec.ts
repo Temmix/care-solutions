@@ -21,10 +21,12 @@ const localStorageMock = (() => {
 vi.stubGlobal('localStorage', localStorageMock);
 
 function jsonResponse(data: unknown, status = 200): Response {
+  const body = JSON.stringify(data);
   return {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(data),
+    text: () => Promise.resolve(body),
   } as Response;
 }
 
@@ -159,18 +161,24 @@ describe('ApiClient', () => {
   });
 
   describe('error handling', () => {
-    it('throws Error with message from API error response on non-ok', async () => {
+    it('throws session expired on 401 when no refresh token available', async () => {
       mockFetch.mockResolvedValueOnce(
         jsonResponse({ statusCode: 401, message: 'Unauthorized' }, 401),
       );
 
-      await expect(api.get('/fail')).rejects.toThrow('Unauthorized');
+      await expect(api.get('/fail')).rejects.toThrow('Session expired. Please log in again.');
     });
 
-    it('throws "Request failed" when error message is not a string', async () => {
+    it('throws error with message from API for non-401 errors', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({ statusCode: 403, message: 'Forbidden' }, 403));
+
+      await expect(api.get('/fail')).rejects.toThrow('Forbidden');
+    });
+
+    it('throws friendly message when error message is not a string', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ statusCode: 500, message: 123 }, 500));
 
-      await expect(api.get('/fail')).rejects.toThrow('Request failed');
+      await expect(api.get('/fail')).rejects.toThrow('Something went wrong. Please try again.');
     });
   });
 });

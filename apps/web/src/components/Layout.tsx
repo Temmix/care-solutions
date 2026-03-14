@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
 
@@ -24,7 +25,7 @@ const navItems = [
   {
     to: '/tenants',
     label: 'Tenants',
-    superAdminOnly: true,
+    platformOnly: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -57,6 +58,26 @@ const navItems = [
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/tenant-admins',
+    label: 'Tenant Admins',
+    superAdminOnly: true,
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"
         />
       </svg>
     ),
@@ -100,6 +121,25 @@ const navItems = [
     ),
   },
   {
+    to: '/medications',
+    label: 'Medications',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"
+        />
+      </svg>
+    ),
+  },
+  {
     to: '/assessments',
     label: 'Assessments',
     icon: (
@@ -114,6 +154,103 @@ const navItems = [
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/roster',
+    label: 'Roster',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/shift-patterns',
+    label: 'Shift Patterns',
+    adminOnly: true,
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/availability',
+    label: 'Availability',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/patient-flow',
+    label: 'Patient Flow',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+        />
+      </svg>
+    ),
+  },
+  {
+    to: '/locations',
+    label: 'Locations & Beds',
+    adminOnly: true,
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
         />
       </svg>
     ),
@@ -205,9 +342,24 @@ const navItems = [
 ];
 
 export function Layout(): React.ReactElement {
-  const { user, logout, isSuperAdmin, selectedTenant, selectTenant } = useAuth();
+  const { user, logout, isSuperAdmin, isPlatformAdmin, selectedTenant, selectTenant, memberships } =
+    useAuth();
+  const hasMultipleMemberships = memberships.length > 1;
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Redirect multi-membership users to tenant selection if no tenant is selected
+  useEffect(() => {
+    if (
+      !isPlatformAdmin &&
+      hasMultipleMemberships &&
+      !selectedTenant &&
+      location.pathname !== '/select-tenant' &&
+      location.pathname !== '/change-password'
+    ) {
+      navigate('/select-tenant', { replace: true });
+    }
+  }, [isPlatformAdmin, hasMultipleMemberships, selectedTenant, location.pathname, navigate]);
 
   const handleLogout = () => {
     logout();
@@ -216,7 +368,7 @@ export function Layout(): React.ReactElement {
 
   const handleClearTenant = () => {
     selectTenant(null);
-    navigate('/tenants');
+    navigate(isPlatformAdmin ? '/tenants' : '/select-tenant');
   };
 
   const isActive = (path: string) => {
@@ -227,11 +379,13 @@ export function Layout(): React.ReactElement {
   const roleLabel =
     user?.role === 'SUPER_ADMIN'
       ? 'Super Admin'
-      : user?.role === 'ADMIN'
-        ? 'Administrator'
-        : user?.role
-          ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
-          : '';
+      : user?.role === 'TENANT_ADMIN'
+        ? 'Tenant Admin'
+        : user?.role === 'ADMIN'
+          ? 'Administrator'
+          : user?.role
+            ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
+            : '';
 
   return (
     <div className="flex min-h-screen">
@@ -248,7 +402,7 @@ export function Layout(): React.ReactElement {
 
         {/* Tenant indicator */}
         <div className="px-5 mb-4">
-          {isSuperAdmin && selectedTenant && (
+          {isPlatformAdmin && selectedTenant && (
             <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
               <div className="text-xs text-slate-400">Managing</div>
               <div className="text-sm font-medium text-accent-light truncate">
@@ -262,7 +416,7 @@ export function Layout(): React.ReactElement {
               </button>
             </div>
           )}
-          {isSuperAdmin && !selectedTenant && (
+          {isPlatformAdmin && !selectedTenant && (
             <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
               <div className="text-xs text-slate-400">No tenant selected</div>
               <Link
@@ -273,10 +427,29 @@ export function Layout(): React.ReactElement {
               </Link>
             </div>
           )}
-          {!isSuperAdmin && user?.tenant && (
+          {!isPlatformAdmin && selectedTenant && (
             <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
               <div className="text-xs text-slate-400">Organisation</div>
-              <div className="text-sm font-medium text-white truncate">{user.tenant.name}</div>
+              <div className="text-sm font-medium text-white truncate">{selectedTenant.name}</div>
+              {hasMultipleMemberships && (
+                <button
+                  onClick={handleClearTenant}
+                  className="text-xs text-slate-400 bg-transparent border-none cursor-pointer p-0 mt-1 hover:text-white transition-colors"
+                >
+                  Switch organisation
+                </button>
+              )}
+            </div>
+          )}
+          {!isPlatformAdmin && !selectedTenant && memberships.length > 0 && (
+            <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
+              <div className="text-xs text-slate-400">No organisation selected</div>
+              <Link
+                to="/select-tenant"
+                className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
+              >
+                Select organisation
+              </Link>
             </div>
           )}
         </div>
@@ -286,7 +459,8 @@ export function Layout(): React.ReactElement {
           <div className="space-y-1">
             {navItems.map((item) => {
               if (item.superAdminOnly && !isSuperAdmin) return null;
-              if (item.adminOnly && !isSuperAdmin && user?.role !== 'ADMIN') return null;
+              if (item.platformOnly && !isPlatformAdmin) return null;
+              if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;
               const active = isActive(item.to);
               return (
                 <Link

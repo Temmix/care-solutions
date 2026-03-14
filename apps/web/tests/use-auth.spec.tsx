@@ -7,6 +7,7 @@ vi.mock('../src/lib/api-client', () => ({
     get: vi.fn(),
     post: vi.fn(),
     setTenantId: vi.fn(),
+    setLogoutHandler: vi.fn(),
   },
 }));
 

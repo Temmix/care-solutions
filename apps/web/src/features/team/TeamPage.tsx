@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../hooks/use-auth';
 import { useTeam, type TeamMember, type CreateMemberForm } from './hooks/use-team';
+import { UsageBanner, useUsage } from '../../components/UsageBanner';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const ROLES = ['ADMIN', 'CLINICIAN', 'NURSE', 'CARER', 'PATIENT'] as const;
 
@@ -205,6 +207,7 @@ function CreateMemberModal({
 export function TeamPage(): React.ReactElement {
   const { user } = useAuth();
   const { list, create, deactivate, reactivate, loading, error } = useTeam();
+  const { usage, refresh: refreshUsage } = useUsage();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -237,6 +240,7 @@ export function TeamPage(): React.ReactElement {
       await create(form);
       setShowCreate(false);
       await loadMembers(1);
+      refreshUsage();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to create member');
     } finally {
@@ -259,6 +263,8 @@ export function TeamPage(): React.ReactElement {
   };
 
   const totalPages = Math.ceil(total / 20);
+  const atUserLimit =
+    !!usage && usage.users.limit !== -1 && usage.users.current >= usage.users.limit;
 
   return (
     <div>
@@ -271,7 +277,15 @@ export function TeamPage(): React.ReactElement {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent/90 cursor-pointer flex items-center gap-2"
+          disabled={atUserLimit}
+          title={
+            atUserLimit ? 'User limit reached — upgrade your plan to add more members' : undefined
+          }
+          className={`px-4 py-2 text-sm rounded-lg flex items-center gap-2 ${
+            atUserLimit
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              : 'bg-accent text-white hover:bg-accent/90 cursor-pointer'
+          }`}
         >
           <svg
             className="w-4 h-4"
@@ -286,16 +300,10 @@ export function TeamPage(): React.ReactElement {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-      {actionError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {actionError}
-        </div>
-      )}
+      <UsageBanner show="users" usage={usage} />
+
+      <ErrorAlert message={error} className="mb-4" />
+      <ErrorAlert message={actionError} className="mb-4" />
 
       {loading && members.length === 0 && (
         <div className="flex items-center justify-center py-20">

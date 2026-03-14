@@ -20,7 +20,7 @@ import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
   id: string;
-  role: string;
+  globalRole: string;
 }
 
 @Controller('assessment-types')
@@ -58,7 +58,7 @@ export class AssessmentTypesController {
     @CurrentTenant() tenantId: string,
   ) {
     // Super admin without tenant context → system-wide type
-    const scope = user.role === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
+    const scope = user.globalRole === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
     return this.service.create(dto, scope);
   }
 
@@ -71,7 +71,7 @@ export class AssessmentTypesController {
     @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    const scope = user.role === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
+    const scope = user.globalRole === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
     return this.service.update(id, dto, scope);
   }
 
@@ -84,7 +84,7 @@ export class AssessmentTypesController {
     @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    const scope = user.role === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
+    const scope = user.globalRole === 'SUPER_ADMIN' && !tenantId ? null : tenantId;
     return this.service.deactivate(id, scope);
   }
 }

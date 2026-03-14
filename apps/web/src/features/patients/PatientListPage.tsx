@@ -2,6 +2,8 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { usePatients, type FhirPatient } from './hooks/use-patients';
 import { useAuth } from '../../hooks/use-auth';
+import { UsageBanner, useUsage } from '../../components/UsageBanner';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const genderBadge: Record<string, string> = {
   male: 'bg-blue-50 text-blue-700',
@@ -13,6 +15,7 @@ const genderBadge: Record<string, string> = {
 export function PatientListPage(): React.ReactElement {
   const { isSuperAdmin, selectedTenant } = useAuth();
   const { searchPatients, loading, error } = usePatients();
+  const { usage } = useUsage();
   const [patients, setPatients] = useState<FhirPatient[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -81,6 +84,8 @@ export function PatientListPage(): React.ReactElement {
   }
 
   const totalPages = Math.ceil(total / 20);
+  const atPatientLimit =
+    !!usage && usage.patients.limit !== -1 && usage.patients.current >= usage.patients.limit;
 
   return (
     <div>
@@ -90,22 +95,42 @@ export function PatientListPage(): React.ReactElement {
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Patients</h1>
           <p className="text-slate-500 text-sm">{total} patient(s) registered</p>
         </div>
-        <Link
-          to="/patients/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+        {atPatientLimit ? (
+          <span
+            title="Patient limit reached — upgrade your plan to register more patients"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-200 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Register Patient
-        </Link>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Register Patient
+          </span>
+        ) : (
+          <Link
+            to="/patients/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Register Patient
+          </Link>
+        )}
       </div>
+
+      <UsageBanner show="patients" usage={usage} />
 
       {/* Search */}
       <form onSubmit={handleSearch} className="flex gap-3 mb-6">
@@ -146,11 +171,7 @@ export function PatientListPage(): React.ReactElement {
         </button>
       </form>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">

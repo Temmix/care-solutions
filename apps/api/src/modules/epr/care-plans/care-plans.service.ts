@@ -106,12 +106,13 @@ export class CarePlansService {
 
   // ── Search ──────────────────────────────────────────────
 
-  async findAll(dto: SearchCarePlansDto, tenantId: string) {
+  async findAll(dto: SearchCarePlansDto, tenantId: string | null) {
     const page = Number(dto.page) || 1;
     const limit = Number(dto.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.CarePlanWhereInput = { tenantId };
+    const where: Prisma.CarePlanWhereInput = {};
+    if (tenantId) where.tenantId = tenantId;
     if (dto.patientId) where.patientId = dto.patientId;
     if (dto.status) where.status = dto.status;
     if (dto.category) where.category = dto.category;
@@ -132,24 +133,34 @@ export class CarePlansService {
 
   // ── Find One ────────────────────────────────────────────
 
-  async findOne(id: string, tenantId: string) {
+  async findOne(id: string, tenantId: string | null) {
+    const where: Prisma.CarePlanWhereInput = { id };
+    if (tenantId) where.tenantId = tenantId;
     const carePlan = await this.prisma.carePlan.findFirst({
-      where: { id, tenantId },
+      where,
       include: CARE_PLAN_INCLUDES,
     });
 
-    if (!carePlan) throw new NotFoundException('Care plan not found');
+    if (!carePlan)
+      throw new NotFoundException(
+        'Care plan not found. It may have been deleted or belongs to another organisation.',
+      );
 
     return toFhirCarePlan(carePlan as CarePlanWithRelations);
   }
 
   // ── Update ──────────────────────────────────────────────
 
-  async update(id: string, dto: UpdateCarePlanDto, userId: string, tenantId: string) {
+  async update(id: string, dto: UpdateCarePlanDto, userId: string, tenantId: string | null) {
+    const findWhere: Prisma.CarePlanWhereInput = { id };
+    if (tenantId) findWhere.tenantId = tenantId;
     const existing = await this.prisma.carePlan.findFirst({
-      where: { id, tenantId },
+      where: findWhere,
     });
-    if (!existing) throw new NotFoundException('Care plan not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Care plan not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const { startDate, endDate, nextReviewDate, ...rest } = dto;
 
@@ -172,7 +183,7 @@ export class CarePlansService {
           summary: `Care plan updated: ${updated.title}`,
           detail: dto as unknown as Prisma.InputJsonValue,
           recordedById: userId,
-          tenantId,
+          tenantId: existing.tenantId,
         },
       });
 
@@ -182,7 +193,7 @@ export class CarePlansService {
           action: 'UPDATE',
           resource: 'CarePlan',
           resourceId: id,
-          tenantId,
+          tenantId: existing.tenantId,
         },
       });
 
@@ -194,7 +205,7 @@ export class CarePlansService {
 
   // ── Goals ───────────────────────────────────────────────
 
-  async addGoal(carePlanId: string, dto: CreateGoalDto, userId: string, tenantId: string) {
+  async addGoal(carePlanId: string, dto: CreateGoalDto, userId: string, tenantId: string | null) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const goal = await this.prisma.carePlanGoal.create({
@@ -219,14 +230,17 @@ export class CarePlansService {
     goalId: string,
     dto: UpdateGoalDto,
     userId: string,
-    tenantId: string,
+    tenantId: string | null,
   ) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const existing = await this.prisma.carePlanGoal.findFirst({
       where: { id: goalId, carePlanId },
     });
-    if (!existing) throw new NotFoundException('Goal not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Goal not found within this care plan. It may have been removed.',
+      );
 
     const { targetDate, ...rest } = dto;
     const goal = await this.prisma.carePlanGoal.update({
@@ -244,13 +258,16 @@ export class CarePlansService {
     return goal;
   }
 
-  async removeGoal(carePlanId: string, goalId: string, userId: string, tenantId: string) {
+  async removeGoal(carePlanId: string, goalId: string, userId: string, tenantId: string | null) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const existing = await this.prisma.carePlanGoal.findFirst({
       where: { id: goalId, carePlanId },
     });
-    if (!existing) throw new NotFoundException('Goal not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Goal not found within this care plan. It may have been removed.',
+      );
 
     await this.prisma.carePlanGoal.delete({ where: { id: goalId } });
 
@@ -261,7 +278,12 @@ export class CarePlansService {
 
   // ── Activities ──────────────────────────────────────────
 
-  async addActivity(carePlanId: string, dto: CreateActivityDto, userId: string, tenantId: string) {
+  async addActivity(
+    carePlanId: string,
+    dto: CreateActivityDto,
+    userId: string,
+    tenantId: string | null,
+  ) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const activity = await this.prisma.carePlanActivity.create({
@@ -296,14 +318,17 @@ export class CarePlansService {
     activityId: string,
     dto: UpdateActivityDto,
     userId: string,
-    tenantId: string,
+    tenantId: string | null,
   ) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const existing = await this.prisma.carePlanActivity.findFirst({
       where: { id: activityId, carePlanId },
     });
-    if (!existing) throw new NotFoundException('Activity not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Activity not found within this care plan. It may have been removed.',
+      );
 
     const { scheduledAt, ...rest } = dto;
     const activity = await this.prisma.carePlanActivity.update({
@@ -330,13 +355,21 @@ export class CarePlansService {
     return activity;
   }
 
-  async removeActivity(carePlanId: string, activityId: string, userId: string, tenantId: string) {
+  async removeActivity(
+    carePlanId: string,
+    activityId: string,
+    userId: string,
+    tenantId: string | null,
+  ) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const existing = await this.prisma.carePlanActivity.findFirst({
       where: { id: activityId, carePlanId },
     });
-    if (!existing) throw new NotFoundException('Activity not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Activity not found within this care plan. It may have been removed.',
+      );
 
     await this.prisma.carePlanActivity.delete({ where: { id: activityId } });
 
@@ -353,7 +386,7 @@ export class CarePlansService {
 
   // ── Notes ───────────────────────────────────────────────
 
-  async addNote(carePlanId: string, dto: CreateNoteDto, userId: string, tenantId: string) {
+  async addNote(carePlanId: string, dto: CreateNoteDto, userId: string, tenantId: string | null) {
     await this.verifyCarePlan(carePlanId, tenantId);
 
     const note = await this.prisma.carePlanNote.create({
@@ -372,7 +405,7 @@ export class CarePlansService {
 
   async getNotes(
     carePlanId: string,
-    tenantId: string,
+    tenantId: string | null,
     pagination?: { page?: number; limit?: number },
   ) {
     await this.verifyCarePlan(carePlanId, tenantId);
@@ -399,11 +432,16 @@ export class CarePlansService {
 
   // ── Helpers ─────────────────────────────────────────────
 
-  private async verifyCarePlan(carePlanId: string, tenantId: string) {
+  private async verifyCarePlan(carePlanId: string, tenantId: string | null) {
+    const where: Prisma.CarePlanWhereInput = { id: carePlanId };
+    if (tenantId) where.tenantId = tenantId;
     const carePlan = await this.prisma.carePlan.findFirst({
-      where: { id: carePlanId, tenantId },
+      where,
     });
-    if (!carePlan) throw new NotFoundException('Care plan not found');
+    if (!carePlan)
+      throw new NotFoundException(
+        'Care plan not found. It may have been deleted or belongs to another organisation.',
+      );
     return carePlan;
   }
 }

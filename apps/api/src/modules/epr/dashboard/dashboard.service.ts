@@ -12,18 +12,37 @@ export class DashboardService {
     const practitionerWhere: Prisma.PractitionerWhereInput = { active: true };
     const eventWhere: Prisma.PatientEventWhereInput = {};
 
+    const shiftWhere: Prisma.ShiftWhereInput = {};
+    const encounterWhere: Prisma.EncounterWhereInput = { status: 'IN_PROGRESS' };
+    const bedWhere: Prisma.BedWhereInput = { status: 'AVAILABLE' };
+
     if (tenantId) {
       patientWhere.tenantId = tenantId;
       userWhere.tenantId = tenantId;
       practitionerWhere.tenantId = tenantId;
       eventWhere.tenantId = tenantId;
+      shiftWhere.tenantId = tenantId;
+      encounterWhere.tenantId = tenantId;
+      bedWhere.tenantId = tenantId;
     }
+
+    // Shifts this week
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    shiftWhere.date = { gte: startOfWeek, lt: endOfWeek };
 
     const [
       totalPatients,
       totalUsers,
       totalPractitioners,
       totalEvents,
+      totalShifts,
+      totalEncounters,
+      totalAvailableBeds,
       recentPatients,
       recentEvents,
       genderBreakdown,
@@ -32,6 +51,9 @@ export class DashboardService {
       this.prisma.user.count({ where: userWhere }),
       this.prisma.practitioner.count({ where: practitionerWhere }),
       this.prisma.patientEvent.count({ where: eventWhere }),
+      this.prisma.shift.count({ where: shiftWhere }),
+      this.prisma.encounter.count({ where: encounterWhere }),
+      this.prisma.bed.count({ where: bedWhere }),
       this.prisma.patient.findMany({
         where: patientWhere,
         select: {
@@ -71,6 +93,9 @@ export class DashboardService {
         users: totalUsers,
         practitioners: totalPractitioners,
         events: totalEvents,
+        shifts: totalShifts,
+        encounters: totalEncounters,
+        availableBeds: totalAvailableBeds,
       },
       recentPatients: recentPatients.map((p) => ({
         id: p.id,

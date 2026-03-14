@@ -33,17 +33,24 @@ export class OrganizationsService {
   async findOne(id: string, tenantId: string | null) {
     // Tenant users can only view their own org
     if (tenantId && id !== tenantId) {
-      throw new NotFoundException('Organization not found');
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
     }
 
     const org = await this.prisma.organization.findUnique({ where: { id } });
-    if (!org) throw new NotFoundException('Organization not found');
+    if (!org)
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
     return toFhirOrganization(org);
   }
 
   async update(id: string, dto: UpdateOrganizationDto, tenantId: string | null) {
     if (tenantId && id !== tenantId) {
-      throw new NotFoundException('Organization not found');
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
     }
     await this.findOne(id, tenantId);
     const org = await this.prisma.organization.update({ where: { id }, data: dto });
@@ -52,7 +59,9 @@ export class OrganizationsService {
 
   async deactivate(id: string, tenantId: string | null) {
     if (tenantId && id !== tenantId) {
-      throw new NotFoundException('Organization not found');
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
     }
     await this.findOne(id, tenantId);
     await this.prisma.organization.update({

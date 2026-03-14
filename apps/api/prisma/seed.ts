@@ -1,3 +1,9 @@
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
+
+// Load root .env (contains ENCRYPTION_ENABLED, ENCRYPTION_MASTER_KEY)
+loadEnv({ path: resolve(__dirname, '../../../.env') });
+
 import {
   PrismaClient,
   type Gender,
@@ -8,10 +14,145 @@ import {
   type ActivityStatus,
   type AssessmentStatus,
   type RiskLevel,
+  type MedicationForm,
+  type MedicationRequestStatus,
+  type MedicationRoute,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+// ── Blind index helper (replicates BlindIndexService.computeGlobalBlindIndex) ──
+const ENCRYPTION_ENABLED = process.env.ENCRYPTION_ENABLED === 'true';
+const MASTER_KEY_HEX = process.env.ENCRYPTION_MASTER_KEY;
+
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['\-]/g, '')
+    .trim();
+}
+
+function computeEmailIndex(email: string): string | undefined {
+  if (!ENCRYPTION_ENABLED || !MASTER_KEY_HEX) return undefined;
+
+  const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
+  const globalKey = Buffer.from(
+    crypto.hkdfSync('sha256', masterKey, Buffer.alloc(0), 'global-blind-index', 32),
+  );
+  const hmacKey = Buffer.from(
+    crypto.hkdfSync('sha256', globalKey, Buffer.alloc(0), 'blind-index:email', 32),
+  );
+  return crypto.createHmac('sha256', hmacKey).update(normalize(email)).digest('hex');
+}
+
+// ── Tenant-scoped blind index helpers (replicate BlindIndexService + KeyManagementService) ──
+const dekCache = new Map<string, Buffer>();
+const MIN_NGRAM = 3;
+
+async function getOrCreateDEK(tenantId: string): Promise<Buffer> {
+  if (!ENCRYPTION_ENABLED || !MASTER_KEY_HEX) throw new Error('Encryption not configured');
+
+  const cached = dekCache.get(tenantId);
+  if (cached) return cached;
+
+  const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
+
+  // Check for existing DEK in DB
+  const existing = await prisma.encryptionKey.findFirst({
+    where: { tenantId, isActive: true },
+    orderBy: { keyVersion: 'desc' },
+  });
+
+  if (existing) {
+    // Unwrap using local master key (same as KeyManagementService.unwrapLocal)
+    const buf = Buffer.from(existing.encryptedDek, 'base64');
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const ciphertext = buf.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
+    decipher.setAuthTag(tag);
+    const dek = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    dekCache.set(tenantId, dek);
+    return dek;
+  }
+
+  // Generate new DEK
+  const dek = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
+  const encrypted = Buffer.concat([cipher.update(dek), cipher.final()]);
+  const encryptedDek = Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64');
+
+  await prisma.encryptionKey.create({
+    data: { tenantId, encryptedDek, keyVersion: 1, isActive: true, algorithm: 'AES-256-GCM' },
+  });
+
+  dekCache.set(tenantId, dek);
+  return dek;
+}
+
+function deriveFieldKey(dek: Buffer, fieldName: string): Buffer {
+  return Buffer.from(
+    crypto.hkdfSync('sha256', dek, Buffer.alloc(0), `blind-index:${fieldName}`, 32),
+  );
+}
+
+function computeHmac(key: Buffer, value: string): string {
+  return crypto.createHmac('sha256', key).update(normalize(value)).digest('hex');
+}
+
+function generateNgrams(value: string, minLength: number): string[] {
+  const ngrams = new Set<string>();
+  for (let len = minLength; len <= value.length; len++) {
+    for (let i = 0; i <= value.length - len; i++) {
+      ngrams.add(value.substring(i, i + len));
+    }
+  }
+  return Array.from(ngrams);
+}
+
+async function computeBlindIndex(
+  value: string,
+  tenantId: string,
+  fieldName: string,
+): Promise<string> {
+  const dek = await getOrCreateDEK(tenantId);
+  const key = deriveFieldKey(dek, fieldName);
+  return computeHmac(key, value);
+}
+
+async function buildSearchIndexes(
+  patientId: string,
+  tenantId: string,
+  fields: Record<string, string>,
+): Promise<{ patientId: string; tenantId: string; fieldName: string; tokenHash: string }[]> {
+  if (!ENCRYPTION_ENABLED || !MASTER_KEY_HEX) return [];
+
+  const dek = await getOrCreateDEK(tenantId);
+  const rows: { patientId: string; tenantId: string; fieldName: string; tokenHash: string }[] = [];
+
+  for (const [fieldName, value] of Object.entries(fields)) {
+    if (!value) continue;
+    const key = deriveFieldKey(dek, fieldName);
+    const normalized = normalize(value);
+    const ngrams =
+      normalized.length < MIN_NGRAM ? [normalized] : generateNgrams(normalized, MIN_NGRAM);
+    for (const ngram of ngrams) {
+      rows.push({
+        patientId,
+        tenantId,
+        fieldName,
+        tokenHash: crypto.createHmac('sha256', key).update(ngram).digest('hex'),
+      });
+    }
+  }
+
+  return rows;
+}
 
 // ── Realistic UK patient data ────────────────────────────
 const sunrisePatients = [
@@ -806,6 +947,7 @@ async function main() {
 
   // ── Clean existing seed data ─────────────────────────
   console.log('  Cleaning existing data...');
+  await prisma.patientSearchIndex.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.assessmentTypeConfig.deleteMany();
   await prisma.specialtyConfig.deleteMany();
@@ -813,13 +955,27 @@ async function main() {
   await prisma.carePlanActivity.deleteMany();
   await prisma.carePlanGoal.deleteMany();
   await prisma.carePlan.deleteMany();
+  await prisma.encounter.deleteMany();
+  await prisma.medicationAdministration.deleteMany();
+  await prisma.medicationRequest.deleteMany();
   await prisma.patientEvent.deleteMany();
+  await prisma.patientContact.deleteMany();
   await prisma.patientIdentifier.deleteMany();
   await prisma.patient.deleteMany();
+  await prisma.transfer.deleteMany();
+  await prisma.shiftAssignment.deleteMany();
+  await prisma.shift.deleteMany();
+  await prisma.staffAvailability.deleteMany();
   await prisma.practitioner.deleteMany();
+  await prisma.bed.deleteMany();
+  await prisma.location.deleteMany();
+  await prisma.shiftPattern.deleteMany();
+  await prisma.medication.deleteMany();
   await prisma.subscription.deleteMany();
   await prisma.auditLog.deleteMany();
+  await prisma.userTenantMembership.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.encryptionKey.deleteMany();
   await prisma.organization.deleteMany();
 
   const passwordHash = await bcrypt.hash('Password123!', 12);
@@ -861,10 +1017,11 @@ async function main() {
       lastName: 'Admin',
       role: 'SUPER_ADMIN',
       tenantId: null,
+      emailIndex: computeEmailIndex('superadmin@care-solutions.local'),
     },
   });
 
-  await prisma.user.create({
+  const sunriseAdmin = await prisma.user.create({
     data: {
       email: 'admin@sunrise-care.local',
       passwordHash,
@@ -872,10 +1029,11 @@ async function main() {
       lastName: 'Mitchell',
       role: 'ADMIN',
       tenantId: sunriseCare.id,
+      emailIndex: computeEmailIndex('admin@sunrise-care.local'),
     },
   });
 
-  await prisma.user.create({
+  const oakwoodAdmin = await prisma.user.create({
     data: {
       email: 'admin@oakwood-gp.local',
       passwordHash,
@@ -883,6 +1041,7 @@ async function main() {
       lastName: 'Thornton',
       role: 'ADMIN',
       tenantId: oakwoodGP.id,
+      emailIndex: computeEmailIndex('admin@oakwood-gp.local'),
     },
   });
 
@@ -894,6 +1053,7 @@ async function main() {
       lastName: 'Carter',
       role: 'NURSE',
       tenantId: sunriseCare.id,
+      emailIndex: computeEmailIndex('nurse@sunrise-care.local'),
     },
   });
 
@@ -908,6 +1068,7 @@ async function main() {
         lastName: p.familyName,
         role: p.role,
         tenantId: sunriseCare.id,
+        emailIndex: computeEmailIndex(p.email),
       },
     });
     sunrisePractitionerUsers.push(user);
@@ -924,6 +1085,7 @@ async function main() {
         lastName: p.familyName,
         role: p.role,
         tenantId: oakwoodGP.id,
+        emailIndex: computeEmailIndex(p.email),
       },
     });
     oakwoodPractitionerUsers.push(user);
@@ -932,6 +1094,36 @@ async function main() {
   console.log(
     '  Created users: superadmin, sunrise admin, oakwood admin, sunrise nurse + 4 sunrise practitioners, 5 oakwood practitioners',
   );
+
+  // ── Create tenant memberships ──────────────────────────
+  const membershipData = [
+    { userId: sunriseAdmin.id, organizationId: sunriseCare.id, role: 'ADMIN' as const },
+    { userId: oakwoodAdmin.id, organizationId: oakwoodGP.id, role: 'ADMIN' as const },
+    { userId: sunriseNurseUser.id, organizationId: sunriseCare.id, role: 'NURSE' as const },
+    ...sunrisePractitionerUsers.map((u, i) => ({
+      userId: u.id,
+      organizationId: sunriseCare.id,
+      role: sunrisePractitionerData[i].role as string,
+    })),
+    ...oakwoodPractitionerUsers.map((u, i) => ({
+      userId: u.id,
+      organizationId: oakwoodGP.id,
+      role: oakwoodPractitionerData[i].role as string,
+    })),
+  ];
+
+  for (const m of membershipData) {
+    await prisma.userTenantMembership.create({
+      data: {
+        userId: m.userId,
+        organizationId: m.organizationId,
+        role: m.role,
+        status: 'ACTIVE',
+      },
+    });
+  }
+
+  console.log(`  Created ${membershipData.length} tenant memberships`);
 
   // ── Create practitioners ─────────────────────────────
   await prisma.practitioner.create({
@@ -987,8 +1179,22 @@ async function main() {
   console.log('  Created 5 practitioners for Oakwood GP');
 
   // ── Create patients for Sunrise Care Home ────────────
+  const allSearchIndexRows: {
+    patientId: string;
+    tenantId: string;
+    fieldName: string;
+    tokenHash: string;
+  }[] = [];
+
   for (const p of sunrisePatients) {
-    await prisma.patient.create({
+    const postalCodeIndex = ENCRYPTION_ENABLED
+      ? await computeBlindIndex(p.postcode, sunriseCare.id, 'postalCode')
+      : undefined;
+    const nhsValueIndex = ENCRYPTION_ENABLED
+      ? await computeBlindIndex(p.nhs, sunriseCare.id, 'value')
+      : undefined;
+
+    const patient = await prisma.patient.create({
       data: {
         givenName: p.givenName,
         familyName: p.familyName,
@@ -998,6 +1204,7 @@ async function main() {
         addressLine1: p.address,
         city: p.city,
         postalCode: p.postcode,
+        postalCodeIndex,
         careSetting: p.careSetting,
         managingOrganizationId: sunriseCare.id,
         tenantId: sunriseCare.id,
@@ -1006,18 +1213,32 @@ async function main() {
             type: 'NHS_NUMBER',
             system: 'https://fhir.nhs.uk/Id/nhs-number',
             value: p.nhs,
+            valueIndex: nhsValueIndex,
             isPrimary: true,
           },
         },
       },
     });
+
+    const rows = await buildSearchIndexes(patient.id, sunriseCare.id, {
+      givenName: p.givenName,
+      familyName: p.familyName,
+    });
+    allSearchIndexRows.push(...rows);
   }
 
   console.log(`  Created ${sunrisePatients.length} patients for Sunrise Care Home`);
 
   // ── Create patients for Oakwood GP Practice ──────────
   for (const p of oakwoodPatients) {
-    await prisma.patient.create({
+    const postalCodeIndex = ENCRYPTION_ENABLED
+      ? await computeBlindIndex(p.postcode, oakwoodGP.id, 'postalCode')
+      : undefined;
+    const nhsValueIndex = ENCRYPTION_ENABLED
+      ? await computeBlindIndex(p.nhs, oakwoodGP.id, 'value')
+      : undefined;
+
+    const patient = await prisma.patient.create({
       data: {
         givenName: p.givenName,
         familyName: p.familyName,
@@ -1027,6 +1248,7 @@ async function main() {
         addressLine1: p.address,
         city: p.city,
         postalCode: p.postcode,
+        postalCodeIndex,
         managingOrganizationId: oakwoodGP.id,
         tenantId: oakwoodGP.id,
         identifiers: {
@@ -1034,14 +1256,27 @@ async function main() {
             type: 'NHS_NUMBER',
             system: 'https://fhir.nhs.uk/Id/nhs-number',
             value: p.nhs,
+            valueIndex: nhsValueIndex,
             isPrimary: true,
           },
         },
       },
     });
+
+    const rows = await buildSearchIndexes(patient.id, oakwoodGP.id, {
+      givenName: p.givenName,
+      familyName: p.familyName,
+    });
+    allSearchIndexRows.push(...rows);
   }
 
   console.log(`  Created ${oakwoodPatients.length} patients for Oakwood GP Practice`);
+
+  // ── Populate patient search indexes (blind index n-grams) ──
+  if (allSearchIndexRows.length > 0) {
+    await prisma.patientSearchIndex.createMany({ data: allSearchIndexRows });
+    console.log(`  Created ${allSearchIndexRows.length} patient search index entries`);
+  }
 
   // ── Create subscriptions ───────────────────────────────
   await prisma.subscription.create({
@@ -1536,6 +1771,262 @@ async function main() {
   }
 
   console.log('  Created 4 assessments for Sunrise Care patients');
+
+  // ── Create medication catalogue ───────────────────────
+  const medicationData = [
+    {
+      name: 'Paracetamol',
+      genericName: 'Paracetamol',
+      code: '322236009',
+      form: 'TABLET' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Teva UK',
+    },
+    {
+      name: 'Ibuprofen',
+      genericName: 'Ibuprofen',
+      code: '387207008',
+      form: 'TABLET' as MedicationForm,
+      strength: '400mg',
+      manufacturer: 'Reckitt Benckiser',
+    },
+    {
+      name: 'Amoxicillin',
+      genericName: 'Amoxicillin',
+      code: '27658006',
+      form: 'CAPSULE' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Sandoz',
+    },
+    {
+      name: 'Amlodipine',
+      genericName: 'Amlodipine besylate',
+      code: '386864001',
+      form: 'TABLET' as MedicationForm,
+      strength: '5mg',
+      manufacturer: 'Pfizer',
+    },
+    {
+      name: 'Metformin',
+      genericName: 'Metformin hydrochloride',
+      code: '109081006',
+      form: 'TABLET' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Merck',
+    },
+    {
+      name: 'Omeprazole',
+      genericName: 'Omeprazole',
+      code: '387137007',
+      form: 'CAPSULE' as MedicationForm,
+      strength: '20mg',
+      manufacturer: 'AstraZeneca',
+    },
+    {
+      name: 'Lactulose',
+      genericName: 'Lactulose',
+      code: '273945008',
+      form: 'LIQUID' as MedicationForm,
+      strength: '3.1-3.7g/5ml',
+      manufacturer: 'Actavis',
+    },
+    {
+      name: 'Morphine Sulphate',
+      genericName: 'Morphine sulphate',
+      code: '373529000',
+      form: 'LIQUID' as MedicationForm,
+      strength: '10mg/5ml',
+      manufacturer: 'Martindale Pharma',
+    },
+    {
+      name: 'Salbutamol Inhaler',
+      genericName: 'Salbutamol',
+      code: '372897005',
+      form: 'INHALER' as MedicationForm,
+      strength: '100mcg/dose',
+      manufacturer: 'GlaxoSmithKline',
+    },
+    {
+      name: 'Fentanyl Patch',
+      genericName: 'Fentanyl',
+      code: '373492002',
+      form: 'PATCH' as MedicationForm,
+      strength: '25mcg/hr',
+      manufacturer: 'Janssen',
+    },
+  ];
+
+  const medications = [];
+  for (const med of medicationData) {
+    const created = await prisma.medication.create({
+      data: { ...med, tenantId: null },
+    });
+    medications.push(created);
+  }
+  console.log(`  Created ${medications.length} system medications`);
+
+  // ── Create prescriptions for Sunrise Care ─────────────
+  const paracetamol = medications.find((m) => m.name === 'Paracetamol')!;
+  const amlodipine = medications.find((m) => m.name === 'Amlodipine')!;
+  const omeprazole = medications.find((m) => m.name === 'Omeprazole')!;
+  const lactulose = medications.find((m) => m.name === 'Lactulose')!;
+  const morphine = medications.find((m) => m.name === 'Morphine Sulphate')!;
+
+  // Margaret — Paracetamol QDS for pain
+  if (margaret && nurseUser) {
+    const rx1 = await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 tablet four times daily',
+        dose: '500mg',
+        frequency: 'QDS',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-01'),
+        reasonText: 'Chronic lower back pain management',
+        instructions: 'Take with or after food',
+        maxDosePerDay: '4g',
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Record two administrations
+    await prisma.medicationAdministration.create({
+      data: {
+        status: 'COMPLETED',
+        occurredAt: new Date('2026-03-12T08:00:00Z'),
+        doseGiven: '500mg',
+        route: 'ORAL' as MedicationRoute,
+        notes: 'Morning dose administered with breakfast',
+        requestId: rx1.id,
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        performerId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+    await prisma.medicationAdministration.create({
+      data: {
+        status: 'COMPLETED',
+        occurredAt: new Date('2026-03-12T12:00:00Z'),
+        doseGiven: '500mg',
+        route: 'ORAL' as MedicationRoute,
+        requestId: rx1.id,
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        performerId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.patientEvent.create({
+      data: {
+        patientId: margaret.id,
+        eventType: 'MEDICATION_PRESCRIBED',
+        summary: 'Medication prescribed: Paracetamol 500mg QDS',
+        detail: { prescriptionId: rx1.id } as any,
+        recordedById: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Margaret — Amlodipine for hypertension
+    const rx2 = await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 tablet once daily in the morning',
+        dose: '5mg',
+        frequency: 'OD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-01-15'),
+        reasonText: 'Hypertension',
+        medicationId: amlodipine.id,
+        patientId: margaret.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.patientEvent.create({
+      data: {
+        patientId: margaret.id,
+        eventType: 'MEDICATION_PRESCRIBED',
+        summary: 'Medication prescribed: Amlodipine 5mg OD',
+        detail: { prescriptionId: rx2.id } as any,
+        recordedById: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  // Harold — Omeprazole + Lactulose
+  if (harold && adminUser) {
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 capsule once daily before breakfast',
+        dose: '20mg',
+        frequency: 'OD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-15'),
+        reasonText: 'Gastro-oesophageal reflux',
+        instructions: 'Take 30 minutes before food',
+        medicationId: omeprazole.id,
+        patientId: harold.id,
+        prescriberId: adminUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '15ml twice daily',
+        dose: '15ml',
+        frequency: 'BD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-15'),
+        reasonText: 'Constipation',
+        medicationId: lactulose.id,
+        patientId: harold.id,
+        prescriberId: adminUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  // Dorothy — Morphine PRN (palliative)
+  if (dorothy && nurseUser) {
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'DRAFT' as MedicationRequestStatus,
+        priority: 'urgent',
+        dosageText: '5mg every 4 hours as needed for pain',
+        dose: '5mg',
+        frequency: 'PRN',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-03-10'),
+        reasonText: 'Anticipatory prescribing — end of life pain management',
+        instructions:
+          'Administer when patient reports pain score > 4. Observe for respiratory depression.',
+        asNeeded: true,
+        asNeededReason: 'Pain score above 4',
+        maxDosePerDay: '30mg',
+        medicationId: morphine.id,
+        patientId: dorothy.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  console.log('  Created 5 prescriptions and 2 administrations for Sunrise Care patients');
 
   // ── Summary ──────────────────────────────────────────
   console.log('\n✅ Seed complete!\n');

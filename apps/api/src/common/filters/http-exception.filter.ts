@@ -4,17 +4,19 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger,
+  Inject,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
+import { LoggerService } from '@care/logger';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger('ExceptionFilter');
+  constructor(@Inject(LoggerService) private readonly logger: LoggerService) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -22,12 +24,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const message =
       exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
 
-    if (!(exception instanceof HttpException)) {
-      this.logger.error(
-        `Unhandled exception: ${exception instanceof Error ? exception.message : String(exception)}`,
-        exception instanceof Error ? exception.stack : undefined,
-      );
-    }
+    const user = request.user as { id?: string } | undefined;
+    const tenantId = (request as unknown as Record<string, unknown>).tenantId as string | undefined;
+
+    this.logger.logException(
+      exception,
+      {
+        service: 'HttpExceptionFilter',
+        method: `${request.method} ${request.url}`,
+      },
+      {
+        userId: user?.id,
+        tenantId,
+        requestId: request.headers['x-request-id'] as string | undefined,
+        metadata: {
+          statusCode: status,
+          path: request.url,
+          method: request.method,
+        },
+      },
+    );
 
     response.status(status).json({
       statusCode: status,

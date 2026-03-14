@@ -2,6 +2,7 @@ import { useState, useMemo, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { usePatients } from './hooks/use-patients';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UK_PHONE_RE = /^(?:\+44|0)\s?\d[\d\s]{8,12}$/;
@@ -179,11 +180,7 @@ export function PatientCreatePage(): React.ReactElement {
         <h1 className="text-2xl font-bold text-slate-900">Register Patient</h1>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <form onSubmit={handleSubmit} className="max-w-3xl" noValidate>
         {/* Personal Details */}

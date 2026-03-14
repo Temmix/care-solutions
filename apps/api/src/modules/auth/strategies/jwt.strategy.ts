@@ -7,8 +7,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 interface JwtPayload {
   sub: string;
   email: string;
-  role: string;
-  tenantId: string | null;
 }
 
 @Injectable()
@@ -33,6 +31,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    return { id: user.id, email: user.email, role: user.role, tenantId: user.tenantId };
+    // globalRole is used for SUPER_ADMIN/SYSTEM/TENANT_ADMIN checks
+    // Tenant-scoped role is resolved by TenantGuard from UserTenantMembership
+    return { id: user.id, email: user.email, globalRole: user.role };
   }
 }
