@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
+import { BlindIndexService } from '../encryption/blind-index.service';
 import { RegisterDto, LoginDto } from './dto';
 
 const MEMBERSHIP_SELECT = {
@@ -19,12 +21,12 @@ export class AuthService {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(JwtService) private jwtService: JwtService,
     @Inject(ConfigService) private configService: ConfigService,
+    @Inject(EncryptionService) private encryption: EncryptionService,
+    @Inject(BlindIndexService) private blindIndex: BlindIndexService,
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existing = await this.findUserByEmail(dto.email);
 
     if (existing) {
       throw new ConflictException(
@@ -105,9 +107,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const user = await this.findUserByEmail(dto.email);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException(
@@ -186,6 +186,14 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  private async findUserByEmail(email: string) {
+    if (this.encryption.isEnabled()) {
+      const emailHash = this.blindIndex.computeGlobalBlindIndex(email, 'email');
+      return this.prisma.user.findFirst({ where: { emailIndex: emailHash } });
+    }
+    return this.prisma.user.findUnique({ where: { email } });
   }
 
   private generateTokens(userId: string, email: string) {

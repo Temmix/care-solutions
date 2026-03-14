@@ -288,6 +288,8 @@ async function encryptWriteArgs(
           blindIndexService,
         );
       }
+      // Always compute global blind indexes even without tenantId
+      computeGlobalIndexes(params.args.data, fieldConfigs, blindIndexService);
       break;
     }
     case 'update': {
@@ -306,6 +308,8 @@ async function encryptWriteArgs(
           blindIndexService,
         );
       }
+      // Always compute global blind indexes even without tenantId
+      computeGlobalIndexes(params.args.data, fieldConfigs, blindIndexService);
       break;
     }
     case 'upsert': {
@@ -319,6 +323,7 @@ async function encryptWriteArgs(
           blindIndexService,
         );
       }
+      computeGlobalIndexes(params.args.create, fieldConfigs, blindIndexService);
       const updateTenantId = await resolveTenantIdForUpdate(
         model,
         params.args.update,
@@ -334,6 +339,7 @@ async function encryptWriteArgs(
           blindIndexService,
         );
       }
+      computeGlobalIndexes(params.args.update, fieldConfigs, blindIndexService);
       break;
     }
     case 'createMany': {
@@ -343,6 +349,7 @@ async function encryptWriteArgs(
           if (tenantId) {
             await encryptFields(item, fieldConfigs, tenantId, encryptionService, blindIndexService);
           }
+          computeGlobalIndexes(item, fieldConfigs, blindIndexService);
         }
       }
       break;
@@ -363,8 +370,35 @@ async function encryptWriteArgs(
           blindIndexService,
         );
       }
+      computeGlobalIndexes(params.args.data, fieldConfigs, blindIndexService);
       break;
     }
+  }
+}
+
+/**
+ * Compute global blind indexes (not tenant-specific) for fields marked globalIndex: true.
+ * Runs even when tenantId is null — e.g. SUPER_ADMIN users without a tenant.
+ * Safe to call after encryptFields (skips fields already indexed).
+ */
+function computeGlobalIndexes(
+  data: Record<string, unknown>,
+  fieldConfigs: Record<string, FieldEncryptionConfig>,
+  blindIndexService: BlindIndexService,
+): void {
+  for (const [fieldName, config] of Object.entries(fieldConfigs)) {
+    if (
+      !config.globalIndex ||
+      !config.searchable ||
+      config.searchType !== 'exact' ||
+      !config.indexField
+    )
+      continue;
+    if (data[config.indexField] !== undefined) continue; // already computed by encryptFields
+    const value = data[fieldName];
+    if (value === undefined || value === null) continue;
+    const plaintext = typeof value === 'string' ? value : String(value);
+    data[config.indexField] = blindIndexService.computeGlobalBlindIndex(plaintext, fieldName);
   }
 }
 
@@ -382,11 +416,15 @@ async function encryptFields(
     // Compute exact blind index BEFORE encryption (needs plaintext)
     if (config.searchable && config.searchType === 'exact' && config.indexField) {
       const plaintext = typeof value === 'string' ? value : String(value);
-      data[config.indexField] = await blindIndexService.computeBlindIndex(
-        plaintext,
-        tenantId,
-        fieldName,
-      );
+      if (config.globalIndex) {
+        data[config.indexField] = blindIndexService.computeGlobalBlindIndex(plaintext, fieldName);
+      } else {
+        data[config.indexField] = await blindIndexService.computeBlindIndex(
+          plaintext,
+          tenantId,
+          fieldName,
+        );
+      }
     }
 
     // Encrypt the field

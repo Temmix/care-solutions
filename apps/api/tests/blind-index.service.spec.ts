@@ -2,10 +2,12 @@ import * as crypto from 'crypto';
 import { BlindIndexService } from '../src/modules/encryption/blind-index.service';
 
 const TEST_KEY = crypto.randomBytes(32);
+const GLOBAL_KEY = crypto.randomBytes(32);
 
 function createService() {
   const keyManager = {
     getDEK: jest.fn().mockResolvedValue({ keyId: 'key-1', key: TEST_KEY }),
+    getGlobalBlindIndexKey: jest.fn().mockReturnValue(GLOBAL_KEY),
   };
   return { service: new BlindIndexService(keyManager as any), keyManager };
 }
@@ -113,6 +115,42 @@ describe('BlindIndexService', () => {
       const hashes1 = await service.computeNgramIndexes('JOHN', 'tenant-1', 'givenName', 3);
       const hashes2 = await service.computeNgramIndexes('john', 'tenant-1', 'givenName', 3);
       expect(hashes1).toEqual(hashes2);
+    });
+  });
+
+  describe('computeGlobalBlindIndex', () => {
+    it('produces a 64-char hex string', () => {
+      const { service } = createService();
+      const hash = service.computeGlobalBlindIndex('test@example.com', 'email');
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it('produces the same hash for the same input regardless of tenant', () => {
+      const { service } = createService();
+      const hash1 = service.computeGlobalBlindIndex('test@example.com', 'email');
+      const hash2 = service.computeGlobalBlindIndex('test@example.com', 'email');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('produces different hashes for different field names', () => {
+      const { service } = createService();
+      const hash1 = service.computeGlobalBlindIndex('same-value', 'email');
+      const hash2 = service.computeGlobalBlindIndex('same-value', 'phone');
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('normalizes input', () => {
+      const { service } = createService();
+      const hash1 = service.computeGlobalBlindIndex('Test@Example.COM', 'email');
+      const hash2 = service.computeGlobalBlindIndex('test@example.com', 'email');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('does not use tenant DEK', () => {
+      const { service, keyManager } = createService();
+      service.computeGlobalBlindIndex('test@example.com', 'email');
+      expect(keyManager.getDEK).not.toHaveBeenCalled();
+      expect(keyManager.getGlobalBlindIndexKey).toHaveBeenCalled();
     });
   });
 

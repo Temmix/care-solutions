@@ -48,7 +48,11 @@ describe('UsersService', () => {
       enforceUserLimit: jest.fn(),
       enforcePatientLimit: jest.fn(),
     };
-    service = new UsersService(prisma as any, limits as any);
+    const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+    const blindIndex = {
+      computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+    };
+    service = new UsersService(prisma as any, limits as any, encryption as any, blindIndex as any);
   });
 
   // ── Tenant-scoped methods ───────────────────────────────
@@ -219,6 +223,40 @@ describe('UsersService', () => {
       await expect(service.deactivateSuperAdmin('nonexistent', 'sa-current')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('createSuperAdmin (encrypted)', () => {
+    it('should use global blind index for email uniqueness check', async () => {
+      const encEnabled = { isEnabled: jest.fn().mockReturnValue(true) };
+      const blindIdx = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'email-hash'),
+      };
+      const encService = new UsersService(
+        prisma as any,
+        { enforceUserLimit: jest.fn() } as any,
+        encEnabled as any,
+        blindIdx as any,
+      );
+
+      (prisma.user as any).findFirst = jest.fn().mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'sa-new',
+        email: 'admin@test.com',
+        role: 'SUPER_ADMIN',
+      });
+
+      await encService.createSuperAdmin({
+        email: 'admin@test.com',
+        password: 'Pass123!',
+        firstName: 'New',
+        lastName: 'Admin',
+      } as any);
+
+      expect(blindIdx.computeGlobalBlindIndex).toHaveBeenCalledWith('admin@test.com', 'email');
+      expect((prisma.user as any).findFirst).toHaveBeenCalledWith({
+        where: { emailIndex: 'email-hash' },
+      });
     });
   });
 

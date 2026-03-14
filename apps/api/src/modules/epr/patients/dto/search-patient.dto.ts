@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsDateString, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsInt,
+  Min,
+  Max,
+  IsBooleanString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SearchPatientDto {
@@ -17,6 +25,10 @@ export class SearchPatientDto {
   @IsOptional()
   @IsString()
   postalCode?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  excludeAdmitted?: string;
 
   @IsOptional()
   @Type(() => Number)

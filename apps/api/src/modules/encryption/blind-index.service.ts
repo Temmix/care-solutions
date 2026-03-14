@@ -55,6 +55,25 @@ export class BlindIndexService {
     return crypto.createHmac('sha256', hmacKey).update(normalized).digest('hex');
   }
 
+  /**
+   * Compute a global blind index (not tenant-specific).
+   * Used for cross-tenant lookups like User.email during login/register.
+   * Key is derived from the master key, so the same email always produces
+   * the same index regardless of tenant.
+   */
+  computeGlobalBlindIndex(value: string, fieldName: string): string {
+    const globalKey = this.keyManager.getGlobalBlindIndexKey();
+    const hmacKey = crypto.hkdfSync(
+      HKDF_HASH,
+      globalKey,
+      Buffer.alloc(0),
+      `blind-index:${fieldName}`,
+      32,
+    );
+    const normalized = this.normalize(value);
+    return crypto.createHmac('sha256', Buffer.from(hmacKey)).update(normalized).digest('hex');
+  }
+
   // ── Private helpers ──────────────────────────────────
 
   /**

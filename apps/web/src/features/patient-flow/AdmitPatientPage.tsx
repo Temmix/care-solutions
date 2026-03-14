@@ -34,7 +34,7 @@ export function AdmitPatientPage(): React.ReactElement {
       try {
         const [locData, patientResult] = await Promise.all([
           listLocations(),
-          api.get<{ data: PatientOption[] }>('/patients?limit=200'),
+          api.get<{ data: PatientOption[] }>('/patients?limit=200&excludeAdmitted=true'),
         ]);
         setLocations(locData);
         const pts = (patientResult as Record<string, unknown>).entry

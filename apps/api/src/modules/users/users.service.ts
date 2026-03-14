@@ -10,6 +10,8 @@ import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionLimitService } from '../billing/subscription-limit.service';
+import { EncryptionService } from '../encryption/encryption.service';
+import { BlindIndexService } from '../encryption/blind-index.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateSuperAdminDto } from './dto/create-super-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
@@ -34,6 +36,8 @@ export class UsersService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(SubscriptionLimitService) private limits: SubscriptionLimitService,
+    @Inject(EncryptionService) private encryption: EncryptionService,
+    @Inject(BlindIndexService) private blindIndex: BlindIndexService,
   ) {}
 
   async findAll(tenantId: string | null, page = 1, limit = 20) {
@@ -155,9 +159,7 @@ export class UsersService {
 
     await this.limits.enforceUserLimit(tenantId);
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existing = await this.findUserByEmail(dto.email);
 
     if (existing) {
       // If user exists, check if they already have a membership in this tenant
@@ -276,9 +278,7 @@ export class UsersService {
   }
 
   async createSuperAdmin(dto: CreateSuperAdminDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existing = await this.findUserByEmail(dto.email);
 
     if (existing) {
       throw new ConflictException(
@@ -366,9 +366,7 @@ export class UsersService {
   }
 
   async createTenantAdmin(dto: CreateTenantAdminDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existing = await this.findUserByEmail(dto.email);
 
     if (existing) {
       throw new ConflictException(
@@ -433,5 +431,15 @@ export class UsersService {
       data: { isActive: true },
       select: USER_SELECT,
     });
+  }
+
+  // ── Private helpers ──────────────────────────────────────
+
+  private async findUserByEmail(email: string) {
+    if (this.encryption.isEnabled()) {
+      const emailHash = this.blindIndex.computeGlobalBlindIndex(email, 'email');
+      return this.prisma.user.findFirst({ where: { emailIndex: emailHash } });
+    }
+    return this.prisma.user.findUnique({ where: { email } });
   }
 }

@@ -250,4 +250,27 @@ describe('KeyManagementService', () => {
       );
     });
   });
+
+  describe('getGlobalBlindIndexKey', () => {
+    it('returns a 32-byte Buffer derived from the master key', () => {
+      const { service } = createService();
+      const key = service.getGlobalBlindIndexKey();
+      expect(key).toBeInstanceOf(Buffer);
+      expect(key.length).toBe(32);
+    });
+
+    it('returns the same key on repeated calls', () => {
+      const { service } = createService();
+      const key1 = service.getGlobalBlindIndexKey();
+      const key2 = service.getGlobalBlindIndexKey();
+      expect(key1.equals(key2)).toBe(true);
+    });
+
+    it('throws when master key is not configured', () => {
+      const { service } = createService({ masterKey: undefined });
+      expect(() => service.getGlobalBlindIndexKey()).toThrow(
+        'ENCRYPTION_MASTER_KEY is required for global blind indexes',
+      );
+    });
+  });
 });

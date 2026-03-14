@@ -123,6 +123,25 @@ export class KeyManagementService implements OnModuleInit {
     return this.generateDEK(tenantId);
   }
 
+  /**
+   * Derive a global blind index key from the master key (not tenant-specific).
+   * Used for cross-tenant lookups like User.email during login/register.
+   */
+  getGlobalBlindIndexKey(): Buffer {
+    if (!this.masterKey) {
+      throw new Error('ENCRYPTION_MASTER_KEY is required for global blind indexes');
+    }
+
+    const derived = crypto.hkdfSync(
+      'sha256',
+      this.masterKey,
+      Buffer.alloc(0),
+      'global-blind-index',
+      32,
+    );
+    return Buffer.from(derived);
+  }
+
   /** Evict a tenant's cached DEK (useful for testing or forced refresh) */
   clearCache(tenantId?: string): void {
     if (tenantId) {

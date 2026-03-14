@@ -24,6 +24,8 @@ export interface FieldEncryptionConfig {
   indexModel?: string;
   /** Whether the field is a Prisma Json type (uses JSON serialization before encryption) */
   isJson?: boolean;
+  /** Whether to use a global (non-tenant-specific) blind index — for cross-tenant lookups like login */
+  globalIndex?: boolean;
 }
 
 /** Map of model name → field name → encryption config */

@@ -57,7 +57,17 @@ describe('AuthService', () => {
       get: jest.fn().mockReturnValue('15m'),
     };
 
-    service = new AuthService(prisma as any, jwtService as any, configService as any);
+    const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+    const blindIndex = {
+      computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+    };
+    service = new AuthService(
+      prisma as any,
+      jwtService as any,
+      configService as any,
+      encryption as any,
+      blindIndex as any,
+    );
   });
 
   describe('register', () => {
@@ -263,6 +273,40 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh('token')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('login (encrypted)', () => {
+    it('should use global blind index for email lookup when encryption enabled', async () => {
+      const encryptionEnabled = { isEnabled: jest.fn().mockReturnValue(true) };
+      const blindIdx = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'email-hash-123'),
+      };
+      const encService = new AuthService(
+        prisma as any,
+        jwtService as any,
+        configService as any,
+        encryptionEnabled as any,
+        blindIdx as any,
+      );
+
+      prisma.user.findUnique.mockResolvedValue(null); // findUnique should NOT be called for email
+      (prisma as any).user.findFirst = jest.fn().mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        passwordHash: 'hashed',
+        isActive: true,
+        mustChangePassword: false,
+      });
+      mockCompare.mockResolvedValue(true);
+      prisma.userTenantMembership.findMany.mockResolvedValue([]);
+
+      await encService.login({ email: 'test@example.com', password: 'pass' } as any);
+
+      expect(blindIdx.computeGlobalBlindIndex).toHaveBeenCalledWith('test@example.com', 'email');
+      expect((prisma as any).user.findFirst).toHaveBeenCalledWith({
+        where: { emailIndex: 'email-hash-123' },
+      });
     });
   });
 
