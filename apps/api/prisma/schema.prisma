@@ -336,6 +336,9 @@ model User {
   // Multi-tenancy memberships
   memberships UserTenantMembership[] @relation("UserMemberships")
 
+  // Encryption: blind index for email lookup
+  emailIndex String?
+
   @@index([tenantId])
   @@map("users")
 }
@@ -475,6 +478,10 @@ model Practitioner {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Encryption: blind indexes for name lookup
+  givenNameIndex  String?
+  familyNameIndex String?
+
   @@index([familyName, givenName])
   @@index([organizationId])
   @@index([tenantId])
@@ -529,6 +536,10 @@ model Patient {
   // Phase 3: Patient Flow
   encounters Encounter[]
 
+  // Encryption: blind index for postal code lookup, search index for name search
+  postalCodeIndex String?
+  searchIndexes   PatientSearchIndex[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -550,6 +561,9 @@ model PatientIdentifier {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  // Encryption: blind index for identifier lookup (NHS number, MRN)
+  valueIndex String?
 
   @@unique([type, value])
   @@index([patientId])
@@ -1093,4 +1107,38 @@ model Transfer {
   @@index([encounterId])
   @@index([transferredAt])
   @@map("transfers")
+}
+
+// ─── Encryption: Patient Search Index ───────────────────
+
+model PatientSearchIndex {
+  id        String @id @default(uuid())
+  patientId String
+  tenantId  String
+  fieldName String
+  tokenHash String
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, tokenHash])
+  @@index([patientId])
+  @@map("patient_search_index")
+}
+
+// ─── Encryption Key Management ─────────────────────────
+
+model EncryptionKey {
+  id           String    @id @default(uuid())
+  tenantId     String
+  encryptedDek String
+  keyVersion   Int       @default(1)
+  isActive     Boolean   @default(true)
+  algorithm    String    @default("AES-256-GCM")
+  kmsKeyArn    String?
+  createdAt    DateTime  @default(now())
+  rotatedAt    DateTime?
+
+  @@unique([tenantId, keyVersion])
+  @@index([tenantId, isActive])
+  @@map("encryption_keys")
 }

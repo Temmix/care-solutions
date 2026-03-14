@@ -10,6 +10,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { WorkforceModule } from './modules/workforce/workforce.module';
 import { PatientFlowModule } from './modules/patient-flow/patient-flow.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
+import { EncryptionModule } from './modules/encryption/encryption.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -28,6 +29,7 @@ import { HealthController } from './health.controller';
       fileOptions: { directory: './logs', prefix: 'care-api' },
     }),
     PrismaModule,
+    EncryptionModule,
     AuthModule,
     UsersModule,
     FhirModule,

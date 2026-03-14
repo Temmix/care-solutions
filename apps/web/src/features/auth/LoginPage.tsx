@@ -67,7 +67,7 @@ export function LoginPage(): React.ReactElement {
         </div>
 
         <div className="text-slate-500 text-sm">
-          &copy; {new Date().getFullYear()} Care Solutions Ltd. All rights reserved.
+          &copy; {new Date().getFullYear()} Web Brains Ent Ltd. All rights reserved.
         </div>
       </div>
 
