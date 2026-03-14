@@ -30,6 +30,7 @@ apps/api/prisma/generated/
 coverage/
 
 # Logs
+logs/
 *.log
 npm-debug.log*
 

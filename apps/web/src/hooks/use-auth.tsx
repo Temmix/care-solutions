@@ -1,6 +1,14 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import { api } from '../lib/api-client';
-import type { User, AuthTokens, AuthState } from '../types/auth';
+import type { User, AuthTokens, AuthState, TenantMembership } from '../types/auth';
 
 interface RegisterParams {
   email: string;
@@ -33,9 +41,29 @@ interface AuthContextType extends AuthState {
   isSuperAdmin: boolean;
   isTenantAdmin: boolean;
   isPlatformAdmin: boolean;
+  currentRole: string | null;
+  memberships: TenantMembership[];
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+function loadPersistedTenant(): SelectedTenant | null {
+  try {
+    const raw = localStorage.getItem('selected_tenant');
+    if (raw) return JSON.parse(raw) as SelectedTenant;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function persistTenant(tenant: SelectedTenant | null): void {
+  if (tenant) {
+    localStorage.setItem('selected_tenant', JSON.stringify(tenant));
+  } else {
+    localStorage.removeItem('selected_tenant');
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -43,11 +71,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
     isLoading: true,
   });
-  const [selectedTenant, setSelectedTenant] = useState<SelectedTenant | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState<SelectedTenant | null>(loadPersistedTenant);
 
   const isSuperAdmin = state.user?.role === 'SUPER_ADMIN';
   const isTenantAdmin = state.user?.role === 'TENANT_ADMIN';
   const isPlatformAdmin = isSuperAdmin || isTenantAdmin;
+
+  const memberships = state.user?.memberships ?? [];
+
+  // Derive current role from selected tenant's membership
+  const currentRole = useMemo(() => {
+    if (isSuperAdmin) return 'SUPER_ADMIN';
+    if (isTenantAdmin) return 'TENANT_ADMIN';
+    if (!selectedTenant || !state.user) return null;
+    const membership = state.user.memberships?.find((m) => m.organizationId === selectedTenant.id);
+    return membership?.role ?? null;
+  }, [isSuperAdmin, isTenantAdmin, selectedTenant, state.user]);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -60,6 +99,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Restore tenant selection on mount (after profile loads)
+  useEffect(() => {
+    if (state.user && !state.isLoading) {
+      const persisted = loadPersistedTenant();
+      if (persisted) {
+        api.setTenantId(persisted.id);
+      }
+    }
+  }, [state.user, state.isLoading]);
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -71,34 +120,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const selectTenant = useCallback((tenant: SelectedTenant | null) => {
     setSelectedTenant(tenant);
+    persistTenant(tenant);
     api.setTenantId(tenant?.id ?? null);
   }, []);
 
+  const autoSelectTenant = useCallback(
+    (loginMemberships: TenantMembership[]) => {
+      if (loginMemberships.length === 1) {
+        const m = loginMemberships[0];
+        const tenant = {
+          id: m.organizationId,
+          name: m.organization.name,
+          type: m.organization.type,
+        };
+        selectTenant(tenant);
+      }
+    },
+    [selectTenant],
+  );
+
   const login = async (email: string, password: string) => {
-    const tokens = await api.post<AuthTokens>('/auth/login', { email, password });
-    localStorage.setItem('access_token', tokens.accessToken);
-    localStorage.setItem('refresh_token', tokens.refreshToken);
-    setSelectedTenant(null);
-    api.setTenantId(null);
+    const result = await api.post<AuthTokens>('/auth/login', { email, password });
+    localStorage.setItem('access_token', result.accessToken);
+    localStorage.setItem('refresh_token', result.refreshToken);
+
+    // Clear previous tenant selection
+    selectTenant(null);
+
     await fetchProfile();
+
+    // Auto-select if single membership
+    if (result.memberships && result.memberships.length > 0) {
+      autoSelectTenant(result.memberships);
+    }
   };
 
   const register = async (params: RegisterParams) => {
-    const tokens = await api.post<AuthTokens>('/auth/register', params);
-    localStorage.setItem('access_token', tokens.accessToken);
-    localStorage.setItem('refresh_token', tokens.refreshToken);
-    setSelectedTenant(null);
-    api.setTenantId(null);
+    const result = await api.post<AuthTokens>('/auth/register', params);
+    localStorage.setItem('access_token', result.accessToken);
+    localStorage.setItem('refresh_token', result.refreshToken);
+
+    selectTenant(null);
     await fetchProfile();
+
+    if (result.memberships && result.memberships.length > 0) {
+      autoSelectTenant(result.memberships);
+    }
   };
 
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    setSelectedTenant(null);
-    api.setTenantId(null);
+    selectTenant(null);
     setState({ user: null, isAuthenticated: false, isLoading: false });
-  }, []);
+  }, [selectTenant]);
 
   // Register the logout handler so the API client can force logout on refresh failure
   useEffect(() => {
@@ -118,6 +193,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isTenantAdmin,
         isPlatformAdmin,
+        currentRole,
+        memberships,
       }}
     >
       {children}

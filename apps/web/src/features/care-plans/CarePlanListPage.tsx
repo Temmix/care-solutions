@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCarePlans, type FhirCarePlan } from './hooks/use-care-plans';
 import { CarePlanStatusBadge } from './components/CarePlanStatusBadge';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const STATUSES = ['', 'DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const;
 const CATEGORIES = [
@@ -100,11 +101,7 @@ export function CarePlanListPage(): React.ReactElement {
         </select>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
 
       {loading && carePlans.length === 0 && (
         <div className="flex items-center justify-center py-20">

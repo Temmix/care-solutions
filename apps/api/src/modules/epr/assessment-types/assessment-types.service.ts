@@ -141,7 +141,10 @@ export class AssessmentTypesService {
     const existing = await this.prisma.assessmentTypeConfig.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Assessment type not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Assessment type not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const updated = await this.prisma.assessmentTypeConfig.update({
       where: { id },
@@ -166,7 +169,10 @@ export class AssessmentTypesService {
     const existing = await this.prisma.assessmentTypeConfig.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Assessment type not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Assessment type not found. It may have been deleted or belongs to another organisation.',
+      );
 
     await this.prisma.assessmentTypeConfig.update({
       where: { id },

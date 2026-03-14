@@ -7,13 +7,13 @@ import {
   UseGuards,
   Inject,
   Req,
-  Logger,
   RawBodyRequest,
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
+import { LoggerService } from '@care/logger';
 import { BillingService } from './billing.service';
 import { SubscriptionLimitService } from './subscription-limit.service';
 import { Roles, CurrentTenant } from '../../common/decorators';
@@ -21,11 +21,10 @@ import { RolesGuard, TenantGuard } from '../../common/guards';
 
 @Controller('billing')
 export class BillingController {
-  private readonly logger = new Logger(BillingController.name);
-
   constructor(
     @Inject(BillingService) private billingService: BillingService,
     @Inject(SubscriptionLimitService) private limitService: SubscriptionLimitService,
+    private readonly logger: LoggerService,
   ) {}
 
   // ── Public: list available plans ──────────────────────
@@ -103,11 +102,17 @@ export class BillingController {
 
     try {
       const event = this.billingService.constructWebhookEvent(rawBody, signature);
-      this.logger.log(`Webhook received: ${event.type} (${event.id})`);
+      this.logger.info(`Webhook received: ${event.type} (${event.id})`, {
+        service: 'BillingController',
+        method: 'handleWebhook',
+      });
       await this.billingService.handleWebhookEvent(event);
       return { received: true };
     } catch (err) {
-      this.logger.error(`Webhook error: ${err instanceof Error ? err.message : err}`);
+      this.logger.logException(err, {
+        service: 'BillingController',
+        method: 'handleWebhook',
+      });
       throw new BadRequestException('Webhook signature verification failed');
     }
   }

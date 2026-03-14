@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMedications, type FhirMedicationRequest } from './hooks/use-medications';
 import { PrescriptionStatusBadge } from './components/PrescriptionStatusBadge';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const STATUSES = ['', 'DRAFT', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'STOPPED', 'CANCELLED'] as const;
 
@@ -77,11 +78,7 @@ export function MedicationsListPage(): React.ReactElement {
         </select>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
 
       {loading && prescriptions.length === 0 && (
         <div className="flex items-center justify-center py-20">

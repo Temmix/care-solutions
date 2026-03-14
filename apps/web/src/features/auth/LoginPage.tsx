@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 export function LoginPage(): React.ReactElement {
   const [email, setEmail] = useState('');
@@ -86,11 +87,7 @@ export function LoginPage(): React.ReactElement {
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Welcome back</h2>
           <p className="text-slate-500 text-sm mb-8">Sign in to your account to continue</p>
 
-          {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} className="mb-6" />
 
           <form onSubmit={handleSubmit}>
             <div className="mb-5">

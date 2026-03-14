@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Inject,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
@@ -26,7 +27,7 @@ import { RolesGuard, TenantGuard } from '../../../common/guards';
 interface RequestUser {
   id: string;
   email: string;
-  role: string;
+  globalRole: string;
 }
 
 @Controller('medications')
@@ -38,7 +39,7 @@ export class MedicationsController {
 
   @Post('catalogue')
   @Roles(Role.ADMIN, Role.CLINICIAN)
-  createMedication(@Body() dto: CreateMedicationDto, @CurrentTenant() tenantId: string) {
+  createMedication(@Body() dto: CreateMedicationDto, @CurrentTenant() tenantId: string | null) {
     return this.medicationsService.createMedication(dto, tenantId);
   }
 
@@ -47,14 +48,14 @@ export class MedicationsController {
   updateMedication(
     @Param('id') id: string,
     @Body() dto: UpdateMedicationDto,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.medicationsService.updateMedication(id, dto, tenantId);
   }
 
   @Get('catalogue')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
-  findAllMedications(@CurrentTenant() tenantId: string) {
+  findAllMedications(@CurrentTenant() tenantId: string | null) {
     return this.medicationsService.findAllMedications(tenantId);
   }
 
@@ -65,20 +66,24 @@ export class MedicationsController {
   createPrescription(
     @Body() dto: CreatePrescriptionDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
     return this.medicationsService.createPrescription(dto, user.id, tenantId);
   }
 
   @Get('prescriptions')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
-  findAllPrescriptions(@Query() dto: SearchPrescriptionsDto, @CurrentTenant() tenantId: string) {
+  findAllPrescriptions(
+    @Query() dto: SearchPrescriptionsDto,
+    @CurrentTenant() tenantId: string | null,
+  ) {
     return this.medicationsService.findAllPrescriptions(dto, tenantId);
   }
 
   @Get('prescriptions/:id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
-  findOnePrescription(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  findOnePrescription(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.medicationsService.findOnePrescription(id, tenantId);
   }
 
@@ -88,7 +93,7 @@ export class MedicationsController {
     @Param('id') id: string,
     @Body() dto: UpdatePrescriptionDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.medicationsService.updatePrescription(id, dto, user.id, tenantId);
   }
@@ -100,7 +105,7 @@ export class MedicationsController {
   recordAdministration(
     @Body() dto: CreateAdministrationDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.medicationsService.recordAdministration(dto, user.id, tenantId);
   }
@@ -109,7 +114,7 @@ export class MedicationsController {
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
   getAdministrations(
     @Param('id') requestId: string,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {

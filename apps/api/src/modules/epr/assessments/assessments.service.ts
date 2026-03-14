@@ -27,7 +27,8 @@ export class AssessmentsService {
   // ── Create ──────────────────────────────────────────────
 
   async create(dto: CreateAssessmentDto, userId: string, tenantId: string) {
-    if (!tenantId) throw new BadRequestException('Tenant context is required');
+    if (!tenantId)
+      throw new BadRequestException('Please select an organisation before performing this action.');
 
     const validType = await this.assessmentTypes.validateCode(dto.assessmentType, tenantId);
     if (!validType) throw new BadRequestException(`Invalid assessment type: ${dto.assessmentType}`);
@@ -81,7 +82,8 @@ export class AssessmentsService {
   // ── Search ──────────────────────────────────────────────
 
   async findAll(dto: SearchAssessmentsDto, tenantId: string) {
-    if (!tenantId) throw new BadRequestException('Tenant context is required');
+    if (!tenantId)
+      throw new BadRequestException('Please select an organisation before performing this action.');
     const page = Number(dto.page) || 1;
     const limit = Number(dto.limit) || 20;
     const skip = (page - 1) * limit;
@@ -117,7 +119,10 @@ export class AssessmentsService {
       include: ASSESSMENT_INCLUDES,
     });
 
-    if (!assessment) throw new NotFoundException('Assessment not found');
+    if (!assessment)
+      throw new NotFoundException(
+        'Assessment not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const displayNames = await this.assessmentTypes.getDisplayNames(
       [assessment.assessmentType],
@@ -136,7 +141,10 @@ export class AssessmentsService {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Assessment not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Assessment not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const assessment = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.assessment.update({
@@ -170,7 +178,10 @@ export class AssessmentsService {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Assessment not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Assessment not found. It may have been deleted or belongs to another organisation.',
+      );
 
     await this.prisma.$transaction(async (tx) => {
       await tx.assessment.update({
@@ -196,7 +207,10 @@ export class AssessmentsService {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
     });
-    if (!existing) throw new NotFoundException('Assessment not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Assessment not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const assessment = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.assessment.update({

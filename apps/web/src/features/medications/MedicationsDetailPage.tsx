@@ -6,6 +6,7 @@ import {
   type FhirMedicationAdministration,
 } from './hooks/use-medications';
 import { PrescriptionStatusBadge } from './components/PrescriptionStatusBadge';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const STATUS_TRANSITIONS: Record<string, { label: string; value: string }[]> = {
   draft: [{ label: 'Activate', value: 'ACTIVE' }],
@@ -93,11 +94,7 @@ export function MedicationsDetailPage(): React.ReactElement {
   }
 
   if (error && !prescription) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {error}
-      </div>
-    );
+    return <ErrorAlert message={error} className="mb-4" />;
   }
 
   if (!prescription) {
@@ -167,11 +164,7 @@ export function MedicationsDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       {/* Info bar */}
       <div className="bg-white rounded-xl border border-slate-100 p-6 mb-6">

@@ -47,7 +47,10 @@ export class PractitionersService {
       where,
       include: { organization: true },
     });
-    if (!practitioner) throw new NotFoundException('Practitioner not found');
+    if (!practitioner)
+      throw new NotFoundException(
+        'Practitioner not found. They may have been deactivated or belong to another organisation.',
+      );
     return toFhirPractitioner(practitioner);
   }
 

@@ -143,10 +143,15 @@ export class PatientsService {
       include: PATIENT_INCLUDES,
     });
 
-    if (!patient) throw new NotFoundException('Patient not found');
+    if (!patient)
+      throw new NotFoundException(
+        'Patient not found. They may have been removed or belong to another organisation.',
+      );
 
     if (userRole === 'PATIENT' && patient.userId !== userId) {
-      throw new ForbiddenException('You can only view your own record');
+      throw new ForbiddenException(
+        'You do not have permission to view this patient record. You can only access your own information.',
+      );
     }
 
     return toFhirPatient(patient as PatientWithRelations);
@@ -154,7 +159,10 @@ export class PatientsService {
 
   async update(id: string, dto: UpdatePatientDto, recordedById: string, tenantId: string) {
     const existing = await this.prisma.patient.findFirst({ where: { id, tenantId } });
-    if (!existing) throw new NotFoundException('Patient not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Patient not found. They may have been removed or belong to another organisation.',
+      );
 
     const { birthDate, ...rest } = dto;
     const data: Prisma.PatientUpdateInput = { ...rest };
@@ -196,7 +204,10 @@ export class PatientsService {
 
   async deactivate(id: string, recordedById: string, tenantId: string) {
     const existing = await this.prisma.patient.findFirst({ where: { id, tenantId } });
-    if (!existing) throw new NotFoundException('Patient not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Patient not found. They may have been removed or belong to another organisation.',
+      );
 
     await this.prisma.$transaction(async (tx) => {
       await tx.patient.update({
@@ -235,7 +246,10 @@ export class PatientsService {
     if (tenantId) patientWhere.tenantId = tenantId;
 
     const existing = await this.prisma.patient.findFirst({ where: patientWhere });
-    if (!existing) throw new NotFoundException('Patient not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Patient not found. They may have been removed or belong to another organisation.',
+      );
 
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
@@ -285,7 +299,10 @@ export class PatientsService {
     tenantId: string,
   ) {
     const existing = await this.prisma.patient.findFirst({ where: { id: patientId, tenantId } });
-    if (!existing) throw new NotFoundException('Patient not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Patient not found. They may have been removed or belong to another organisation.',
+      );
 
     const event = await this.prisma.patientEvent.create({
       data: {

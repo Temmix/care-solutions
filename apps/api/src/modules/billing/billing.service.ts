@@ -18,7 +18,9 @@ export class BillingService {
     if (!this._stripe) {
       const apiKey = this.config.get<string>('STRIPE_SECRET_KEY');
       if (!apiKey) {
-        throw new BadRequestException('Stripe is not configured. Set STRIPE_SECRET_KEY.');
+        throw new BadRequestException(
+          'Payment processing is not configured. Please contact your system administrator.',
+        );
       }
       this._stripe = new Stripe(apiKey);
     }
@@ -40,7 +42,7 @@ export class BillingService {
       });
 
       if (!org) {
-        throw new NotFoundException('Organization not found');
+        throw new NotFoundException('Organisation not found. Please verify your account setup.');
       }
 
       const limits = PLAN_LIMITS.FREE;
@@ -84,7 +86,8 @@ export class BillingService {
       where: { id: organizationId },
     });
 
-    if (!org) throw new NotFoundException('Organization not found');
+    if (!org)
+      throw new NotFoundException('Organisation not found. Please verify your account setup.');
 
     if (org.stripeCustomerId) return org.stripeCustomerId;
 
@@ -128,7 +131,9 @@ export class BillingService {
     });
 
     if (!org?.stripeCustomerId) {
-      throw new BadRequestException('No billing account found. Subscribe to a plan first.');
+      throw new BadRequestException(
+        'No billing account found. Please subscribe to a plan to access billing features.',
+      );
     }
 
     const session = await this.stripe.billingPortal.sessions.create({

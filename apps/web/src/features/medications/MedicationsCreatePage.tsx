@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useMedications, type MedicationCatalogueItem } from './hooks/use-medications';
 import { usePatients, type FhirPatient } from '../patients/hooks/use-patients';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const ROUTES = [
   'ORAL',
@@ -174,11 +175,7 @@ export function MedicationsCreatePage(): React.ReactElement {
         <h1 className="text-2xl font-bold text-slate-900">New Prescription</h1>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <form
         onSubmit={handleSubmit}

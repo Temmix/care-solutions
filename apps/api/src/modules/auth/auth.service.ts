@@ -5,6 +5,14 @@ import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto, LoginDto } from './dto';
 
+const MEMBERSHIP_SELECT = {
+  organizationId: true,
+  role: true,
+  organization: {
+    select: { id: true, name: true, type: true },
+  },
+} as const;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -19,7 +27,9 @@ export class AuthService {
     });
 
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException(
+        'An account with this email already exists. Please log in or use a different email.',
+      );
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -47,19 +57,36 @@ export class AuthService {
             firstName: dto.firstName,
             lastName: dto.lastName,
             role: 'ADMIN',
-            tenantId: org.id,
+            tenantId: org.id, // Dual-write: keep for backwards compat
+          },
+        });
+
+        // Create membership record
+        await tx.userTenantMembership.create({
+          data: {
+            userId: user.id,
+            organizationId: org.id,
+            role: 'ADMIN',
+            status: 'ACTIVE',
           },
         });
 
         return { user, org };
       });
 
-      return this.generateTokens(
-        result.user.id,
-        result.user.email,
-        result.user.role,
-        result.org.id,
-      );
+      const tokens = this.generateTokens(result.user.id, result.user.email);
+      const memberships = [
+        {
+          organizationId: result.org.id,
+          role: 'ADMIN' as const,
+          organization: {
+            id: result.org.id,
+            name: dto.tenantName!,
+            type: dto.organizationType ?? 'CARE_HOME',
+          },
+        },
+      ];
+      return { ...tokens, memberships };
     }
 
     // No tenant provided — create user with default role
@@ -73,7 +100,8 @@ export class AuthService {
       },
     });
 
-    return this.generateTokens(user.id, user.email, user.role, user.tenantId);
+    const tokens = this.generateTokens(user.id, user.email);
+    return { ...tokens, memberships: [] };
   }
 
   async login(dto: LoginDto) {
@@ -82,16 +110,27 @@ export class AuthService {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Incorrect email or password. Please check your details and try again.',
+      );
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Incorrect email or password. Please check your details and try again.',
+      );
     }
 
-    const tokens = this.generateTokens(user.id, user.email, user.role, user.tenantId);
-    return { ...tokens, mustChangePassword: user.mustChangePassword };
+    const tokens = this.generateTokens(user.id, user.email);
+
+    const memberships = await this.prisma.userTenantMembership.findMany({
+      where: { userId: user.id, status: 'ACTIVE' },
+      select: MEMBERSHIP_SELECT,
+      orderBy: { joinedAt: 'desc' },
+    });
+
+    return { ...tokens, mustChangePassword: user.mustChangePassword, memberships };
   }
 
   async refresh(refreshToken: string) {
@@ -108,9 +147,9 @@ export class AuthService {
         throw new UnauthorizedException();
       }
 
-      return this.generateTokens(user.id, user.email, user.role, user.tenantId);
+      return this.generateTokens(user.id, user.email);
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('Your session has expired. Please log in again.');
     }
   }
 
@@ -134,6 +173,11 @@ export class AuthService {
             type: true,
           },
         },
+        memberships: {
+          where: { status: 'ACTIVE' },
+          select: MEMBERSHIP_SELECT,
+          orderBy: { joinedAt: 'desc' },
+        },
       },
     });
 
@@ -144,8 +188,8 @@ export class AuthService {
     return user;
   }
 
-  private generateTokens(userId: string, email: string, role: string, tenantId: string | null) {
-    const payload = { sub: userId, email, role, tenantId };
+  private generateTokens(userId: string, email: string) {
+    const payload = { sub: userId, email };
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),

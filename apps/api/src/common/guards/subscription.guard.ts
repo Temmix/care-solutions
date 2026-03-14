@@ -27,7 +27,8 @@ export class SubscriptionGuard implements CanActivate {
     const user = request.user;
 
     // SUPER_ADMIN and TENANT_ADMIN bypass subscription checks
-    if (user?.role === 'SUPER_ADMIN' || user?.role === 'TENANT_ADMIN') {
+    const role = request.role ?? user?.globalRole;
+    if (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') {
       return true;
     }
 

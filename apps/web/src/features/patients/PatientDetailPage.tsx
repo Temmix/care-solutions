@@ -14,6 +14,7 @@ import { AssessmentStatusBadge } from '../assessments/components/AssessmentStatu
 import { RiskLevelBadge } from '../assessments/components/RiskLevelBadge';
 import { useMedications, type FhirMedicationRequest } from '../medications/hooks/use-medications';
 import { PrescriptionStatusBadge } from '../medications/components/PrescriptionStatusBadge';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UK_PHONE_RE = /^(?:\+44|0)\s?\d[\d\s]{8,12}$/;
@@ -291,11 +292,7 @@ export function PatientDetailPage(): React.ReactElement {
     );
   }
   if (error && !patient) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {error}
-      </div>
-    );
+    return <ErrorAlert message={error} className="mb-4" />;
   }
   if (!patient) {
     return <div className="text-slate-500 text-center py-20">Patient not found</div>;
@@ -384,11 +381,7 @@ export function PatientDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Demographics — 2 cols */}

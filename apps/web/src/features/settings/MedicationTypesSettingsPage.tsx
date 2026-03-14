@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useMedications, type MedicationCatalogueItem } from '../medications/hooks/use-medications';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const FORM_OPTIONS = [
   'TABLET',
@@ -173,11 +174,7 @@ export function MedicationTypesSettingsPage(): React.ReactElement {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       {/* Create/Edit Form */}
       {showForm && (

@@ -38,34 +38,71 @@ export class UsersService {
 
   async findAll(tenantId: string | null, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where: Prisma.UserWhereInput = {};
-    if (tenantId) where.tenantId = tenantId;
 
-    const [users, total] = await Promise.all([
-      this.prisma.user.findMany({
+    if (!tenantId) {
+      // SUPER_ADMIN listing all users
+      const [users, total] = await Promise.all([
+        this.prisma.user.findMany({
+          select: USER_SELECT,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.user.count(),
+      ]);
+      return { data: users, total, page, limit };
+    }
+
+    // Tenant-scoped: find users via membership join table
+    const where = { organizationId: tenantId, status: 'ACTIVE' as const };
+    const [memberships, total] = await Promise.all([
+      this.prisma.userTenantMembership.findMany({
         where,
-        select: USER_SELECT,
+        select: {
+          role: true,
+          user: { select: USER_SELECT },
+        },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { joinedAt: 'desc' },
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.userTenantMembership.count({ where }),
     ]);
 
-    return { data: users, total, page, limit };
+    // Map to expected shape, using membership role
+    const data = memberships.map((m) => ({
+      ...m.user,
+      role: m.role, // Override with tenant-specific role from membership
+    }));
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: string, tenantId: string | null) {
-    const where: Prisma.UserWhereInput = { id };
-    if (tenantId) where.tenantId = tenantId;
+    if (tenantId) {
+      // Validate user has active membership in this tenant
+      const membership = await this.prisma.userTenantMembership.findFirst({
+        where: { userId: id, organizationId: tenantId, status: 'ACTIVE' },
+        select: {
+          role: true,
+          user: { select: USER_SELECT },
+        },
+      });
+
+      if (!membership) {
+        throw new NotFoundException('User not found. They may have been deactivated or removed.');
+      }
+
+      return { ...membership.user, role: membership.role };
+    }
 
     const user = await this.prisma.user.findFirst({
-      where,
+      where: { id },
       select: USER_SELECT,
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('User not found. They may have been deactivated or removed.');
     }
 
     return user;
@@ -73,6 +110,14 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto, tenantId: string | null) {
     await this.findOne(id, tenantId);
+
+    // If role is being updated and we have a tenant context, also update the membership
+    if (dto.role && tenantId) {
+      await this.prisma.userTenantMembership.updateMany({
+        where: { userId: id, organizationId: tenantId, status: 'ACTIVE' },
+        data: { role: dto.role },
+      });
+    }
 
     return this.prisma.user.update({
       where: { id },
@@ -83,6 +128,14 @@ export class UsersService {
 
   async remove(id: string, tenantId: string | null) {
     await this.findOne(id, tenantId);
+
+    // If tenant-scoped, deactivate the membership rather than the entire user
+    if (tenantId) {
+      await this.prisma.userTenantMembership.updateMany({
+        where: { userId: id, organizationId: tenantId, status: 'ACTIVE' },
+        data: { status: 'INACTIVE', leftAt: new Date() },
+      });
+    }
 
     return this.prisma.user.update({
       where: { id },
@@ -95,7 +148,9 @@ export class UsersService {
 
   async createTenantUser(dto: CreateTenantUserDto, tenantId: string) {
     if (dto.role === 'SUPER_ADMIN' || dto.role === 'TENANT_ADMIN') {
-      throw new ForbiddenException('Cannot create a super admin or tenant admin via this endpoint');
+      throw new ForbiddenException(
+        'Super admins and tenant admins must be created through their dedicated management pages.',
+      );
     }
 
     await this.limits.enforceUserLimit(tenantId);
@@ -105,22 +160,64 @@ export class UsersService {
     });
 
     if (existing) {
-      throw new ConflictException('Email already registered');
+      // If user exists, check if they already have a membership in this tenant
+      const existingMembership = await this.prisma.userTenantMembership.findUnique({
+        where: { userId_organizationId: { userId: existing.id, organizationId: tenantId } },
+      });
+
+      if (existingMembership && existingMembership.status === 'ACTIVE') {
+        throw new ConflictException('This user is already a member of this organization.');
+      }
+
+      // Reactivate or create membership for existing user
+      if (existingMembership) {
+        await this.prisma.userTenantMembership.update({
+          where: { id: existingMembership.id },
+          data: { status: 'ACTIVE', role: dto.role, leftAt: null, joinedAt: new Date() },
+        });
+      } else {
+        await this.prisma.userTenantMembership.create({
+          data: {
+            userId: existing.id,
+            organizationId: tenantId,
+            role: dto.role,
+            status: 'ACTIVE',
+          },
+        });
+      }
+
+      return this.prisma.user.findUnique({
+        where: { id: existing.id },
+        select: USER_SELECT,
+      });
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    return this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        role: dto.role,
-        tenantId,
-        mustChangePassword: true,
-      },
-      select: USER_SELECT,
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: dto.role, // Dual-write: keep for backwards compat
+          tenantId, // Dual-write: keep for backwards compat
+          mustChangePassword: true,
+        },
+        select: USER_SELECT,
+      });
+
+      await tx.userTenantMembership.create({
+        data: {
+          userId: user.id,
+          organizationId: tenantId,
+          role: dto.role,
+          status: 'ACTIVE',
+        },
+      });
+
+      return user;
     });
   }
 
@@ -132,16 +229,20 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('User not found. They may have been deactivated or removed.');
     }
 
     const isValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
     if (!isValid) {
-      throw new BadRequestException('Current password is incorrect');
+      throw new BadRequestException(
+        'The current password you entered is incorrect. Please try again.',
+      );
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new BadRequestException('New password must be different from current password');
+      throw new BadRequestException(
+        'Your new password must be different from your current password.',
+      );
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
@@ -180,7 +281,9 @@ export class UsersService {
     });
 
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException(
+        'This email address is already in use. Please use a different email.',
+      );
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -200,7 +303,9 @@ export class UsersService {
 
   async deactivateSuperAdmin(id: string, currentUserId: string) {
     if (id === currentUserId) {
-      throw new ForbiddenException('Cannot deactivate your own account');
+      throw new ForbiddenException(
+        'You cannot deactivate your own account. Ask another administrator to do this.',
+      );
     }
 
     const user = await this.prisma.user.findFirst({
@@ -209,7 +314,9 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Super admin not found');
+      throw new NotFoundException(
+        'Super admin not found. They may have been deactivated or removed.',
+      );
     }
 
     return this.prisma.user.update({
@@ -226,7 +333,9 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Super admin not found');
+      throw new NotFoundException(
+        'Super admin not found. They may have been deactivated or removed.',
+      );
     }
 
     return this.prisma.user.update({
@@ -262,7 +371,9 @@ export class UsersService {
     });
 
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException(
+        'This email address is already in use. Please use a different email.',
+      );
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -282,7 +393,9 @@ export class UsersService {
 
   async deactivateTenantAdmin(id: string, currentUserId: string) {
     if (id === currentUserId) {
-      throw new ForbiddenException('Cannot deactivate your own account');
+      throw new ForbiddenException(
+        'You cannot deactivate your own account. Ask another administrator to do this.',
+      );
     }
 
     const user = await this.prisma.user.findFirst({
@@ -291,7 +404,9 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Tenant admin not found');
+      throw new NotFoundException(
+        'Tenant admin not found. They may have been deactivated or removed.',
+      );
     }
 
     return this.prisma.user.update({
@@ -308,7 +423,9 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Tenant admin not found');
+      throw new NotFoundException(
+        'Tenant admin not found. They may have been deactivated or removed.',
+      );
     }
 
     return this.prisma.user.update({

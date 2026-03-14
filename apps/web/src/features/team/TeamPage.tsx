@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../hooks/use-auth';
 import { useTeam, type TeamMember, type CreateMemberForm } from './hooks/use-team';
 import { UsageBanner, useUsage } from '../../components/UsageBanner';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const ROLES = ['ADMIN', 'CLINICIAN', 'NURSE', 'CARER', 'PATIENT'] as const;
 
@@ -301,16 +302,8 @@ export function TeamPage(): React.ReactElement {
 
       <UsageBanner show="users" usage={usage} />
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-      {actionError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {actionError}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
+      <ErrorAlert message={actionError} className="mb-4" />
 
       {loading && members.length === 0 && (
         <div className="flex items-center justify-center py-20">

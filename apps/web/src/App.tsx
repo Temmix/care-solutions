@@ -9,6 +9,7 @@ import { PatientListPage } from './features/patients/PatientListPage';
 import { PatientCreatePage } from './features/patients/PatientCreatePage';
 import { PatientDetailPage } from './features/patients/PatientDetailPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
+import { SelectTenantPage } from './features/tenants/SelectTenantPage';
 import { PractitionersPage } from './features/practitioners/PractitionersPage';
 import { SuperAdminsPage } from './features/super-admins/SuperAdminsPage';
 import { TenantAdminsPage } from './features/tenant-admins/TenantAdminsPage';
@@ -29,6 +30,13 @@ import { OrganisationSettingsPage } from './features/settings/OrganisationSettin
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
 import { MedicationsDetailPage } from './features/medications/MedicationsDetailPage';
+import { RosterPage } from './features/workforce/RosterPage';
+import { ShiftPatternsPage } from './features/workforce/ShiftPatternsPage';
+import { AvailabilityPage } from './features/workforce/AvailabilityPage';
+import { PatientFlowDashboardPage } from './features/patient-flow/PatientFlowDashboardPage';
+import { LocationsPage } from './features/patient-flow/LocationsPage';
+import { AdmitPatientPage } from './features/patient-flow/AdmitPatientPage';
+import { EncounterDetailPage } from './features/patient-flow/EncounterDetailPage';
 
 export function App(): React.ReactElement {
   return (
@@ -51,6 +59,7 @@ export function App(): React.ReactElement {
             <Route path="patients/:id" element={<PatientDetailPage />} />
             <Route path="practitioners" element={<PractitionersPage />} />
             <Route path="tenants" element={<TenantsPage />} />
+            <Route path="select-tenant" element={<SelectTenantPage />} />
             <Route path="super-admins" element={<SuperAdminsPage />} />
             <Route path="tenant-admins" element={<TenantAdminsPage />} />
             <Route path="care-plans" element={<CarePlanListPage />} />
@@ -67,6 +76,13 @@ export function App(): React.ReactElement {
             <Route path="settings/specialty-types" element={<SpecialtyTypesSettingsPage />} />
             <Route path="settings/medication-types" element={<MedicationTypesSettingsPage />} />
             <Route path="settings/organisation" element={<OrganisationSettingsPage />} />
+            <Route path="roster" element={<RosterPage />} />
+            <Route path="shift-patterns" element={<ShiftPatternsPage />} />
+            <Route path="availability" element={<AvailabilityPage />} />
+            <Route path="patient-flow" element={<PatientFlowDashboardPage />} />
+            <Route path="locations" element={<LocationsPage />} />
+            <Route path="admit" element={<AdmitPatientPage />} />
+            <Route path="encounters/:id" element={<EncounterDetailPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />

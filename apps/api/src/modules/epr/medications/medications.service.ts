@@ -41,7 +41,10 @@ export class MedicationsService {
     const existing = await this.prisma.medication.findFirst({
       where: { id, OR: [{ tenantId }, { tenantId: null }] },
     });
-    if (!existing) throw new NotFoundException('Medication not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Medication not found. It may have been discontinued or belongs to another organisation.',
+      );
 
     return this.prisma.medication.update({
       where: { id },
@@ -103,12 +106,13 @@ export class MedicationsService {
     return toFhirMedicationRequest(prescription as PrescriptionWithRelations);
   }
 
-  async findAllPrescriptions(dto: SearchPrescriptionsDto, tenantId: string) {
+  async findAllPrescriptions(dto: SearchPrescriptionsDto, tenantId: string | null) {
     const page = Number(dto.page) || 1;
     const limit = Number(dto.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.MedicationRequestWhereInput = { tenantId };
+    const where: Prisma.MedicationRequestWhereInput = {};
+    if (tenantId) where.tenantId = tenantId;
     if (dto.patientId) where.patientId = dto.patientId;
     if (dto.medicationId) where.medicationId = dto.medicationId;
     if (dto.status) where.status = dto.status;
@@ -127,13 +131,18 @@ export class MedicationsService {
     return toFhirMedicationRequestBundle(prescriptions as PrescriptionWithRelations[], total);
   }
 
-  async findOnePrescription(id: string, tenantId: string) {
+  async findOnePrescription(id: string, tenantId: string | null) {
+    const where: Prisma.MedicationRequestWhereInput = { id };
+    if (tenantId) where.tenantId = tenantId;
     const prescription = await this.prisma.medicationRequest.findFirst({
-      where: { id, tenantId },
+      where,
       include: PRESCRIPTION_INCLUDES,
     });
 
-    if (!prescription) throw new NotFoundException('Prescription not found');
+    if (!prescription)
+      throw new NotFoundException(
+        'Prescription not found. It may have been deleted or belongs to another organisation.',
+      );
 
     return toFhirMedicationRequest(prescription as PrescriptionWithRelations);
   }
@@ -142,12 +151,17 @@ export class MedicationsService {
     id: string,
     dto: UpdatePrescriptionDto,
     userId: string,
-    tenantId: string,
+    tenantId: string | null,
   ) {
+    const findWhere: Prisma.MedicationRequestWhereInput = { id };
+    if (tenantId) findWhere.tenantId = tenantId;
     const existing = await this.prisma.medicationRequest.findFirst({
-      where: { id, tenantId },
+      where: findWhere,
     });
-    if (!existing) throw new NotFoundException('Prescription not found');
+    if (!existing)
+      throw new NotFoundException(
+        'Prescription not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const { startDate, endDate, ...rest } = dto;
 
@@ -168,7 +182,7 @@ export class MedicationsService {
           action: 'UPDATE',
           resource: 'MedicationRequest',
           resourceId: id,
-          tenantId,
+          tenantId: existing.tenantId,
         },
       });
 
@@ -180,14 +194,25 @@ export class MedicationsService {
 
   // ── Administration ────────────────────────────────────
 
-  async recordAdministration(dto: CreateAdministrationDto, userId: string, tenantId: string) {
+  async recordAdministration(
+    dto: CreateAdministrationDto,
+    userId: string,
+    tenantId: string | null,
+  ) {
+    const reqWhere: Prisma.MedicationRequestWhereInput = { id: dto.requestId };
+    if (tenantId) reqWhere.tenantId = tenantId;
     const request = await this.prisma.medicationRequest.findFirst({
-      where: { id: dto.requestId, tenantId },
+      where: reqWhere,
       include: { medication: true },
     });
-    if (!request) throw new NotFoundException('Prescription not found');
+    if (!request)
+      throw new NotFoundException(
+        'Prescription not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const { requestId, occurredAt, ...rest } = dto;
+
+    const resolvedTenantId = request.tenantId;
 
     const admin = await this.prisma.$transaction(async (tx) => {
       const created = await tx.medicationAdministration.create({
@@ -198,7 +223,7 @@ export class MedicationsService {
           medicationId: request.medicationId,
           patientId: request.patientId,
           performerId: userId,
-          tenantId,
+          tenantId: resolvedTenantId,
         },
       });
 
@@ -212,7 +237,7 @@ export class MedicationsService {
             prescriptionId: requestId,
           } as unknown as Prisma.InputJsonValue,
           recordedById: userId,
-          tenantId,
+          tenantId: resolvedTenantId,
         },
       });
 
@@ -222,7 +247,7 @@ export class MedicationsService {
           action: 'CREATE',
           resource: 'MedicationAdministration',
           resourceId: created.id,
-          tenantId,
+          tenantId: resolvedTenantId,
         },
       });
 
@@ -234,13 +259,18 @@ export class MedicationsService {
 
   async getAdministrations(
     requestId: string,
-    tenantId: string,
+    tenantId: string | null,
     pagination?: { page?: number; limit?: number },
   ) {
+    const reqWhere: Prisma.MedicationRequestWhereInput = { id: requestId };
+    if (tenantId) reqWhere.tenantId = tenantId;
     const request = await this.prisma.medicationRequest.findFirst({
-      where: { id: requestId, tenantId },
+      where: reqWhere,
     });
-    if (!request) throw new NotFoundException('Prescription not found');
+    if (!request)
+      throw new NotFoundException(
+        'Prescription not found. It may have been deleted or belongs to another organisation.',
+      );
 
     const page = pagination?.page ?? 1;
     const limit = pagination?.limit ?? 50;

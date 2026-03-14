@@ -36,10 +36,10 @@ export class SubscriptionLimitService {
     };
   }
 
-  /** Count active users belonging to a tenant */
+  /** Count active members belonging to a tenant (via membership table) */
   private async countUsers(tenantId: string): Promise<number> {
-    return this.prisma.user.count({
-      where: { tenantId, isActive: true },
+    return this.prisma.userTenantMembership.count({
+      where: { organizationId: tenantId, status: 'ACTIVE' },
     });
   }
 

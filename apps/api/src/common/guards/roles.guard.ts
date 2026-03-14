@@ -17,18 +17,20 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
+    // request.role is set by TenantGuard (from membership or globalRole)
+    const role = request.role ?? request.user?.globalRole;
 
     // SUPER_ADMIN bypasses all role checks
-    if (user?.role === 'SUPER_ADMIN') {
+    if (role === 'SUPER_ADMIN') {
       return true;
     }
 
     // TENANT_ADMIN inherits ADMIN privileges (but not SUPER_ADMIN)
-    if (user?.role === 'TENANT_ADMIN') {
-      return requiredRoles.some((role) => role === 'TENANT_ADMIN' || role === 'ADMIN');
+    if (role === 'TENANT_ADMIN') {
+      return requiredRoles.some((r) => r === 'TENANT_ADMIN' || r === 'ADMIN');
     }
 
-    return requiredRoles.some((role) => user?.role === role);
+    return requiredRoles.some((r) => r === role);
   }
 }

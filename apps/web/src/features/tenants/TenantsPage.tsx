@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 interface FhirOrganization {
   id: string;
@@ -85,11 +86,7 @@ export function TenantsPage(): React.ReactElement {
   }
 
   if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {error}
-      </div>
-    );
+    return <ErrorAlert message={error} className="mb-4" />;
   }
 
   return (

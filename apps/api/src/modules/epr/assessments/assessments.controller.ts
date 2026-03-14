@@ -22,7 +22,7 @@ import { RolesGuard, TenantGuard } from '../../../common/guards';
 interface RequestUser {
   id: string;
   email: string;
-  role: string;
+  globalRole: string;
 }
 
 @Controller('assessments')

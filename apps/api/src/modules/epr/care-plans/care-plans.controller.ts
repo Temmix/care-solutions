@@ -11,6 +11,7 @@ import {
   Inject,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
@@ -31,7 +32,7 @@ import { RolesGuard, TenantGuard } from '../../../common/guards';
 interface RequestUser {
   id: string;
   email: string;
-  role: string;
+  globalRole: string;
 }
 
 @Controller('care-plans')
@@ -46,20 +47,21 @@ export class CarePlansController {
   create(
     @Body() dto: CreateCarePlanDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
     return this.carePlansService.create(dto, user.id, tenantId);
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
-  findAll(@Query() dto: SearchCarePlansDto, @CurrentTenant() tenantId: string) {
+  findAll(@Query() dto: SearchCarePlansDto, @CurrentTenant() tenantId: string | null) {
     return this.carePlansService.findAll(dto, tenantId);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
-  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.carePlansService.findOne(id, tenantId);
   }
 
@@ -69,7 +71,7 @@ export class CarePlansController {
     @Param('id') id: string,
     @Body() dto: UpdateCarePlanDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.update(id, dto, user.id, tenantId);
   }
@@ -82,7 +84,7 @@ export class CarePlansController {
     @Param('id') carePlanId: string,
     @Body() dto: CreateGoalDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.addGoal(carePlanId, dto, user.id, tenantId);
   }
@@ -94,7 +96,7 @@ export class CarePlansController {
     @Param('goalId') goalId: string,
     @Body() dto: UpdateGoalDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.updateGoal(carePlanId, goalId, dto, user.id, tenantId);
   }
@@ -106,7 +108,7 @@ export class CarePlansController {
     @Param('id') carePlanId: string,
     @Param('goalId') goalId: string,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.removeGoal(carePlanId, goalId, user.id, tenantId);
   }
@@ -119,7 +121,7 @@ export class CarePlansController {
     @Param('id') carePlanId: string,
     @Body() dto: CreateActivityDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.addActivity(carePlanId, dto, user.id, tenantId);
   }
@@ -131,7 +133,7 @@ export class CarePlansController {
     @Param('activityId') activityId: string,
     @Body() dto: UpdateActivityDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.updateActivity(carePlanId, activityId, dto, user.id, tenantId);
   }
@@ -143,7 +145,7 @@ export class CarePlansController {
     @Param('id') carePlanId: string,
     @Param('activityId') activityId: string,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.removeActivity(carePlanId, activityId, user.id, tenantId);
   }
@@ -156,7 +158,7 @@ export class CarePlansController {
     @Param('id') carePlanId: string,
     @Body() dto: CreateNoteDto,
     @CurrentUser() user: RequestUser,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
   ) {
     return this.carePlansService.addNote(carePlanId, dto, user.id, tenantId);
   }
@@ -165,7 +167,7 @@ export class CarePlansController {
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
   getNotes(
     @Param('id') carePlanId: string,
-    @CurrentTenant() tenantId: string,
+    @CurrentTenant() tenantId: string | null,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {

@@ -4,6 +4,7 @@ import { useAssessments, type FhirAssessment } from './hooks/use-assessments';
 import { AssessmentStatusBadge } from './components/AssessmentStatusBadge';
 import { RiskLevelBadge } from './components/RiskLevelBadge';
 import { useAuth } from '../../hooks/use-auth';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 export function AssessmentDetailPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
@@ -44,11 +45,7 @@ export function AssessmentDetailPage(): React.ReactElement {
   }
 
   if (error && !assessment) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        {error}
-      </div>
-    );
+    return <ErrorAlert message={error} className="mb-4" />;
   }
 
   if (!assessment) {
@@ -111,11 +108,7 @@ export function AssessmentDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-6" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main info */}

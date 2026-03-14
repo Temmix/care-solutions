@@ -1,8 +1,9 @@
 const API_BASE = '/api';
 
-interface ApiError {
+interface ApiErrorResponse {
   statusCode: number;
-  message: string;
+  message: string | string[];
+  error?: string;
 }
 
 type LogoutHandler = () => void;
@@ -103,11 +104,29 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const error: ApiError = await response.json();
-      throw new Error(typeof error.message === 'string' ? error.message : 'Request failed');
+      let message = 'Something went wrong. Please try again.';
+      try {
+        const body: ApiErrorResponse = await response.json();
+        if (Array.isArray(body.message)) {
+          message = body.message.join('. ');
+        } else if (typeof body.message === 'string') {
+          message = body.message;
+        }
+      } catch {
+        // If JSON parsing fails, use status-based messages
+        if (response.status === 403) message = 'You do not have permission to perform this action.';
+        else if (response.status === 404) message = 'The requested resource was not found.';
+        else if (response.status === 409) message = 'This action conflicts with existing data.';
+        else if (response.status >= 500)
+          message = 'A server error occurred. Please try again later.';
+      }
+      throw new Error(message);
     }
 
-    return response.json() as Promise<T>;
+    // Handle empty responses (e.g. 204 No Content from DELETE)
+    const text = await response.text();
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
   }
 
   get<T>(path: string): Promise<T> {

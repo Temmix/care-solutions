@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api-client';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const ORG_TYPES = [
   { value: 'CARE_HOME', label: 'Care Home' },
@@ -158,11 +159,7 @@ export function OrganisationSettingsPage(): React.ReactElement {
         </p>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
       {success && (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm">
           {success}

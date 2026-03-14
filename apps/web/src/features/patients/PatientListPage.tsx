@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { usePatients, type FhirPatient } from './hooks/use-patients';
 import { useAuth } from '../../hooks/use-auth';
 import { UsageBanner, useUsage } from '../../components/UsageBanner';
+import { ErrorAlert } from '../../components/ErrorAlert';
 
 const genderBadge: Record<string, string> = {
   male: 'bg-blue-50 text-blue-700',
@@ -170,11 +171,7 @@ export function PatientListPage(): React.ReactElement {
         </button>
       </form>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} className="mb-4" />
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
