@@ -12,6 +12,8 @@ import { CarePlanStatusBadge } from '../care-plans/components/CarePlanStatusBadg
 import { useAssessments, type FhirAssessment } from '../assessments/hooks/use-assessments';
 import { AssessmentStatusBadge } from '../assessments/components/AssessmentStatusBadge';
 import { RiskLevelBadge } from '../assessments/components/RiskLevelBadge';
+import { useMedications, type FhirMedicationRequest } from '../medications/hooks/use-medications';
+import { PrescriptionStatusBadge } from '../medications/components/PrescriptionStatusBadge';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UK_PHONE_RE = /^(?:\+44|0)\s?\d[\d\s]{8,12}$/;
@@ -136,10 +138,12 @@ export function PatientDetailPage(): React.ReactElement {
     usePatients();
   const { searchCarePlans } = useCarePlans();
   const { searchAssessments } = useAssessments();
+  const { searchPrescriptions } = useMedications();
   const [patient, setPatient] = useState<FhirPatient | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [patientCarePlans, setPatientCarePlans] = useState<FhirCarePlan[]>([]);
   const [patientAssessments, setPatientAssessments] = useState<FhirAssessment[]>([]);
+  const [patientMedications, setPatientMedications] = useState<FhirMedicationRequest[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -252,7 +256,17 @@ export function PatientDetailPage(): React.ReactElement {
         );
       })
       .catch(() => {});
-  }, [id, getPatient, getTimeline, searchCarePlans, searchAssessments]);
+
+    searchPrescriptions({ patientId: id, limit: 10 })
+      .then((result) => {
+        setPatientMedications(
+          (result.entry ?? [])
+            .map((e) => e.resource)
+            .filter((r): r is FhirMedicationRequest => !!r),
+        );
+      })
+      .catch(() => {});
+  }, [id, getPatient, getTimeline, searchCarePlans, searchAssessments, searchPrescriptions]);
 
   const handleAddEvent = async () => {
     if (!id || !eventForm.summary.trim()) return;
@@ -616,6 +630,42 @@ export function PatientDetailPage(): React.ReactElement {
                     </Link>
                   );
                 })}
+              </div>
+            )}
+          </div>
+
+          {/* Medications */}
+          <div className="bg-white rounded-xl border border-slate-100 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-slate-900">Medications</h2>
+              <Link
+                to={`/medications/new?patientId=${id}`}
+                className="text-xs text-accent no-underline hover:underline"
+              >
+                + New
+              </Link>
+            </div>
+            {patientMedications.length === 0 ? (
+              <p className="text-sm text-slate-400 m-0">No medications</p>
+            ) : (
+              <div className="space-y-2">
+                {patientMedications.map((rx) => (
+                  <Link
+                    key={rx.id}
+                    to={`/medications/${rx.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border border-slate-100 no-underline hover:border-slate-200 transition-colors"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">
+                        {rx.medicationReference?.display ?? 'Prescription'}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {rx.dosageInstruction?.[0]?.text ?? '-'}
+                      </div>
+                    </div>
+                    <PrescriptionStatusBadge status={rx.status} />
+                  </Link>
+                ))}
               </div>
             )}
           </div>

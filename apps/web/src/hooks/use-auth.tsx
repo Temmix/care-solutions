@@ -9,6 +9,12 @@ interface RegisterParams {
   lastName: string;
   tenantName?: string;
   organizationType?: string;
+  orgPhone?: string;
+  orgEmail?: string;
+  addressLine1?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
 }
 
 interface SelectedTenant {
@@ -86,13 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchProfile();
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setSelectedTenant(null);
     api.setTenantId(null);
     setState({ user: null, isAuthenticated: false, isLoading: false });
-  };
+  }, []);
+
+  // Register the logout handler so the API client can force logout on refresh failure
+  useEffect(() => {
+    api.setLogoutHandler(logout);
+  }, [logout]);
 
   return (
     <AuthContext.Provider

@@ -1,6 +1,7 @@
 import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { SubscriptionLimitService } from '../../billing/subscription-limit.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { SearchPatientDto } from './dto/search-patient.dto';
@@ -20,9 +21,14 @@ const PATIENT_INCLUDES = {
 
 @Injectable()
 export class PatientsService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(SubscriptionLimitService) private limits: SubscriptionLimitService,
+  ) {}
 
   async create(dto: CreatePatientDto, recordedById: string, tenantId: string) {
+    await this.limits.enforcePatientLimit(tenantId);
+
     const { nhsNumber, mrn, contacts, birthDate, ...patientData } = dto;
 
     const identifiers: Prisma.PatientIdentifierCreateWithoutPatientInput[] = [];

@@ -60,6 +60,8 @@ enum PatientEventType {
   DEMOGRAPHIC_CHANGE
   CARE_PLAN_CREATED
   CARE_PLAN_UPDATED
+  MEDICATION_PRESCRIBED
+  MEDICATION_ADMINISTERED
 }
 
 enum OrganizationType {
@@ -144,6 +146,49 @@ enum RiskLevel {
   VERY_HIGH
 }
 
+enum MedicationRequestStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  STOPPED
+  CANCELLED
+  ENTERED_IN_ERROR
+}
+
+enum MedicationAdminStatus {
+  IN_PROGRESS
+  COMPLETED
+  NOT_DONE
+  ENTERED_IN_ERROR
+}
+
+enum MedicationRoute {
+  ORAL
+  TOPICAL
+  INTRAVENOUS
+  INTRAMUSCULAR
+  SUBCUTANEOUS
+  INHALED
+  RECTAL
+  SUBLINGUAL
+  OTHER
+}
+
+enum MedicationForm {
+  TABLET
+  CAPSULE
+  LIQUID
+  INJECTION
+  CREAM
+  OINTMENT
+  INHALER
+  PATCH
+  DROPS
+  SUPPOSITORY
+  OTHER
+}
+
 // ─── Auth & System ────────────────────────────────────
 
 model User {
@@ -171,6 +216,9 @@ model User {
 
   performedAssessments Assessment[] @relation("AssessmentPerformer")
   reviewedAssessments  Assessment[] @relation("AssessmentReviewer")
+
+  prescribedMedications    MedicationRequest[]        @relation("MedicationPrescriber")
+  administeredMedications  MedicationAdministration[] @relation("MedicationAdministrator")
 
   @@index([tenantId])
   @@map("users")
@@ -233,6 +281,10 @@ model Organization {
   tenantAssessments     Assessment[]           @relation("TenantAssessments")
   tenantAssessmentTypes AssessmentTypeConfig[] @relation("TenantAssessmentTypes")
   tenantSpecialtyTypes  SpecialtyConfig[]      @relation("TenantSpecialtyTypes")
+
+  tenantMedications       Medication[]               @relation("TenantMedications")
+  tenantMedicationRequests MedicationRequest[]        @relation("TenantMedicationRequests")
+  tenantMedicationAdmins  MedicationAdministration[] @relation("TenantMedicationAdmins")
 
   subscription Subscription?
 
@@ -341,6 +393,9 @@ model Patient {
   events       PatientEvent[]
   carePlans    CarePlan[]
   assessments  Assessment[]
+
+  medicationRequests       MedicationRequest[]
+  medicationAdministrations MedicationAdministration[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -588,4 +643,104 @@ model Assessment {
   @@index([assessmentType, riskLevel])
   @@index([tenantId])
   @@map("assessments")
+}
+
+// ─── EPR: Medications (EPMA) ─────────────────────────
+
+model Medication {
+  id           String         @id @default(uuid())
+  name         String
+  genericName  String?
+  code         String?
+  form         MedicationForm @default(TABLET)
+  strength     String?
+  manufacturer String?
+  isActive     Boolean        @default(true)
+
+  tenantId String?
+  tenant   Organization? @relation("TenantMedications", fields: [tenantId], references: [id])
+
+  requests        MedicationRequest[]
+  administrations MedicationAdministration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([code])
+  @@index([tenantId])
+  @@map("medications")
+}
+
+model MedicationRequest {
+  id             String                  @id @default(uuid())
+  status         MedicationRequestStatus @default(DRAFT)
+  priority       String?
+  dosageText     String
+  dose           String?
+  frequency      String?
+  route          MedicationRoute         @default(ORAL)
+  startDate      DateTime                @db.Date
+  endDate        DateTime?               @db.Date
+  reasonText     String?
+  instructions   String?
+  asNeeded       Boolean                 @default(false)
+  asNeededReason String?
+  maxDosePerDay  String?
+
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  prescriberId String
+  prescriber   User @relation("MedicationPrescriber", fields: [prescriberId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantMedicationRequests", fields: [tenantId], references: [id])
+
+  administrations MedicationAdministration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, status])
+  @@index([medicationId])
+  @@index([tenantId])
+  @@index([prescriberId])
+  @@map("medication_requests")
+}
+
+model MedicationAdministration {
+  id             String               @id @default(uuid())
+  status         MedicationAdminStatus @default(COMPLETED)
+  occurredAt     DateTime             @default(now())
+  doseGiven      String?
+  route          MedicationRoute?
+  site           String?
+  notes          String?
+  notGivenReason String?
+
+  requestId String
+  request   MedicationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  performerId String
+  performer   User @relation("MedicationAdministrator", fields: [performerId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantMedicationAdmins", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+  @@index([patientId, occurredAt])
+  @@index([tenantId])
+  @@map("medication_administrations")
 }

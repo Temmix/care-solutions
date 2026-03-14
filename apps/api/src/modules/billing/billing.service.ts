@@ -34,7 +34,32 @@ export class BillingService {
     });
 
     if (!sub) {
-      throw new NotFoundException('No subscription found for this organization');
+      const org = await this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true, stripeCustomerId: true },
+      });
+
+      if (!org) {
+        throw new NotFoundException('Organization not found');
+      }
+
+      const limits = PLAN_LIMITS.FREE;
+      return {
+        id: null,
+        organizationId,
+        tier: 'FREE',
+        status: 'ACTIVE',
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        trialEndsAt: null,
+        patientLimit: limits.patientLimit,
+        userLimit: limits.userLimit,
+        limits,
+        organization: org,
+      };
     }
 
     const limits = PLAN_LIMITS[sub.tier] ?? PLAN_LIMITS.FREE;
@@ -232,6 +257,20 @@ export class BillingService {
       paused: 'CANCELED',
     };
     return map[status] ?? 'ACTIVE';
+  }
+
+  // ── All subscriptions (SUPER_ADMIN) ────────────────────
+
+  async getAllSubscriptions(): Promise<Record<string, { tier: string; status: string }>> {
+    const subs = await this.prisma.subscription.findMany({
+      select: { organizationId: true, tier: true, status: true },
+    });
+
+    const map: Record<string, { tier: string; status: string }> = {};
+    for (const sub of subs) {
+      map[sub.organizationId] = { tier: sub.tier, status: sub.status };
+    }
+    return map;
   }
 
   // ── Plan listing (public) ──────────────────────────────

@@ -9,6 +9,7 @@ import {
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SubscriptionLimitService } from '../billing/subscription-limit.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateSuperAdminDto } from './dto/create-super-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
@@ -30,7 +31,10 @@ const USER_SELECT = {
 
 @Injectable()
 export class UsersService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(SubscriptionLimitService) private limits: SubscriptionLimitService,
+  ) {}
 
   async findAll(tenantId: string | null, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -93,6 +97,8 @@ export class UsersService {
     if (dto.role === 'SUPER_ADMIN' || dto.role === 'TENANT_ADMIN') {
       throw new ForbiddenException('Cannot create a super admin or tenant admin via this endpoint');
     }
+
+    await this.limits.enforceUserLimit(tenantId);
 
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },

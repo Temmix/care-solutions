@@ -340,8 +340,8 @@ export function DashboardPage(): React.ReactElement {
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
               {[
                 { title: 'EPR', status: 'Live', done: true },
-                { title: 'Care Plans', status: 'Phase 2', done: false },
-                { title: 'EPMA', status: 'Phase 2', done: false },
+                { title: 'Care Plans', status: 'Live', done: true },
+                { title: 'EPMA', status: 'Live', done: true },
                 { title: 'Workforce', status: 'Phase 3', done: false },
                 { title: 'Patient Flow', status: 'Phase 3', done: false },
                 { title: 'Analytics', status: 'Phase 6', done: false },

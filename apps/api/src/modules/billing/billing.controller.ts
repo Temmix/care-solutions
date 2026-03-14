@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
 import { BillingService } from './billing.service';
+import { SubscriptionLimitService } from './subscription-limit.service';
 import { Roles, CurrentTenant } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
 
@@ -22,13 +23,25 @@ import { RolesGuard, TenantGuard } from '../../common/guards';
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
 
-  constructor(@Inject(BillingService) private billingService: BillingService) {}
+  constructor(
+    @Inject(BillingService) private billingService: BillingService,
+    @Inject(SubscriptionLimitService) private limitService: SubscriptionLimitService,
+  ) {}
 
   // ── Public: list available plans ──────────────────────
 
   @Get('plans')
   getPlans() {
     return this.billingService.getPlans();
+  }
+
+  // ── SUPER_ADMIN: all subscriptions ───────────────────
+
+  @Get('subscriptions')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  getAllSubscriptions() {
+    return this.billingService.getAllSubscriptions();
   }
 
   // ── Authenticated: subscription info ──────────────────
@@ -38,6 +51,15 @@ export class BillingController {
   @Roles(Role.ADMIN)
   getSubscription(@CurrentTenant() tenantId: string) {
     return this.billingService.getSubscription(tenantId);
+  }
+
+  // ── Authenticated: usage info ────────────────────────
+
+  @Get('usage')
+  @UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  getUsage(@CurrentTenant() tenantId: string) {
+    return this.limitService.getUsage(tenantId);
   }
 
   // ── Authenticated: create checkout session ────────────

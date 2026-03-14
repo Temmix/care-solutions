@@ -31,6 +31,12 @@ export class AuthService {
           data: {
             name: dto.tenantName!,
             type: dto.organizationType ?? 'CARE_HOME',
+            phone: dto.orgPhone ?? null,
+            email: dto.orgEmail ?? null,
+            addressLine1: dto.addressLine1 ?? null,
+            city: dto.city ?? null,
+            postalCode: dto.postalCode ?? null,
+            country: dto.country ?? 'GB',
           },
         });
 

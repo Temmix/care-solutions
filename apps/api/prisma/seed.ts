@@ -8,6 +8,9 @@ import {
   type ActivityStatus,
   type AssessmentStatus,
   type RiskLevel,
+  type MedicationForm,
+  type MedicationRequestStatus,
+  type MedicationRoute,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -1536,6 +1539,262 @@ async function main() {
   }
 
   console.log('  Created 4 assessments for Sunrise Care patients');
+
+  // ── Create medication catalogue ───────────────────────
+  const medicationData = [
+    {
+      name: 'Paracetamol',
+      genericName: 'Paracetamol',
+      code: '322236009',
+      form: 'TABLET' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Teva UK',
+    },
+    {
+      name: 'Ibuprofen',
+      genericName: 'Ibuprofen',
+      code: '387207008',
+      form: 'TABLET' as MedicationForm,
+      strength: '400mg',
+      manufacturer: 'Reckitt Benckiser',
+    },
+    {
+      name: 'Amoxicillin',
+      genericName: 'Amoxicillin',
+      code: '27658006',
+      form: 'CAPSULE' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Sandoz',
+    },
+    {
+      name: 'Amlodipine',
+      genericName: 'Amlodipine besylate',
+      code: '386864001',
+      form: 'TABLET' as MedicationForm,
+      strength: '5mg',
+      manufacturer: 'Pfizer',
+    },
+    {
+      name: 'Metformin',
+      genericName: 'Metformin hydrochloride',
+      code: '109081006',
+      form: 'TABLET' as MedicationForm,
+      strength: '500mg',
+      manufacturer: 'Merck',
+    },
+    {
+      name: 'Omeprazole',
+      genericName: 'Omeprazole',
+      code: '387137007',
+      form: 'CAPSULE' as MedicationForm,
+      strength: '20mg',
+      manufacturer: 'AstraZeneca',
+    },
+    {
+      name: 'Lactulose',
+      genericName: 'Lactulose',
+      code: '273945008',
+      form: 'LIQUID' as MedicationForm,
+      strength: '3.1-3.7g/5ml',
+      manufacturer: 'Actavis',
+    },
+    {
+      name: 'Morphine Sulphate',
+      genericName: 'Morphine sulphate',
+      code: '373529000',
+      form: 'LIQUID' as MedicationForm,
+      strength: '10mg/5ml',
+      manufacturer: 'Martindale Pharma',
+    },
+    {
+      name: 'Salbutamol Inhaler',
+      genericName: 'Salbutamol',
+      code: '372897005',
+      form: 'INHALER' as MedicationForm,
+      strength: '100mcg/dose',
+      manufacturer: 'GlaxoSmithKline',
+    },
+    {
+      name: 'Fentanyl Patch',
+      genericName: 'Fentanyl',
+      code: '373492002',
+      form: 'PATCH' as MedicationForm,
+      strength: '25mcg/hr',
+      manufacturer: 'Janssen',
+    },
+  ];
+
+  const medications = [];
+  for (const med of medicationData) {
+    const created = await prisma.medication.create({
+      data: { ...med, tenantId: null },
+    });
+    medications.push(created);
+  }
+  console.log(`  Created ${medications.length} system medications`);
+
+  // ── Create prescriptions for Sunrise Care ─────────────
+  const paracetamol = medications.find((m) => m.name === 'Paracetamol')!;
+  const amlodipine = medications.find((m) => m.name === 'Amlodipine')!;
+  const omeprazole = medications.find((m) => m.name === 'Omeprazole')!;
+  const lactulose = medications.find((m) => m.name === 'Lactulose')!;
+  const morphine = medications.find((m) => m.name === 'Morphine Sulphate')!;
+
+  // Margaret — Paracetamol QDS for pain
+  if (margaret && nurseUser) {
+    const rx1 = await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 tablet four times daily',
+        dose: '500mg',
+        frequency: 'QDS',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-01'),
+        reasonText: 'Chronic lower back pain management',
+        instructions: 'Take with or after food',
+        maxDosePerDay: '4g',
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Record two administrations
+    await prisma.medicationAdministration.create({
+      data: {
+        status: 'COMPLETED',
+        occurredAt: new Date('2026-03-12T08:00:00Z'),
+        doseGiven: '500mg',
+        route: 'ORAL' as MedicationRoute,
+        notes: 'Morning dose administered with breakfast',
+        requestId: rx1.id,
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        performerId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+    await prisma.medicationAdministration.create({
+      data: {
+        status: 'COMPLETED',
+        occurredAt: new Date('2026-03-12T12:00:00Z'),
+        doseGiven: '500mg',
+        route: 'ORAL' as MedicationRoute,
+        requestId: rx1.id,
+        medicationId: paracetamol.id,
+        patientId: margaret.id,
+        performerId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.patientEvent.create({
+      data: {
+        patientId: margaret.id,
+        eventType: 'MEDICATION_PRESCRIBED',
+        summary: 'Medication prescribed: Paracetamol 500mg QDS',
+        detail: { prescriptionId: rx1.id } as any,
+        recordedById: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Margaret — Amlodipine for hypertension
+    const rx2 = await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 tablet once daily in the morning',
+        dose: '5mg',
+        frequency: 'OD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-01-15'),
+        reasonText: 'Hypertension',
+        medicationId: amlodipine.id,
+        patientId: margaret.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.patientEvent.create({
+      data: {
+        patientId: margaret.id,
+        eventType: 'MEDICATION_PRESCRIBED',
+        summary: 'Medication prescribed: Amlodipine 5mg OD',
+        detail: { prescriptionId: rx2.id } as any,
+        recordedById: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  // Harold — Omeprazole + Lactulose
+  if (harold && adminUser) {
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '1 capsule once daily before breakfast',
+        dose: '20mg',
+        frequency: 'OD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-15'),
+        reasonText: 'Gastro-oesophageal reflux',
+        instructions: 'Take 30 minutes before food',
+        medicationId: omeprazole.id,
+        patientId: harold.id,
+        prescriberId: adminUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'ACTIVE' as MedicationRequestStatus,
+        priority: 'routine',
+        dosageText: '15ml twice daily',
+        dose: '15ml',
+        frequency: 'BD',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-02-15'),
+        reasonText: 'Constipation',
+        medicationId: lactulose.id,
+        patientId: harold.id,
+        prescriberId: adminUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  // Dorothy — Morphine PRN (palliative)
+  if (dorothy && nurseUser) {
+    await prisma.medicationRequest.create({
+      data: {
+        status: 'DRAFT' as MedicationRequestStatus,
+        priority: 'urgent',
+        dosageText: '5mg every 4 hours as needed for pain',
+        dose: '5mg',
+        frequency: 'PRN',
+        route: 'ORAL' as MedicationRoute,
+        startDate: new Date('2026-03-10'),
+        reasonText: 'Anticipatory prescribing — end of life pain management',
+        instructions:
+          'Administer when patient reports pain score > 4. Observe for respiratory depression.',
+        asNeeded: true,
+        asNeededReason: 'Pain score above 4',
+        maxDosePerDay: '30mg',
+        medicationId: morphine.id,
+        patientId: dorothy.id,
+        prescriberId: nurseUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  console.log('  Created 5 prescriptions and 2 administrations for Sunrise Care patients');
 
   // ── Summary ──────────────────────────────────────────
   console.log('\n✅ Seed complete!\n');

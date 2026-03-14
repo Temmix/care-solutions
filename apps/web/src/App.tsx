@@ -24,6 +24,11 @@ import { AssessmentDetailPage } from './features/assessments/AssessmentDetailPag
 import { AssessmentTypesSettingsPage } from './features/settings/AssessmentTypesSettingsPage';
 import { SpecialtyTypesSettingsPage } from './features/settings/SpecialtyTypesSettingsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { MedicationTypesSettingsPage } from './features/settings/MedicationTypesSettingsPage';
+import { OrganisationSettingsPage } from './features/settings/OrganisationSettingsPage';
+import { MedicationsListPage } from './features/medications/MedicationsListPage';
+import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
+import { MedicationsDetailPage } from './features/medications/MedicationsDetailPage';
 
 export function App(): React.ReactElement {
   return (
@@ -51,12 +56,17 @@ export function App(): React.ReactElement {
             <Route path="care-plans" element={<CarePlanListPage />} />
             <Route path="care-plans/new" element={<CarePlanCreatePage />} />
             <Route path="care-plans/:id" element={<CarePlanDetailPage />} />
+            <Route path="medications" element={<MedicationsListPage />} />
+            <Route path="medications/new" element={<MedicationsCreatePage />} />
+            <Route path="medications/:id" element={<MedicationsDetailPage />} />
             <Route path="assessments" element={<AssessmentListPage />} />
             <Route path="assessments/new" element={<AssessmentCreatePage />} />
             <Route path="assessments/:id" element={<AssessmentDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/assessment-types" element={<AssessmentTypesSettingsPage />} />
             <Route path="settings/specialty-types" element={<SpecialtyTypesSettingsPage />} />
+            <Route path="settings/medication-types" element={<MedicationTypesSettingsPage />} />
+            <Route path="settings/organisation" element={<OrganisationSettingsPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />
