@@ -35,16 +35,31 @@ module "ecr" {
   repository_names = ["care-api", "care-web"]
 }
 
-# ── ACM (uncomment when you have a domain) ──────────────
-# module "acm" {
-#   source = "../../modules/acm"
-#
-#   project_name              = var.project_name
-#   environment               = var.environment
-#   domain_name               = var.domain_name
-#   subject_alternative_names = ["*.${var.domain_name}"]
-#   route53_zone_id           = var.route53_zone_id
-# }
+# ── Route53 (DNS) ─────────────────────────────────────
+
+module "route53" {
+  count  = var.enable_dns ? 1 : 0
+  source = "../../modules/route53"
+
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+  alb_dns_name = module.alb.alb_dns_name
+  alb_zone_id  = module.alb.alb_zone_id
+}
+
+# ── ACM (SSL certificate) ────────────────────────────
+
+module "acm" {
+  count  = var.enable_dns ? 1 : 0
+  source = "../../modules/acm"
+
+  project_name              = var.project_name
+  environment               = var.environment
+  domain_name               = var.domain_name
+  subject_alternative_names = ["*.${var.domain_name}"]
+  route53_zone_id           = module.route53[0].zone_id
+}
 
 # ── RDS (free tier) ─────────────────────────────────────
 
@@ -77,7 +92,7 @@ module "alb" {
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
-  # certificate_arn = module.acm.certificate_arn  # uncomment when ACM is enabled
+  certificate_arn = var.enable_dns ? module.acm[0].certificate_arn : ""
 }
 
 # ── Secrets Manager ─────────────────────────────────────

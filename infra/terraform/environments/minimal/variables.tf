@@ -54,3 +54,16 @@ variable "stripe_webhook_secret" {
   sensitive   = true
   default     = ""
 }
+
+# Domain
+variable "domain_name" {
+  description = "Primary domain name (e.g. clinvara.com)"
+  type        = string
+  default     = "clinvara.com"
+}
+
+variable "enable_dns" {
+  description = "Enable Route53 hosted zone, ACM certificate, and HTTPS"
+  type        = bool
+  default     = false
+}
