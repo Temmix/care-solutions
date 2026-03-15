@@ -51,6 +51,7 @@ jobs:
     name: Build & Push Images
     runs-on: ubuntu-latest
     needs: [test]
+    environment: production
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
       api_image: ${{ steps.images.outputs.api }}
