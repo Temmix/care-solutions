@@ -20,6 +20,9 @@ import {
   AdmitPatientDto,
   TransferDto,
   DischargeDto,
+  CreateDischargePlanDto,
+  CreateDischargeTaskDto,
+  UpdateDischargeTaskDto,
 } from './dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
@@ -145,5 +148,58 @@ export class PatientFlowController {
     @CurrentTenant() tenantId: string | null,
   ) {
     return this.patientFlowService.discharge(id, dto, user.id, tenantId);
+  }
+
+  // ── Discharge Planning ────────────────────────────────
+
+  @Post('encounters/:id/discharge-plan')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE)
+  createDischargePlan(
+    @Param('id') id: string,
+    @Body() dto: CreateDischargePlanDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.patientFlowService.createDischargePlan(id, dto, user.id, tenantId);
+  }
+
+  @Get('encounters/:id/discharge-plan')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  getDischargePlan(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
+    return this.patientFlowService.getDischargePlan(id, tenantId);
+  }
+
+  @Post('encounters/:id/discharge-plan/tasks')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE)
+  addDischargeTask(
+    @Param('id') id: string,
+    @Body() dto: CreateDischargeTaskDto,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.patientFlowService.addDischargeTask(id, dto, tenantId);
+  }
+
+  @Patch('encounters/:id/discharge-plan/tasks/:taskId')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  updateDischargeTask(
+    @Param('id') id: string,
+    @Param('taskId') taskId: string,
+    @Body() dto: UpdateDischargeTaskDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    return this.patientFlowService.updateDischargeTask(id, taskId, dto, user.id, tenantId);
+  }
+
+  @Post('encounters/:id/discharge-plan/complete')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE)
+  completeDischargePlan(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    return this.patientFlowService.completeDischargePlan(id, user.id, tenantId);
   }
 }

@@ -4,3 +4,6 @@ export { CreateBedDto } from './create-bed.dto';
 export { AdmitPatientDto } from './admit-patient.dto';
 export { TransferDto } from './transfer.dto';
 export { DischargeDto } from './discharge.dto';
+export { CreateDischargePlanDto } from './create-discharge-plan.dto';
+export { CreateDischargeTaskDto } from './create-discharge-task.dto';
+export { UpdateDischargeTaskDto } from './update-discharge-task.dto';

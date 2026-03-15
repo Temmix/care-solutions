@@ -15,7 +15,10 @@
     "@care/shared": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.23.0"
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^6.23.0",
+    "recharts": "^3.8.0",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

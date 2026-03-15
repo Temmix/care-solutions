@@ -246,6 +246,45 @@ enum AvailabilityType {
   TRAINING
 }
 
+// ─── Phase 3: Shift Swap Enums ──────────────────────────
+
+enum ShiftSwapStatus {
+  PENDING
+  ACCEPTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+// ─── Phase 3: Discharge Planning Enums ──────────────────
+
+enum DischargePlanStatus {
+  DRAFT
+  IN_PROGRESS
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum DischargeTaskType {
+  MEDICATION_REVIEW
+  CARE_PACKAGE
+  TRANSPORT
+  FOLLOW_UP_APPOINTMENT
+  EQUIPMENT
+  PATIENT_EDUCATION
+  FAMILY_NOTIFICATION
+  GP_LETTER
+}
+
+enum DischargeTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
 // ─── Phase 3: Patient Flow Enums ───────────────────────
 
 enum EncounterStatus {
@@ -334,6 +373,17 @@ model User {
   // Phase 3: Patient Flow
   primaryEncounters Encounter[] @relation("EncounterPrimaryPractitioner")
 
+  // Phase 3: Shift Swaps
+  swapRequestsMade     ShiftSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived ShiftSwapRequest[] @relation("SwapResponder")
+  swapRequestsApproved ShiftSwapRequest[] @relation("SwapApprover")
+
+  // Phase 3: Discharge Planning
+  dischargePlansCreated   DischargePlan[] @relation("DischargePlanCreator")
+  dischargePlansCompleted DischargePlan[] @relation("DischargePlanCompleter")
+  dischargeTasksAssigned  DischargeTask[] @relation("DischargeTaskAssignee")
+  dischargeTasksCompleted DischargeTask[] @relation("DischargeTaskCompleter")
+
   // Multi-tenancy memberships
   memberships UserTenantMembership[] @relation("UserMemberships")
 
@@ -415,6 +465,12 @@ model Organization {
   tenantLocations  Location[]  @relation("TenantLocations")
   tenantBeds       Bed[]       @relation("TenantBeds")
   tenantEncounters Encounter[] @relation("TenantEncounters")
+
+  // Phase 3: Shift Swaps
+  tenantSwapRequests ShiftSwapRequest[] @relation("TenantSwapRequests")
+
+  // Phase 3: Discharge Planning
+  tenantDischargePlans DischargePlan[] @relation("TenantDischargePlans")
 
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
@@ -956,6 +1012,10 @@ model ShiftAssignment {
 
   createdAt DateTime @default(now())
 
+  // Phase 3: Shift Swaps
+  swapRequestsAsOriginal ShiftSwapRequest[] @relation("SwapOriginal")
+  swapRequestsAsTarget   ShiftSwapRequest[] @relation("SwapTarget")
+
   @@unique([shiftId, userId])
   @@index([userId])
   @@index([shiftId])
@@ -1068,7 +1128,8 @@ model Encounter {
   tenantId String
   tenant   Organization @relation("TenantEncounters", fields: [tenantId], references: [id])
 
-  transfers Transfer[]
+  transfers     Transfer[]
+  dischargePlan DischargePlan?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1108,6 +1169,97 @@ model Transfer {
   @@index([encounterId])
   @@index([transferredAt])
   @@map("transfers")
+}
+
+// ─── Phase 3: Shift Swap Marketplace ────────────────────
+
+model ShiftSwapRequest {
+  id          String          @id @default(uuid())
+  status      ShiftSwapStatus @default(PENDING)
+  reason      String?
+  managerNote String?
+
+  requesterId               String
+  requester                 User            @relation("SwapRequester", fields: [requesterId], references: [id])
+
+  originalShiftAssignmentId String
+  originalShiftAssignment   ShiftAssignment @relation("SwapOriginal", fields: [originalShiftAssignmentId], references: [id])
+
+  targetShiftAssignmentId   String?
+  targetShiftAssignment     ShiftAssignment? @relation("SwapTarget", fields: [targetShiftAssignmentId], references: [id])
+
+  responderId               String?
+  responder                 User?           @relation("SwapResponder", fields: [responderId], references: [id])
+
+  approvedById              String?
+  approvedBy                User?           @relation("SwapApprover", fields: [approvedById], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantSwapRequests", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([requesterId])
+  @@index([responderId])
+  @@index([originalShiftAssignmentId])
+  @@map("shift_swap_requests")
+}
+
+// ─── Phase 3: Discharge Planning ────────────────────────
+
+model DischargePlan {
+  id          String              @id @default(uuid())
+  status      DischargePlanStatus @default(DRAFT)
+  plannedDate DateTime?           @db.Date
+  actualDate  DateTime?
+  notes       String?
+
+  encounterId String    @unique
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("DischargePlanCreator", fields: [createdById], references: [id])
+
+  completedById String?
+  completedBy   User?  @relation("DischargePlanCompleter", fields: [completedById], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantDischargePlans", fields: [tenantId], references: [id])
+
+  tasks DischargeTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([encounterId])
+  @@map("discharge_plans")
+}
+
+model DischargeTask {
+  id          String              @id @default(uuid())
+  type        DischargeTaskType
+  status      DischargeTaskStatus @default(PENDING)
+  notes       String?
+  completedAt DateTime?
+
+  dischargePlanId String
+  dischargePlan   DischargePlan @relation(fields: [dischargePlanId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?  @relation("DischargeTaskAssignee", fields: [assignedToId], references: [id])
+
+  completedById String?
+  completedBy   User?  @relation("DischargeTaskCompleter", fields: [completedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dischargePlanId])
+  @@index([assignedToId])
+  @@map("discharge_tasks")
 }
 
 // ─── Encryption: Patient Search Index ───────────────────

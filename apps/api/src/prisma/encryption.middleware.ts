@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { ENCRYPTED_FIELDS } from '../modules/encryption/encryption.constants';
+import { ENCRYPTED_FIELDS, ENCRYPTION_PREFIX } from '../modules/encryption/encryption.constants';
 import type { EncryptionService } from '../modules/encryption/encryption.service';
 import type { BlindIndexService } from '../modules/encryption/blind-index.service';
 import type { FieldEncryptionConfig } from '../modules/encryption/encryption.types';
@@ -66,19 +66,89 @@ const TENANT_RESOLUTION: Record<string, TenantResolution> = {
   StaffAvailability: { type: 'direct', field: 'tenantId' },
 };
 
-/** Relations that may be included in queries and contain encrypted fields */
+/**
+ * Relations that may be included in queries and contain encrypted fields.
+ * The middleware walks these recursively, so deeply nested chains work
+ * (e.g. CarePlan -> notes -> author decrypts all three levels).
+ */
 const NESTED_RELATIONS: Record<string, Record<string, string>> = {
+  // ── EPR core ──────────────────────────────────────────
   Patient: {
     contacts: 'PatientContact',
     identifiers: 'PatientIdentifier',
   },
   CarePlan: {
+    patient: 'Patient',
+    author: 'User',
     notes: 'CarePlanNote',
     goals: 'CarePlanGoal',
     activities: 'CarePlanActivity',
   },
+  CarePlanNote: {
+    author: 'User',
+  },
+  CarePlanActivity: {
+    assignee: 'Practitioner',
+  },
   MedicationRequest: {
+    patient: 'Patient',
+    prescriber: 'User',
     administrations: 'MedicationAdministration',
+  },
+  MedicationAdministration: {
+    performer: 'User',
+  },
+  Assessment: {
+    patient: 'Patient',
+    performedBy: 'User',
+    reviewedBy: 'User',
+  },
+  PatientEvent: {
+    patient: 'Patient',
+    recordedBy: 'User',
+  },
+
+  // ── Patient flow ──────────────────────────────────────
+  Encounter: {
+    patient: 'Patient',
+    primaryPractitioner: 'Practitioner',
+  },
+  Transfer: {
+    transferredBy: 'User',
+  },
+  DischargePlan: {
+    createdBy: 'User',
+    completedBy: 'User',
+    tasks: 'DischargeTask',
+  },
+  DischargeTask: {
+    assignedTo: 'User',
+    completedBy: 'User',
+  },
+
+  // ── Workforce ─────────────────────────────────────────
+  Shift: {
+    assignments: 'ShiftAssignment',
+  },
+  ShiftAssignment: {
+    user: 'User',
+  },
+  ShiftSwapRequest: {
+    requester: 'User',
+    responder: 'User',
+    approvedBy: 'User',
+  },
+
+  // ── Admin / billing ───────────────────────────────────
+  UserTenantMembership: {
+    user: 'User',
+    organization: 'Organization',
+  },
+  Practitioner: {
+    organization: 'Organization',
+  },
+  Subscription: {
+    organization: 'Organization',
   },
 };
 
@@ -116,14 +186,17 @@ export function setupEncryptionMiddleware(
     }
 
     const fieldConfigs = ENCRYPTED_FIELDS[model];
-    if (!fieldConfigs) {
+    const hasNestedRelations = NESTED_RELATIONS[model] != null;
+
+    // Skip models that have no encrypted fields AND no nested encrypted relations
+    if (!fieldConfigs && !hasNestedRelations) {
       return next(params);
     }
 
     // Save plaintext values for n-gram indexing BEFORE encryption
     let ngramPlaintexts: Record<string, string> | null = null;
 
-    if (WRITE_ACTIONS.has(params.action)) {
+    if (fieldConfigs && WRITE_ACTIONS.has(params.action)) {
       ngramPlaintexts = extractNgramPlaintexts(params, fieldConfigs);
       await encryptWriteArgs(
         params,
@@ -147,7 +220,7 @@ export function setupEncryptionMiddleware(
       await upsertNgramIndexes(model, result, ngramPlaintexts, blindIndexService, prisma);
     }
 
-    // Decrypt result fields
+    // Decrypt result fields and nested relations
     if (result != null && RESULT_ACTIONS.has(params.action)) {
       await decryptResult(result, model, encryptionService, prisma);
     }
@@ -168,15 +241,64 @@ async function resolveTenantId(
   prisma: PrismaLike,
 ): Promise<string | null> {
   const resolution = TENANT_RESOLUTION[model];
-  if (!resolution) return null;
+  if (!resolution) return resolveTenantFromEnvelope(record, prisma);
 
-  if (resolution.type === 'direct' || resolution.type === 'self') {
+  if (resolution.type === 'self') {
     return (record[resolution.field] as string) ?? null;
+  }
+
+  if (resolution.type === 'direct') {
+    // Field is in the record (full select or include)
+    const value = record[resolution.field] as string | undefined;
+    if (value) return value;
+
+    // Field was not selected — look it up by record id
+    const id = record.id as string | undefined;
+    if (id) {
+      try {
+        const delegateName = toDelegateName(model);
+        const row = await prisma[delegateName].findUnique({
+          where: { id },
+          select: { [resolution.field]: true },
+        });
+        if (row?.[resolution.field]) return row[resolution.field] as string;
+      } catch {
+        // fall through
+      }
+    }
+
+    // Last resort: extract kid from any encrypted value and look up tenant
+    return resolveTenantFromEnvelope(record, prisma);
   }
 
   if (resolution.type === 'parent' && resolution.parentModel && resolution.foreignKey) {
     const fkValue = record[resolution.foreignKey] as string | undefined;
-    if (!fkValue) return null;
+    if (!fkValue) {
+      // Foreign key not selected — look it up by record id
+      const id = record.id as string | undefined;
+      if (id) {
+        try {
+          const delegateName = toDelegateName(model);
+          const row = await prisma[delegateName].findUnique({
+            where: { id },
+            select: { [resolution.foreignKey]: true },
+          });
+          const fk = row?.[resolution.foreignKey] as string | undefined;
+          if (fk) {
+            const parent = await prisma[resolution.parentModel].findUnique({
+              where: { id: fk },
+              select: { [resolution.field]: true },
+            });
+            if (parent?.[resolution.field]) return parent[resolution.field] as string;
+          }
+        } catch {
+          // fall through
+        }
+      }
+
+      // Last resort: extract kid from any encrypted value and look up tenant
+      return resolveTenantFromEnvelope(record, prisma);
+    }
 
     const parent = await prisma[resolution.parentModel].findUnique({
       where: { id: fkValue },
@@ -185,6 +307,34 @@ async function resolveTenantId(
     return parent?.[resolution.field] ?? null;
   }
 
+  return resolveTenantFromEnvelope(record, prisma);
+}
+
+/**
+ * Last-resort tenant resolution: find any encrypted value in the record,
+ * parse the envelope to extract the key ID, and look up the tenant from
+ * the encryption_keys table.
+ */
+async function resolveTenantFromEnvelope(
+  record: Record<string, unknown>,
+  prisma: PrismaLike,
+): Promise<string | null> {
+  for (const value of Object.values(record)) {
+    if (typeof value !== 'string' || !value.startsWith(ENCRYPTION_PREFIX)) continue;
+    try {
+      const envelopeB64 = value.slice(ENCRYPTION_PREFIX.length);
+      const envelope = JSON.parse(Buffer.from(envelopeB64, 'base64').toString('utf8'));
+      const kid = envelope.kid as string | undefined;
+      if (!kid) continue;
+      const key = await prisma.encryptionKey.findUnique({
+        where: { id: kid },
+        select: { tenantId: true },
+      });
+      if (key?.tenantId) return key.tenantId;
+    } catch {
+      continue;
+    }
+  }
   return null;
 }
 
@@ -445,7 +595,10 @@ async function decryptResult(
   prisma: PrismaLike,
 ): Promise<void> {
   const fieldConfigs = ENCRYPTED_FIELDS[model];
-  if (!fieldConfigs) return;
+  const nestedRelations = NESTED_RELATIONS[model];
+
+  // Nothing to decrypt on this model or its children
+  if (!fieldConfigs && !nestedRelations) return;
 
   if (Array.isArray(result)) {
     for (const item of result) {
@@ -453,7 +606,8 @@ async function decryptResult(
         await decryptRecord(
           item as Record<string, unknown>,
           model,
-          fieldConfigs,
+          fieldConfigs ?? null,
+          nestedRelations ?? null,
           encryptionService,
           prisma,
         );
@@ -463,7 +617,8 @@ async function decryptResult(
     await decryptRecord(
       result as Record<string, unknown>,
       model,
-      fieldConfigs,
+      fieldConfigs ?? null,
+      nestedRelations ?? null,
       encryptionService,
       prisma,
     );
@@ -473,26 +628,29 @@ async function decryptResult(
 async function decryptRecord(
   record: Record<string, unknown>,
   model: string,
-  fieldConfigs: Record<string, FieldEncryptionConfig>,
+  fieldConfigs: Record<string, FieldEncryptionConfig> | null,
+  nestedRelations: Record<string, string> | null,
   encryptionService: EncryptionService,
   prisma: PrismaLike,
 ): Promise<void> {
-  const tenantId = await resolveTenantId(model, record, prisma);
-  if (!tenantId) return;
+  // Decrypt own encrypted fields (requires tenantId for decryption key)
+  if (fieldConfigs) {
+    const tenantId = await resolveTenantId(model, record, prisma);
+    if (tenantId) {
+      for (const [fieldName, config] of Object.entries(fieldConfigs)) {
+        const value = record[fieldName];
+        if (value === undefined || value === null || typeof value !== 'string') continue;
 
-  for (const [fieldName, config] of Object.entries(fieldConfigs)) {
-    const value = record[fieldName];
-    if (value === undefined || value === null || typeof value !== 'string') continue;
-
-    if (encryptionService.isEncrypted(value)) {
-      record[fieldName] = config.isJson
-        ? await encryptionService.decryptJson(value, tenantId)
-        : await encryptionService.decrypt(value, tenantId);
+        if (encryptionService.isEncrypted(value)) {
+          record[fieldName] = config.isJson
+            ? await encryptionService.decryptJson(value, tenantId)
+            : await encryptionService.decrypt(value, tenantId);
+        }
+      }
     }
   }
 
-  // Decrypt nested included relations
-  const nestedRelations = NESTED_RELATIONS[model];
+  // Recursively decrypt nested included relations — child records resolve their own tenantId
   if (nestedRelations) {
     for (const [relationName, childModel] of Object.entries(nestedRelations)) {
       if (record[relationName]) {

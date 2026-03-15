@@ -1,4 +1,11 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Prisma, ShiftStatus, AvailabilityType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
@@ -6,6 +13,9 @@ import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { AssignShiftDto } from './dto/assign-shift.dto';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
+import { CreateSwapRequestDto } from './dto/create-swap-request.dto';
+import { RespondSwapDto } from './dto/respond-swap.dto';
+import { EventsService } from '../events/events.service';
 
 // ── Time helpers ──────────────────────────────────────
 
@@ -55,7 +65,12 @@ const BLOCKING_AVAILABILITY: AvailabilityType[] = [
 
 @Injectable()
 export class WorkforceService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  private readonly logger = new Logger(WorkforceService.name);
+
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(EventsService) private eventsService: EventsService,
+  ) {}
 
   // ── Shift Patterns ──────────────────────────────────
 
@@ -821,5 +836,471 @@ export class WorkforceService {
         'Availability record not found. It may have already been deleted.',
       );
     await this.prisma.staffAvailability.delete({ where: { id } });
+  }
+
+  // ── Shift Swap Marketplace ────────────────────────────
+
+  async createSwapRequest(dto: CreateSwapRequestDto, userId: string, tenantId: string) {
+    const assignment = await this.prisma.shiftAssignment.findFirst({
+      where: { id: dto.originalShiftAssignmentId, userId },
+      include: { shift: { include: { shiftPattern: true } } },
+    });
+    if (!assignment)
+      throw new NotFoundException('Shift assignment not found or does not belong to you.');
+
+    if (assignment.shift.status === 'COMPLETED' || assignment.shift.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot swap a completed or cancelled shift.');
+    }
+
+    const existing = await this.prisma.shiftSwapRequest.findFirst({
+      where: {
+        originalShiftAssignmentId: dto.originalShiftAssignmentId,
+        status: { in: ['PENDING', 'ACCEPTED'] },
+      },
+    });
+    if (existing) {
+      throw new BadRequestException('A swap request already exists for this shift assignment.');
+    }
+
+    const swapRequest = await this.prisma.shiftSwapRequest.create({
+      data: {
+        requesterId: userId,
+        originalShiftAssignmentId: dto.originalShiftAssignmentId,
+        targetShiftAssignmentId: dto.targetShiftAssignmentId,
+        reason: dto.reason,
+        tenantId,
+      },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true } },
+        originalShiftAssignment: { include: { shift: { include: { shiftPattern: true } } } },
+      },
+    });
+
+    this.eventsService.emitSwapCreated(tenantId, {
+      swapId: swapRequest.id,
+      requesterName: `${swapRequest.requester.firstName} ${swapRequest.requester.lastName}`,
+      shiftDate: swapRequest.originalShiftAssignment.shift.date.toISOString().split('T')[0],
+    });
+
+    return swapRequest;
+  }
+
+  async getOpenSwaps(tenantId: string) {
+    return this.prisma.shiftSwapRequest.findMany({
+      where: { tenantId, status: 'PENDING' },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true, role: true } },
+        originalShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true, location: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getMySwapRequests(userId: string, tenantId: string) {
+    return this.prisma.shiftSwapRequest.findMany({
+      where: {
+        tenantId,
+        OR: [{ requesterId: userId }, { responderId: userId }],
+      },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true } },
+        responder: { select: { id: true, firstName: true, lastName: true } },
+        approvedBy: { select: { id: true, firstName: true, lastName: true } },
+        originalShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true, location: true } } },
+        },
+        targetShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true, location: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPendingApprovals(tenantId: string) {
+    return this.prisma.shiftSwapRequest.findMany({
+      where: { tenantId, status: 'ACCEPTED' },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true, role: true } },
+        responder: { select: { id: true, firstName: true, lastName: true, role: true } },
+        originalShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true, location: true } } },
+        },
+        targetShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true, location: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async respondToSwap(swapId: string, dto: RespondSwapDto, userId: string, tenantId: string) {
+    const swap = await this.prisma.shiftSwapRequest.findFirst({
+      where: { id: swapId, tenantId, status: 'PENDING' },
+    });
+    if (!swap) throw new NotFoundException('Swap request not found or no longer pending.');
+
+    if (swap.requesterId === userId) {
+      throw new BadRequestException('You cannot respond to your own swap request.');
+    }
+
+    const assignment = await this.prisma.shiftAssignment.findFirst({
+      where: { id: dto.targetShiftAssignmentId, userId },
+    });
+    if (!assignment) throw new NotFoundException('The shift assignment does not belong to you.');
+
+    return this.prisma.shiftSwapRequest.update({
+      where: { id: swapId },
+      data: {
+        status: 'ACCEPTED',
+        responderId: userId,
+        targetShiftAssignmentId: dto.targetShiftAssignmentId,
+      },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true } },
+        responder: { select: { id: true, firstName: true, lastName: true } },
+        originalShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true } } },
+        },
+        targetShiftAssignment: {
+          include: { shift: { include: { shiftPattern: true } } },
+        },
+      },
+    });
+  }
+
+  async approveSwap(swapId: string, approvedById: string, tenantId: string) {
+    this.logger.log(`approveSwap called: swapId=${swapId}, approvedById=${approvedById}`);
+
+    const swap = await this.prisma.shiftSwapRequest.findFirst({
+      where: { id: swapId, tenantId, status: 'ACCEPTED' },
+      include: {
+        originalShiftAssignment: { include: { shift: { include: { shiftPattern: true } } } },
+        targetShiftAssignment: { include: { shift: { include: { shiftPattern: true } } } },
+      },
+    });
+
+    this.logger.log(`swap found: ${!!swap}, status: ${swap?.status}`);
+
+    if (!swap) throw new NotFoundException('Swap request not found or not yet accepted.');
+    if (!swap.targetShiftAssignment)
+      throw new BadRequestException('No target assignment to swap with.');
+
+    const originalUserId = swap.originalShiftAssignment.userId;
+    const targetUserId = swap.targetShiftAssignment.userId;
+
+    this.logger.log(`Swapping users: ${originalUserId} <-> ${targetUserId}`);
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        await tx.shiftAssignment.update({
+          where: { id: swap.originalShiftAssignmentId },
+          data: { userId: targetUserId },
+        });
+        await tx.shiftAssignment.update({
+          where: { id: swap.targetShiftAssignmentId! },
+          data: { userId: originalUserId },
+        });
+
+        return tx.shiftSwapRequest.update({
+          where: { id: swapId },
+          data: { status: 'APPROVED', approvedById },
+          include: {
+            requester: { select: { id: true, firstName: true, lastName: true } },
+            responder: { select: { id: true, firstName: true, lastName: true } },
+            approvedBy: { select: { id: true, firstName: true, lastName: true } },
+          },
+        });
+      });
+
+      this.logger.log(`Transaction completed successfully for swap ${swapId}`);
+      this.eventsService.emitSwapUpdated(tenantId, { swapId, status: 'APPROVED' });
+      return result;
+    } catch (error) {
+      this.logger.error(`approveSwap failed: ${error}`);
+      this.logger.error(error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
+  }
+
+  async rejectSwap(
+    swapId: string,
+    managerNote: string | undefined,
+    approvedById: string,
+    tenantId: string,
+  ) {
+    const swap = await this.prisma.shiftSwapRequest.findFirst({
+      where: { id: swapId, tenantId, status: { in: ['PENDING', 'ACCEPTED'] } },
+    });
+    if (!swap) throw new NotFoundException('Swap request not found.');
+
+    return this.prisma.shiftSwapRequest.update({
+      where: { id: swapId },
+      data: { status: 'REJECTED', managerNote, approvedById },
+    });
+  }
+
+  async cancelSwapRequest(swapId: string, userId: string, tenantId: string) {
+    const swap = await this.prisma.shiftSwapRequest.findFirst({
+      where: { id: swapId, tenantId, status: { in: ['PENDING', 'ACCEPTED'] } },
+    });
+    if (!swap) throw new NotFoundException('Swap request not found.');
+    if (swap.requesterId !== userId)
+      throw new ForbiddenException('Only the requester can cancel this swap request.');
+
+    return this.prisma.shiftSwapRequest.update({
+      where: { id: swapId },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
+  // ── Compliance Dashboard ──────────────────────────────
+
+  async getComplianceReport(tenantId: string, from: string, to: string) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    const [shifts, members] = await Promise.all([
+      this.prisma.shift.findMany({
+        where: {
+          tenantId,
+          date: { gte: fromDate, lte: toDate },
+          status: { not: 'CANCELLED' },
+        },
+        include: {
+          shiftPattern: true,
+          location: true,
+          assignments: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, role: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.userTenantMembership.findMany({
+        where: { organizationId: tenantId, status: 'ACTIVE' },
+        include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+      }),
+    ]);
+
+    // Build per-user assignment list
+    const userAssignments = new Map<
+      string,
+      Array<{
+        date: Date;
+        startTime: string;
+        endTime: string;
+        breakMinutes: number;
+        shiftName: string;
+      }>
+    >();
+    const userNames = new Map<string, string>();
+
+    for (const shift of shifts) {
+      for (const assignment of shift.assignments) {
+        const uid = assignment.userId;
+        userNames.set(uid, `${assignment.user.firstName} ${assignment.user.lastName}`);
+        const list = userAssignments.get(uid) ?? [];
+        list.push({
+          date: shift.date,
+          startTime: shift.shiftPattern.startTime,
+          endTime: shift.shiftPattern.endTime,
+          breakMinutes: shift.shiftPattern.breakMinutes,
+          shiftName: shift.shiftPattern.name,
+        });
+        userAssignments.set(uid, list);
+      }
+    }
+
+    // Calculate violations
+    const weeklyHoursExceeded: Array<{
+      userId: string;
+      name: string;
+      weekStart: string;
+      hours: number;
+    }> = [];
+    const insufficientRest: Array<{
+      userId: string;
+      name: string;
+      date: string;
+      restHours: number;
+    }> = [];
+    const consecutiveDaysExceeded: Array<{
+      userId: string;
+      name: string;
+      startDate: string;
+      days: number;
+    }> = [];
+    const overtimeHours: Array<{
+      userId: string;
+      name: string;
+      scheduledHours: number;
+      overtimeHours: number;
+    }> = [];
+
+    let totalShifts = 0;
+    let totalHoursScheduled = 0;
+
+    for (const [userId, assignments] of userAssignments) {
+      const name = userNames.get(userId) ?? 'Unknown';
+
+      // Sort by date
+      assignments.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      let userTotalHours = 0;
+
+      // Weekly hours check
+      const weeklyBuckets = new Map<string, number>();
+      for (const a of assignments) {
+        const hours = shiftDurationHours(a.startTime, a.endTime, a.breakMinutes);
+        userTotalHours += hours;
+        totalShifts++;
+        totalHoursScheduled += hours;
+
+        const weekStart = new Date(a.date);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+        const weekKey = weekStart.toISOString().split('T')[0];
+        weeklyBuckets.set(weekKey, (weeklyBuckets.get(weekKey) ?? 0) + hours);
+      }
+
+      for (const [weekStart, hours] of weeklyBuckets) {
+        if (hours > MAX_WEEKLY_HOURS) {
+          weeklyHoursExceeded.push({ userId, name, weekStart, hours: Math.round(hours) });
+        }
+      }
+
+      // Standard working hours (assume 37.5h/week * weeks in period)
+      const weeksInPeriod = Math.max(
+        1,
+        (toDate.getTime() - fromDate.getTime()) / (7 * 24 * 60 * 60 * 1000),
+      );
+      const standardHours = weeksInPeriod * 37.5;
+      const overtime = userTotalHours - standardHours;
+      if (overtime > 0) {
+        overtimeHours.push({
+          userId,
+          name,
+          scheduledHours: Math.round(userTotalHours),
+          overtimeHours: Math.round(overtime),
+        });
+      }
+
+      // Rest period check
+      for (let i = 1; i < assignments.length; i++) {
+        const prev = assignments[i - 1];
+        const curr = assignments[i];
+        const dayDiff = (curr.date.getTime() - prev.date.getTime()) / (24 * 60 * 60 * 1000);
+        if (dayDiff <= 1) {
+          const prevRange = shiftTimeRange(prev.startTime, prev.endTime);
+          const currRange = shiftTimeRange(curr.startTime, curr.endTime);
+          let restH: number;
+          if (dayDiff === 0) {
+            restH = (currRange.startMin - prevRange.endMin) / 60;
+          } else {
+            restH = (24 * 60 - prevRange.endMin + currRange.startMin) / 60;
+            if (prevRange.overnight) {
+              restH = (currRange.startMin - (prevRange.endMin - 24 * 60)) / 60;
+            }
+          }
+          if (restH < MIN_REST_HOURS) {
+            insufficientRest.push({
+              userId,
+              name,
+              date: curr.date.toISOString().split('T')[0],
+              restHours: Math.round(restH),
+            });
+          }
+        }
+      }
+
+      // Consecutive days check
+      const dates = [...new Set(assignments.map((a) => a.date.toISOString().split('T')[0]))].sort();
+      let maxRun = 1;
+      let runStart = dates[0];
+      let currentRun = 1;
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diff = (curr.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000);
+        if (diff === 1) {
+          currentRun++;
+          if (currentRun > maxRun) {
+            maxRun = currentRun;
+            runStart = dates[i - currentRun + 1];
+          }
+        } else {
+          currentRun = 1;
+        }
+      }
+      if (maxRun > MAX_CONSECUTIVE_DAYS) {
+        consecutiveDaysExceeded.push({ userId, name, startDate: runStart, days: maxRun });
+      }
+    }
+
+    const violationCount =
+      weeklyHoursExceeded.length + insufficientRest.length + consecutiveDaysExceeded.length;
+    const totalStaff = members.length;
+    const maxViolations = totalStaff * 3;
+    const complianceScore =
+      maxViolations > 0
+        ? Math.round(((maxViolations - violationCount) / maxViolations) * 100)
+        : 100;
+
+    // Staffing by location
+    const locationMap = new Map<
+      string,
+      {
+        locationId: string;
+        locationName: string;
+        totalBeds: number;
+        shiftCount: number;
+        staffCount: number;
+      }
+    >();
+    for (const shift of shifts) {
+      if (!shift.locationId || !shift.location) continue;
+      const loc = locationMap.get(shift.locationId) ?? {
+        locationId: shift.locationId,
+        locationName: shift.location.name,
+        totalBeds: shift.location.capacity,
+        shiftCount: 0,
+        staffCount: 0,
+      };
+      loc.shiftCount++;
+      loc.staffCount += shift.assignments.length;
+      locationMap.set(shift.locationId, loc);
+    }
+
+    const staffingByLocation = [...locationMap.values()].map((loc) => ({
+      locationId: loc.locationId,
+      locationName: loc.locationName,
+      totalBeds: loc.totalBeds,
+      avgStaffPerShift:
+        loc.shiftCount > 0 ? Math.round((loc.staffCount / loc.shiftCount) * 10) / 10 : 0,
+      staffToPatientRatio:
+        loc.totalBeds > 0
+          ? Math.round((loc.staffCount / loc.shiftCount / loc.totalBeds) * 100) / 100
+          : 0,
+    }));
+
+    return {
+      period: { from, to },
+      summary: {
+        totalStaff,
+        totalShifts,
+        totalHoursScheduled: Math.round(totalHoursScheduled),
+        violationCount,
+        complianceScore,
+      },
+      workingTimeViolations: {
+        weeklyHoursExceeded,
+        insufficientRest,
+        consecutiveDaysExceeded,
+      },
+      staffingByLocation,
+      overtimeHours,
+    };
   }
 }

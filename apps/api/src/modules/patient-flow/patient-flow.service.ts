@@ -7,10 +7,17 @@ import { CreateBedDto } from './dto/create-bed.dto';
 import { AdmitPatientDto } from './dto/admit-patient.dto';
 import { TransferDto } from './dto/transfer.dto';
 import { DischargeDto } from './dto/discharge.dto';
+import { CreateDischargePlanDto } from './dto/create-discharge-plan.dto';
+import { CreateDischargeTaskDto } from './dto/create-discharge-task.dto';
+import { UpdateDischargeTaskDto } from './dto/update-discharge-task.dto';
+import { EventsService } from '../events/events.service';
 
 @Injectable()
 export class PatientFlowService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(EventsService) private eventsService: EventsService,
+  ) {}
 
   // ── Locations ───────────────────────────────────────
 
@@ -177,6 +184,15 @@ export class PatientFlowService {
           tenantId,
         },
       });
+
+      if (dto.bedId) {
+        this.eventsService.emitBedStatusChanged(tenantId, {
+          bedId: dto.bedId,
+          status: 'OCCUPIED',
+          locationName: encounter.location?.name,
+          encounterAction: 'ADMISSION',
+        });
+      }
 
       return encounter;
     });
@@ -364,7 +380,215 @@ export class PatientFlowService {
         },
       });
 
+      if (encounter.bedId) {
+        this.eventsService.emitBedStatusChanged(encounter.tenantId, {
+          bedId: encounter.bedId,
+          status: 'AVAILABLE',
+          encounterAction: 'DISCHARGE',
+        });
+      }
+
       return updated;
+    });
+  }
+
+  // ── Discharge Planning ────────────────────────────────
+
+  async createDischargePlan(
+    encounterId: string,
+    dto: CreateDischargePlanDto,
+    userId: string,
+    tenantId: string,
+  ) {
+    const encounter = await this.prisma.encounter.findFirst({
+      where: { id: encounterId, tenantId, status: { in: ['IN_PROGRESS', 'ARRIVED'] } },
+    });
+    if (!encounter) throw new NotFoundException('No active encounter found for this patient.');
+
+    const existing = await this.prisma.dischargePlan.findUnique({
+      where: { encounterId },
+    });
+    if (existing)
+      throw new BadRequestException('A discharge plan already exists for this encounter.');
+
+    return this.prisma.dischargePlan.create({
+      data: {
+        encounterId,
+        plannedDate: dto.plannedDate ? new Date(dto.plannedDate) : null,
+        notes: dto.notes,
+        createdById: userId,
+        tenantId,
+      },
+      include: { tasks: true },
+    });
+  }
+
+  async getDischargePlan(encounterId: string, tenantId: string | null) {
+    const where: Prisma.DischargePlanWhereInput = { encounterId };
+    if (tenantId) where.tenantId = tenantId;
+
+    const plan = await this.prisma.dischargePlan.findFirst({
+      where,
+      include: {
+        tasks: {
+          include: {
+            assignedTo: { select: { id: true, firstName: true, lastName: true } },
+            completedBy: { select: { id: true, firstName: true, lastName: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+        completedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+    if (!plan) throw new NotFoundException('No discharge plan found for this encounter.');
+    return plan;
+  }
+
+  async addDischargeTask(encounterId: string, dto: CreateDischargeTaskDto, tenantId: string) {
+    const plan = await this.prisma.dischargePlan.findFirst({
+      where: { encounterId, tenantId, status: { in: ['DRAFT', 'IN_PROGRESS'] } },
+    });
+    if (!plan) throw new NotFoundException('Discharge plan not found or already completed.');
+
+    const task = await this.prisma.dischargeTask.create({
+      data: {
+        dischargePlanId: plan.id,
+        type: dto.type,
+        assignedToId: dto.assignedToId,
+        notes: dto.notes,
+      },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    // Auto-update plan status to IN_PROGRESS if still DRAFT
+    if (plan.status === 'DRAFT') {
+      await this.prisma.dischargePlan.update({
+        where: { id: plan.id },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
+    return task;
+  }
+
+  async updateDischargeTask(
+    encounterId: string,
+    taskId: string,
+    dto: UpdateDischargeTaskDto,
+    userId: string,
+    tenantId: string | null,
+  ) {
+    const planWhere: Prisma.DischargePlanWhereInput = { encounterId };
+    if (tenantId) planWhere.tenantId = tenantId;
+    const plan = await this.prisma.dischargePlan.findFirst({ where: planWhere });
+    if (!plan) throw new NotFoundException('Discharge plan not found.');
+
+    if (plan.status === 'COMPLETED' || plan.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot modify tasks on a completed or cancelled plan.');
+    }
+
+    const task = await this.prisma.dischargeTask.findFirst({
+      where: { id: taskId, dischargePlanId: plan.id },
+    });
+    if (!task) throw new NotFoundException('Discharge task not found.');
+
+    const updateData: Prisma.DischargeTaskUpdateInput = {};
+    if (dto.status) {
+      updateData.status = dto.status;
+      if (dto.status === 'COMPLETED') {
+        updateData.completedAt = new Date();
+        updateData.completedBy = { connect: { id: userId } };
+      }
+    }
+    if (dto.notes !== undefined) updateData.notes = dto.notes;
+    if (dto.assignedToId) updateData.assignedTo = { connect: { id: dto.assignedToId } };
+
+    const updated = await this.prisma.dischargeTask.update({
+      where: { id: taskId },
+      data: updateData,
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        completedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    // Auto-set plan to READY when all tasks completed
+    if (dto.status === 'COMPLETED') {
+      const allTasks = await this.prisma.dischargeTask.findMany({
+        where: { dischargePlanId: plan.id },
+      });
+      const allComplete = allTasks.every((t) => t.status === 'COMPLETED');
+      if (allComplete) {
+        await this.prisma.dischargePlan.update({
+          where: { id: plan.id },
+          data: { status: 'READY' },
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  async completeDischargePlan(encounterId: string, userId: string, tenantId: string | null) {
+    const planWhere: Prisma.DischargePlanWhereInput = {
+      encounterId,
+      status: { in: ['READY', 'IN_PROGRESS'] },
+    };
+    if (tenantId) planWhere.tenantId = tenantId;
+    const plan = await this.prisma.dischargePlan.findFirst({ where: planWhere });
+    if (!plan) throw new NotFoundException('Discharge plan not found or not ready.');
+
+    const encounter = await this.prisma.encounter.findFirst({
+      where: { id: encounterId, status: 'IN_PROGRESS' },
+      include: { patient: { select: { givenName: true, familyName: true } } },
+    });
+    if (!encounter) throw new NotFoundException('No active encounter found.');
+
+    return this.prisma.$transaction(async (tx) => {
+      // Complete the plan
+      const completedPlan = await tx.dischargePlan.update({
+        where: { id: plan.id },
+        data: {
+          status: 'COMPLETED',
+          actualDate: new Date(),
+          completedById: userId,
+        },
+        include: { tasks: true },
+      });
+
+      // Discharge the encounter
+      await tx.encounter.update({
+        where: { id: encounterId },
+        data: {
+          status: 'FINISHED',
+          dischargeDate: new Date(),
+          dischargeDestination: 'HOME',
+        },
+      });
+
+      // Free the bed
+      if (encounter.bedId) {
+        await tx.bed.update({
+          where: { id: encounter.bedId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      // Timeline event
+      await tx.patientEvent.create({
+        data: {
+          patientId: encounter.patientId,
+          eventType: 'DISCHARGE',
+          summary: `Patient discharged via discharge plan`,
+          recordedById: userId,
+          tenantId: encounter.tenantId,
+        },
+      });
+
+      return completedPlan;
     });
   }
 }

@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { usePatientFlow, type Encounter, type Location } from './hooks/use-patient-flow';
 import { useAuth } from '../../hooks/use-auth';
+import { useWebSocket } from '../../hooks/use-websocket';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
 const statusColors: Record<string, string> = {
@@ -27,23 +29,32 @@ export function PatientFlowDashboardPage(): React.ReactElement {
   const [locations, setLocations] = useState<Location[]>([]);
   const [totalEncounters, setTotalEncounters] = useState(0);
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (isSuperAdmin && !selectedTenant) return;
-    const load = async () => {
-      try {
-        const [encResult, locs] = await Promise.all([
-          listEncounters({ status: 'IN_PROGRESS', limit: 10 }),
-          listLocations(),
-        ]);
-        setEncounters(encResult.data);
-        setTotalEncounters(encResult.total);
-        setLocations(locs);
-      } catch {
-        // error
-      }
-    };
-    load();
-  }, [selectedTenant]); // eslint-disable-line
+    try {
+      const [encResult, locs] = await Promise.all([
+        listEncounters({ status: 'IN_PROGRESS', limit: 10 }),
+        listLocations(),
+      ]);
+      setEncounters(encResult.data);
+      setTotalEncounters(encResult.total);
+      setLocations(locs);
+    } catch {
+      // error
+    }
+  }, [isSuperAdmin, selectedTenant, listEncounters, listLocations]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  useWebSocket({
+    'bed:status-changed': (data: unknown) => {
+      const evt = data as { bedId: string; status: string };
+      toast(`Bed updated: ${evt.bedId} → ${evt.status}`, { icon: '🛏️' });
+      reload();
+    },
+  });
 
   // Compute bed stats
   const allBeds = locations.flatMap((l) => l.beds);

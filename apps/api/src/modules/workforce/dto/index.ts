@@ -3,3 +3,6 @@ export { UpdateShiftPatternDto } from './update-shift-pattern.dto';
 export { CreateShiftDto } from './create-shift.dto';
 export { AssignShiftDto } from './assign-shift.dto';
 export { CreateAvailabilityDto } from './create-availability.dto';
+export { CreateSwapRequestDto } from './create-swap-request.dto';
+export { RespondSwapDto } from './respond-swap.dto';
+export { ComplianceQueryDto } from './compliance-query.dto';
