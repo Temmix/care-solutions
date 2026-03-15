@@ -65,7 +65,7 @@ export function RegisterPage(): React.ReactElement {
             <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-lg">
               C
             </div>
-            <span className="text-xl font-semibold tracking-tight">Care Solutions</span>
+            <span className="text-xl font-semibold tracking-tight">Clinvara</span>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export function RegisterPage(): React.ReactElement {
         </div>
 
         <div className="text-slate-500 text-sm">
-          &copy; {new Date().getFullYear()} Care Solutions Ltd. All rights reserved.
+          &copy; {new Date().getFullYear()} Clinvara Ltd. All rights reserved.
         </div>
       </div>
 
@@ -109,13 +109,11 @@ export function RegisterPage(): React.ReactElement {
             <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-lg">
               C
             </div>
-            <span className="text-xl font-semibold text-primary tracking-tight">
-              Care Solutions
-            </span>
+            <span className="text-xl font-semibold text-primary tracking-tight">Clinvara</span>
           </div>
 
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Create your account</h2>
-          <p className="text-slate-500 text-sm mb-8">Get started with Care Solutions in minutes</p>
+          <p className="text-slate-500 text-sm mb-8">Get started with Clinvara in minutes</p>
 
           <ErrorAlert message={error} className="mb-6" />
 

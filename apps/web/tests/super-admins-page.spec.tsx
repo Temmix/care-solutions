@@ -39,7 +39,7 @@ function renderPage() {
 
 const mockAdmin = {
   id: 'sa-1',
-  email: 'admin@care-solutions.local',
+  email: 'admin@clinvara.com',
   firstName: 'Super',
   lastName: 'Admin',
   role: 'SUPER_ADMIN',
@@ -49,7 +49,7 @@ const mockAdmin = {
 
 const otherAdmin = {
   id: 'sa-2',
-  email: 'other@care-solutions.local',
+  email: 'other@clinvara.com',
   firstName: 'Other',
   lastName: 'Admin',
   role: 'SUPER_ADMIN',
@@ -81,9 +81,9 @@ describe('SuperAdminsPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('admin@care-solutions.local')).toBeInTheDocument();
+      expect(screen.getByText('admin@clinvara.com')).toBeInTheDocument();
     });
-    expect(screen.getByText('other@care-solutions.local')).toBeInTheDocument();
+    expect(screen.getByText('other@clinvara.com')).toBeInTheDocument();
   });
 
   it('shows empty state when no super admins', async () => {
@@ -160,7 +160,7 @@ describe('SuperAdminsPage', () => {
 
     await user.click(screen.getByText('Add Super Admin'));
 
-    const emailInput = screen.getByPlaceholderText('admin@care-solutions.local');
+    const emailInput = screen.getByPlaceholderText('admin@clinvara.com');
     await user.type(emailInput, 'invalid-email');
     await user.tab();
 
@@ -197,7 +197,7 @@ describe('SuperAdminsPage', () => {
 
     await user.type(screen.getByPlaceholderText('John'), 'New');
     await user.type(screen.getByPlaceholderText('Smith'), 'Admin');
-    await user.type(screen.getByPlaceholderText('admin@care-solutions.local'), 'new@test.com');
+    await user.type(screen.getByPlaceholderText('admin@clinvara.com'), 'new@test.com');
     await user.type(screen.getByPlaceholderText('Minimum 8 characters'), 'Password123!');
 
     await user.click(screen.getByRole('button', { name: 'Create' }));
@@ -218,7 +218,7 @@ describe('SuperAdminsPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('other@care-solutions.local')).toBeInTheDocument();
+      expect(screen.getByText('other@clinvara.com')).toBeInTheDocument();
     });
 
     // There should be a Deactivate button for the other admin

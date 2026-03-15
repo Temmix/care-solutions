@@ -132,7 +132,7 @@ function CreateTenantAdminModal({
               value={form.email}
               onChange={set('email')}
               onBlur={blur('email')}
-              placeholder="admin@care-solutions.local"
+              placeholder="admin@clinvara.com"
             />
             <FieldError message={showError('email')} />
           </div>
