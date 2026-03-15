@@ -11,5 +11,7 @@ module.exports = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@care/logger$': '<rootDir>/../../apps/logger/src',
+    '^@care/shared$': '<rootDir>/../../packages/shared/src',
   },
 };
