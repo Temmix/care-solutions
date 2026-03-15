@@ -37,3 +37,13 @@ output "github_actions_role_arn" {
   description = "GitHub Actions IAM role ARN"
   value       = aws_iam_role.github_actions.arn
 }
+
+output "nameservers" {
+  description = "Route53 nameservers — set these at your domain registrar"
+  value       = var.enable_dns ? module.route53[0].nameservers : []
+}
+
+output "domain_name" {
+  description = "Primary domain name"
+  value       = var.enable_dns ? var.domain_name : null
+}
