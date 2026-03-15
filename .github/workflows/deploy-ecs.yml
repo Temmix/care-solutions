@@ -32,7 +32,7 @@ jobs:
 
       - run: npm run format:check
 
-      - run: npm run build -w packages/shared
+      - run: npm run build -w packages/shared -w apps/logger
 
       - run: npx prisma generate
         working-directory: apps/api
