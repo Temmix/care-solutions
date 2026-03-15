@@ -197,6 +197,9 @@ resource "aws_ecs_task_definition" "api" {
         { name = "STRIPE_SECRET_KEY", valueFrom = "${var.secret_arn}:STRIPE_SECRET_KEY::" },
         { name = "STRIPE_WEBHOOK_SECRET", valueFrom = "${var.secret_arn}:STRIPE_WEBHOOK_SECRET::" },
         { name = "AWS_KMS_KEY_ARN", valueFrom = "${var.secret_arn}:AWS_KMS_KEY_ARN::" },
+        { name = "STRIPE_PRICE_STARTER", valueFrom = "${var.secret_arn}:STRIPE_PRICE_STARTER::" },
+        { name = "STRIPE_PRICE_PROFESSIONAL", valueFrom = "${var.secret_arn}:STRIPE_PRICE_PROFESSIONAL::" },
+        { name = "STRIPE_PRICE_ENTERPRISE", valueFrom = "${var.secret_arn}:STRIPE_PRICE_ENTERPRISE::" },
       ]
 
       healthCheck = {
