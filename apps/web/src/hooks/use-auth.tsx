@@ -71,7 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
     isLoading: true,
   });
-  const [selectedTenant, setSelectedTenant] = useState<SelectedTenant | null>(loadPersistedTenant);
+  const [selectedTenant, setSelectedTenant] = useState<SelectedTenant | null>(() => {
+    const persisted = loadPersistedTenant();
+    // Sync API client immediately so the first request has the tenant header
+    if (persisted) api.setTenantId(persisted.id);
+    return persisted;
+  });
 
   const isSuperAdmin = state.user?.role === 'SUPER_ADMIN';
   const isTenantAdmin = state.user?.role === 'TENANT_ADMIN';
@@ -98,16 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState({ user: null, isAuthenticated: false, isLoading: false });
     }
   }, []);
-
-  // Restore tenant selection on mount (after profile loads)
-  useEffect(() => {
-    if (state.user && !state.isLoading) {
-      const persisted = loadPersistedTenant();
-      if (persisted) {
-        api.setTenantId(persisted.id);
-      }
-    }
-  }, [state.user, state.isLoading]);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');

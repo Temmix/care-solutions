@@ -11,6 +11,7 @@ import { WorkforceModule } from './modules/workforce/workforce.module';
 import { PatientFlowModule } from './modules/patient-flow/patient-flow.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
+import { EventsModule } from './modules/events/events.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -30,6 +31,7 @@ import { HealthController } from './health.controller';
     }),
     PrismaModule,
     EncryptionModule,
+    EventsModule,
     AuthModule,
     UsersModule,
     FhirModule,

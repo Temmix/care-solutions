@@ -147,6 +147,43 @@ export function usePatientFlow() {
     [wrap],
   );
 
+  // Discharge Planning
+  const createDischargePlan = useCallback(
+    (encounterId: string, data: { plannedDate?: string; notes?: string }) =>
+      wrap(() => api.post<DischargePlan>(`/encounters/${encounterId}/discharge-plan`, data)),
+    [wrap],
+  );
+
+  const getDischargePlan = useCallback(
+    (encounterId: string) =>
+      wrap(() => api.get<DischargePlan>(`/encounters/${encounterId}/discharge-plan`)),
+    [wrap],
+  );
+
+  const addDischargeTask = useCallback(
+    (encounterId: string, data: { type: string; assignedToId?: string; notes?: string }) =>
+      wrap(() => api.post<DischargeTask>(`/encounters/${encounterId}/discharge-plan/tasks`, data)),
+    [wrap],
+  );
+
+  const updateDischargeTask = useCallback(
+    (
+      encounterId: string,
+      taskId: string,
+      data: { status?: string; notes?: string; assignedToId?: string },
+    ) =>
+      wrap(() =>
+        api.patch<DischargeTask>(`/encounters/${encounterId}/discharge-plan/tasks/${taskId}`, data),
+      ),
+    [wrap],
+  );
+
+  const completeDischargePlan = useCallback(
+    (encounterId: string) =>
+      wrap(() => api.post<DischargePlan>(`/encounters/${encounterId}/discharge-plan/complete`, {})),
+    [wrap],
+  );
+
   return {
     loading,
     error,
@@ -161,5 +198,34 @@ export function usePatientFlow() {
     getEncounter,
     transferPatient,
     dischargePatient,
+    createDischargePlan,
+    getDischargePlan,
+    addDischargeTask,
+    updateDischargeTask,
+    completeDischargePlan,
   };
+}
+
+export interface DischargePlan {
+  id: string;
+  status: string;
+  plannedDate: string | null;
+  actualDate: string | null;
+  notes: string | null;
+  encounterId: string;
+  tasks: DischargeTask[];
+  createdBy: { id: string; firstName: string; lastName: string };
+  completedBy: { id: string; firstName: string; lastName: string } | null;
+  createdAt: string;
+}
+
+export interface DischargeTask {
+  id: string;
+  type: string;
+  status: string;
+  notes: string | null;
+  completedAt: string | null;
+  assignedTo: { id: string; firstName: string; lastName: string } | null;
+  completedBy: { id: string; firstName: string; lastName: string } | null;
+  createdAt: string;
 }

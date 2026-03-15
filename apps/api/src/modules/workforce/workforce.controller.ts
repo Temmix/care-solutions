@@ -20,6 +20,8 @@ import {
   CreateShiftDto,
   AssignShiftDto,
   CreateAvailabilityDto,
+  CreateSwapRequestDto,
+  RespondSwapDto,
 } from './dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
@@ -187,5 +189,100 @@ export class WorkforceController {
   @Delete('availability/:id')
   deleteAvailability(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.workforceService.deleteAvailability(id, user.id);
+  }
+
+  // ── Shift Swap Marketplace ────────────────────────────
+
+  @Post('swaps')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  createSwapRequest(
+    @Body() dto: CreateSwapRequestDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.createSwapRequest(dto, user.id, tenantId);
+  }
+
+  @Get('swaps')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  getOpenSwaps(@CurrentTenant() tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getOpenSwaps(tenantId);
+  }
+
+  @Get('swaps/mine')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  getMySwapRequests(@CurrentUser() user: RequestUser, @CurrentTenant() tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getMySwapRequests(user.id, tenantId);
+  }
+
+  @Get('swaps/pending-approval')
+  @Roles(Role.ADMIN)
+  getPendingApprovals(@CurrentTenant() tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getPendingApprovals(tenantId);
+  }
+
+  @Post('swaps/:id/respond')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  respondToSwap(
+    @Param('id') id: string,
+    @Body() dto: RespondSwapDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.respondToSwap(id, dto, user.id, tenantId);
+  }
+
+  @Post('swaps/:id/approve')
+  @Roles(Role.ADMIN)
+  approveSwap(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.approveSwap(id, user.id, tenantId);
+  }
+
+  @Post('swaps/:id/reject')
+  @Roles(Role.ADMIN)
+  rejectSwap(
+    @Param('id') id: string,
+    @Body() body: { managerNote?: string },
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.rejectSwap(id, body.managerNote, user.id, tenantId);
+  }
+
+  @Post('swaps/:id/cancel')
+  @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  cancelSwapRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.cancelSwapRequest(id, user.id, tenantId);
+  }
+
+  // ── Compliance Dashboard ──────────────────────────────
+
+  @Get('compliance/report')
+  @Roles(Role.ADMIN)
+  getComplianceReport(
+    @CurrentTenant() tenantId: string | null,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    if (!from || !to)
+      throw new BadRequestException('Both "from" and "to" query params are required');
+    return this.workforceService.getComplianceReport(tenantId, from, to);
   }
 }

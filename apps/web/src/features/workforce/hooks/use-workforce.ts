@@ -187,6 +187,57 @@ export function useWorkforce() {
     [wrap],
   );
 
+  // Shift Swaps
+  const createSwapRequest = useCallback(
+    (data: {
+      originalShiftAssignmentId: string;
+      targetShiftAssignmentId?: string;
+      reason?: string;
+    }) => wrap(() => api.post<SwapRequest>('/swaps', data)),
+    [wrap],
+  );
+
+  const getOpenSwaps = useCallback(() => wrap(() => api.get<SwapRequest[]>('/swaps')), [wrap]);
+
+  const getMySwapRequests = useCallback(
+    () => wrap(() => api.get<SwapRequest[]>('/swaps/mine')),
+    [wrap],
+  );
+
+  const getPendingApprovals = useCallback(
+    () => wrap(() => api.get<SwapRequest[]>('/swaps/pending-approval')),
+    [wrap],
+  );
+
+  const respondToSwap = useCallback(
+    (swapId: string, data: { targetShiftAssignmentId: string }) =>
+      wrap(() => api.post<SwapRequest>(`/swaps/${swapId}/respond`, data)),
+    [wrap],
+  );
+
+  const approveSwap = useCallback(
+    (swapId: string) => wrap(() => api.post<SwapRequest>(`/swaps/${swapId}/approve`, {})),
+    [wrap],
+  );
+
+  const rejectSwap = useCallback(
+    (swapId: string, managerNote?: string) =>
+      wrap(() => api.post<SwapRequest>(`/swaps/${swapId}/reject`, { managerNote })),
+    [wrap],
+  );
+
+  const cancelSwapRequest = useCallback(
+    (swapId: string) => wrap(() => api.post(`/swaps/${swapId}/cancel`, {})),
+    [wrap],
+  );
+
+  // Compliance
+  const getComplianceReport = useCallback(
+    (from: string, to: string) =>
+      wrap(() => api.get<ComplianceReport>(`/compliance/report?from=${from}&to=${to}`)),
+    [wrap],
+  );
+
   return {
     loading,
     error,
@@ -206,5 +257,77 @@ export function useWorkforce() {
     listAvailability,
     getMyAvailability,
     deleteAvailability,
+    createSwapRequest,
+    getOpenSwaps,
+    getMySwapRequests,
+    getPendingApprovals,
+    respondToSwap,
+    approveSwap,
+    rejectSwap,
+    cancelSwapRequest,
+    getComplianceReport,
   };
+}
+
+export interface SwapRequest {
+  id: string;
+  status: string;
+  reason: string | null;
+  managerNote: string | null;
+  requester: { id: string; firstName: string; lastName: string; role?: string };
+  responder: { id: string; firstName: string; lastName: string; role?: string } | null;
+  approvedBy: { id: string; firstName: string; lastName: string } | null;
+  originalShiftAssignment: {
+    id: string;
+    shift: {
+      id: string;
+      date: string;
+      shiftPattern: ShiftPattern;
+      location?: ShiftLocation | null;
+    };
+  };
+  targetShiftAssignment: {
+    id: string;
+    shift: {
+      id: string;
+      date: string;
+      shiftPattern: ShiftPattern;
+      location?: ShiftLocation | null;
+    };
+  } | null;
+  createdAt: string;
+}
+
+export interface ComplianceReport {
+  period: { from: string; to: string };
+  summary: {
+    totalStaff: number;
+    totalShifts: number;
+    totalHoursScheduled: number;
+    violationCount: number;
+    complianceScore: number;
+  };
+  workingTimeViolations: {
+    weeklyHoursExceeded: Array<{ userId: string; name: string; weekStart: string; hours: number }>;
+    insufficientRest: Array<{ userId: string; name: string; date: string; restHours: number }>;
+    consecutiveDaysExceeded: Array<{
+      userId: string;
+      name: string;
+      startDate: string;
+      days: number;
+    }>;
+  };
+  staffingByLocation: Array<{
+    locationId: string;
+    locationName: string;
+    totalBeds: number;
+    avgStaffPerShift: number;
+    staffToPatientRatio: number;
+  }>;
+  overtimeHours: Array<{
+    userId: string;
+    name: string;
+    scheduledHours: number;
+    overtimeHours: number;
+  }>;
 }

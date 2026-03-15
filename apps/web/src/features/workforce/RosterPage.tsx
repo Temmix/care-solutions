@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import {
   useWorkforce,
   type Shift,
@@ -72,7 +73,7 @@ const monthNames = [
 ];
 
 export function RosterPage(): React.ReactElement {
-  const { isSuperAdmin, selectedTenant } = useAuth();
+  const { isSuperAdmin, isPlatformAdmin, currentRole, selectedTenant, user } = useAuth();
   const {
     listShifts,
     listShiftPatterns,
@@ -82,9 +83,12 @@ export function RosterPage(): React.ReactElement {
     removeAssignment,
     updateShift,
     getAssignableStaff,
+    createSwapRequest,
     loading,
     error,
   } = useWorkforce();
+  const canManageStaff = isPlatformAdmin || currentRole === 'ADMIN';
+
   const [weekOffset, setWeekOffset] = useState(0);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
@@ -109,6 +113,9 @@ export function RosterPage(): React.ReactElement {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [swapAssignmentId, setSwapAssignmentId] = useState<string | null>(null);
+  const [swapReason, setSwapReason] = useState('');
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   const week = getWeekDates(weekOffset);
 
@@ -294,6 +301,22 @@ export function RosterPage(): React.ReactElement {
     }
   };
 
+  const handleRequestSwap = async () => {
+    if (!swapAssignmentId) return;
+    setSwapError(null);
+    try {
+      await createSwapRequest({
+        originalShiftAssignmentId: swapAssignmentId,
+        reason: swapReason || undefined,
+      });
+      setSwapAssignmentId(null);
+      setSwapReason('');
+      toast.success('Swap request posted to the marketplace');
+    } catch {
+      setSwapError('Swap is already created for this shift.');
+    }
+  };
+
   // ── Tenant guard ──────────────────────────────────────
   if (isSuperAdmin && !selectedTenant) {
     return (
@@ -338,39 +361,56 @@ export function RosterPage(): React.ReactElement {
                 <span className="text-slate-600 truncate">
                   {a.user.firstName} {a.user.lastName[0]}.
                 </span>
-                <button
-                  onClick={() => handleRemoveAssignment(shift.id, a.user.id)}
-                  className="text-slate-300 hover:text-red-500 bg-transparent border-none cursor-pointer p-0 transition-colors opacity-0 group-hover:opacity-100 ml-auto shrink-0"
-                  title="Remove"
-                >
-                  &times;
-                </button>
+                {a.user.id === user?.id && shift.status === 'PUBLISHED' && (
+                  <button
+                    onClick={() => {
+                      setSwapAssignmentId(a.id);
+                      setSwapReason('');
+                      setSwapError(null);
+                    }}
+                    className="text-accent hover:text-accent-dark bg-transparent border-none cursor-pointer p-0 transition-colors opacity-0 group-hover:opacity-100 ml-auto shrink-0 text-[0.55rem] font-medium"
+                    title="Request swap"
+                  >
+                    Swap
+                  </button>
+                )}
+                {canManageStaff && (
+                  <button
+                    onClick={() => handleRemoveAssignment(shift.id, a.user.id)}
+                    className="text-slate-300 hover:text-red-500 bg-transparent border-none cursor-pointer p-0 transition-colors opacity-0 group-hover:opacity-100 ml-auto shrink-0"
+                    title="Remove"
+                  >
+                    &times;
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
         <div className="flex gap-2 pt-0.5 pl-3">
-          <button
-            onClick={async () => {
-              setAssignShiftId(shift.id);
-              setAssignUserId('');
-              setAssignError(null);
-              setAssignableStaff([]);
-              setAssignableLoading(true);
-              try {
-                const staff = await getAssignableStaff(shift.id);
-                setAssignableStaff(staff);
-              } catch {
-                // fallback handled by error state
-              } finally {
-                setAssignableLoading(false);
-              }
-            }}
-            className="text-accent text-[0.6rem] bg-transparent border-none cursor-pointer p-0 hover:underline"
-          >
-            + Staff
-          </button>
-          {shift.status === 'DRAFT' && (
+          {canManageStaff && (
+            <button
+              onClick={async () => {
+                setAssignShiftId(shift.id);
+                setAssignUserId('');
+                setAssignError(null);
+                setAssignableStaff([]);
+                setAssignableLoading(true);
+                try {
+                  const staff = await getAssignableStaff(shift.id);
+                  setAssignableStaff(staff);
+                } catch {
+                  // fallback handled by error state
+                } finally {
+                  setAssignableLoading(false);
+                }
+              }}
+              className="text-accent text-[0.6rem] bg-transparent border-none cursor-pointer p-0 hover:underline"
+            >
+              + Staff
+            </button>
+          )}
+          {canManageStaff && shift.status === 'DRAFT' && (
             <button
               onClick={() => handlePublish(shift.id)}
               className="text-emerald-600 text-[0.6rem] bg-transparent border-none cursor-pointer p-0 hover:underline ml-auto"
@@ -378,7 +418,8 @@ export function RosterPage(): React.ReactElement {
               Publish
             </button>
           )}
-          {(shift.status === 'DRAFT' || shift.status === 'CANCELLED') &&
+          {canManageStaff &&
+            (shift.status === 'DRAFT' || shift.status === 'CANCELLED') &&
             shift.date.split('T')[0] >= todayStr && (
               <button
                 onClick={() => handleDeleteShift(shift.id)}
@@ -457,21 +498,23 @@ export function RosterPage(): React.ReactElement {
             ))}
           </div>
 
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white border-none rounded-lg text-sm font-medium cursor-pointer transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          {canManageStaff && (
+            <button
+              onClick={() => setShowCreate(!showCreate)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white border-none rounded-lg text-sm font-medium cursor-pointer transition-colors"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Schedule Shifts
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Schedule Shifts
+            </button>
+          )}
         </div>
       </div>
 
@@ -954,6 +997,51 @@ export function RosterPage(): React.ReactElement {
                   setAssignUserId('');
                   setAssignError(null);
                   setAssignableStaff([]);
+                }}
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Swap request modal ─────────────────────────── */}
+      {swapAssignmentId && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">Request Shift Swap</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Your shift will be posted to the swap marketplace. Other staff members can offer their
+              shift in exchange.
+            </p>
+            <ErrorAlert message={swapError} onDismiss={() => setSwapError(null)} className="mb-4" />
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">
+                Reason (optional)
+              </label>
+              <textarea
+                value={swapReason}
+                onChange={(e) => setSwapReason(e.target.value)}
+                placeholder="e.g. Personal appointment, childcare conflict..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none"
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRequestSwap}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-accent hover:bg-accent-dark text-white border-none rounded-lg text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Posting...' : 'Post Swap Request'}
+              </button>
+              <button
+                onClick={() => {
+                  setSwapAssignmentId(null);
+                  setSwapReason('');
+                  setSwapError(null);
                 }}
                 className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm cursor-pointer hover:bg-slate-50 transition-colors"
               >

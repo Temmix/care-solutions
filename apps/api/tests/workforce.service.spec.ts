@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { WorkforceService } from '../src/modules/workforce/workforce.service';
 
 // ── Mock Prisma ──────────────────────────────────────
@@ -22,6 +22,7 @@ function createMockPrisma() {
     shiftAssignment: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -35,6 +36,28 @@ function createMockPrisma() {
     userTenantMembership: {
       findMany: jest.fn(),
     },
+    shiftSwapRequest: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+    },
+    $transaction: jest.fn((fn: (tx: any) => Promise<any>) => fn(mockTx)),
+  };
+}
+
+// Transaction mock that mirrors prisma methods
+const mockTx = {
+  shiftAssignment: { update: jest.fn() },
+  shiftSwapRequest: { update: jest.fn() },
+};
+
+function createMockEventsService() {
+  return {
+    emitSwapCreated: jest.fn(),
+    emitSwapUpdated: jest.fn(),
+    emitBedStatusChanged: jest.fn(),
+    emitDischargePlanUpdated: jest.fn(),
   };
 }
 
@@ -90,10 +113,15 @@ function makeMember(userId: string, firstName: string, lastName: string, role = 
 describe('WorkforceService', () => {
   let service: WorkforceService;
   let prisma: MockPrisma;
+  let eventsService: ReturnType<typeof createMockEventsService>;
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new WorkforceService(prisma as any);
+    eventsService = createMockEventsService();
+    // Reset transaction mocks
+    mockTx.shiftAssignment.update.mockReset();
+    mockTx.shiftSwapRequest.update.mockReset();
+    service = new WorkforceService(prisma as any, eventsService as any);
   });
 
   // ── Shift Patterns ──────────────────────────────────
@@ -670,6 +698,432 @@ describe('WorkforceService', () => {
       expect(prisma.shiftAssignment.delete).toHaveBeenCalledWith({
         where: { shiftId_userId: { shiftId: 'shift-1', userId: 'user-1' } },
       });
+    });
+  });
+
+  // ── Shift Swap Marketplace ────────────────────────────
+
+  describe('createSwapRequest', () => {
+    const dto = { originalShiftAssignmentId: 'assign-1', reason: 'Personal' };
+
+    it('should throw NotFoundException when assignment does not belong to user', async () => {
+      prisma.shiftAssignment.findFirst.mockResolvedValue(null);
+
+      await expect(service.createSwapRequest(dto as any, 'user-1', tenantId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should reject swap for completed shift', async () => {
+      prisma.shiftAssignment.findFirst.mockResolvedValue({
+        id: 'assign-1',
+        userId: 'user-1',
+        shift: { status: 'COMPLETED', shiftPattern: makeShiftPattern() },
+      });
+
+      await expect(service.createSwapRequest(dto as any, 'user-1', tenantId)).rejects.toThrow(
+        'completed or cancelled',
+      );
+    });
+
+    it('should reject swap for cancelled shift', async () => {
+      prisma.shiftAssignment.findFirst.mockResolvedValue({
+        id: 'assign-1',
+        userId: 'user-1',
+        shift: { status: 'CANCELLED', shiftPattern: makeShiftPattern() },
+      });
+
+      await expect(service.createSwapRequest(dto as any, 'user-1', tenantId)).rejects.toThrow(
+        'completed or cancelled',
+      );
+    });
+
+    it('should reject when a pending/accepted swap already exists', async () => {
+      prisma.shiftAssignment.findFirst.mockResolvedValue({
+        id: 'assign-1',
+        userId: 'user-1',
+        shift: { status: 'PUBLISHED', shiftPattern: makeShiftPattern() },
+      });
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({ id: 'existing-swap' });
+
+      await expect(service.createSwapRequest(dto as any, 'user-1', tenantId)).rejects.toThrow(
+        'already exists',
+      );
+    });
+
+    it('should create swap request and emit event', async () => {
+      prisma.shiftAssignment.findFirst.mockResolvedValue({
+        id: 'assign-1',
+        userId: 'user-1',
+        shift: { status: 'PUBLISHED', shiftPattern: makeShiftPattern() },
+      });
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue(null);
+      prisma.shiftSwapRequest.create.mockResolvedValue({
+        id: 'swap-1',
+        requester: { id: 'user-1', firstName: 'Jane', lastName: 'Doe' },
+        originalShiftAssignment: {
+          shift: { date: new Date('2026-03-20'), shiftPattern: makeShiftPattern() },
+        },
+      });
+
+      const result = await service.createSwapRequest(dto as any, 'user-1', tenantId);
+
+      expect(result.id).toBe('swap-1');
+      expect(eventsService.emitSwapCreated).toHaveBeenCalledWith(tenantId, {
+        swapId: 'swap-1',
+        requesterName: 'Jane Doe',
+        shiftDate: '2026-03-20',
+      });
+    });
+  });
+
+  describe('getOpenSwaps', () => {
+    it('should query pending swaps for tenant', async () => {
+      prisma.shiftSwapRequest.findMany.mockResolvedValue([]);
+
+      await service.getOpenSwaps(tenantId);
+
+      expect(prisma.shiftSwapRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId, status: 'PENDING' },
+        }),
+      );
+    });
+  });
+
+  describe('getMySwapRequests', () => {
+    it('should query swaps where user is requester or responder', async () => {
+      prisma.shiftSwapRequest.findMany.mockResolvedValue([]);
+
+      await service.getMySwapRequests('user-1', tenantId);
+
+      expect(prisma.shiftSwapRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId,
+            OR: [{ requesterId: 'user-1' }, { responderId: 'user-1' }],
+          },
+        }),
+      );
+    });
+  });
+
+  describe('getPendingApprovals', () => {
+    it('should query accepted swaps for tenant', async () => {
+      prisma.shiftSwapRequest.findMany.mockResolvedValue([]);
+
+      await service.getPendingApprovals(tenantId);
+
+      expect(prisma.shiftSwapRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId, status: 'ACCEPTED' },
+        }),
+      );
+    });
+  });
+
+  describe('respondToSwap', () => {
+    const dto = { targetShiftAssignmentId: 'assign-2' };
+
+    it('should throw NotFoundException when swap not found or not pending', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue(null);
+
+      await expect(service.respondToSwap('swap-1', dto as any, 'user-2', tenantId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should reject if user responds to own swap', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        requesterId: 'user-1',
+        status: 'PENDING',
+      });
+
+      await expect(service.respondToSwap('swap-1', dto as any, 'user-1', tenantId)).rejects.toThrow(
+        'cannot respond to your own',
+      );
+    });
+
+    it('should reject if target assignment does not belong to responder', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        requesterId: 'user-1',
+        status: 'PENDING',
+      });
+      prisma.shiftAssignment.findFirst.mockResolvedValue(null);
+
+      await expect(service.respondToSwap('swap-1', dto as any, 'user-2', tenantId)).rejects.toThrow(
+        'does not belong to you',
+      );
+    });
+
+    it('should update swap to ACCEPTED with responder info', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        requesterId: 'user-1',
+        status: 'PENDING',
+      });
+      prisma.shiftAssignment.findFirst.mockResolvedValue({ id: 'assign-2', userId: 'user-2' });
+      prisma.shiftSwapRequest.update.mockResolvedValue({
+        id: 'swap-1',
+        status: 'ACCEPTED',
+        responderId: 'user-2',
+      });
+
+      const result = await service.respondToSwap('swap-1', dto as any, 'user-2', tenantId);
+
+      expect(result.status).toBe('ACCEPTED');
+      expect(prisma.shiftSwapRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'ACCEPTED',
+            responderId: 'user-2',
+            targetShiftAssignmentId: 'assign-2',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('approveSwap', () => {
+    it('should throw NotFoundException when swap not found or not accepted', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue(null);
+
+      await expect(service.approveSwap('swap-1', 'admin-1', tenantId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should reject when no target assignment exists', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        status: 'ACCEPTED',
+        originalShiftAssignment: { userId: 'user-1', shift: { shiftPattern: makeShiftPattern() } },
+        targetShiftAssignment: null,
+        originalShiftAssignmentId: 'assign-1',
+        targetShiftAssignmentId: null,
+      });
+
+      await expect(service.approveSwap('swap-1', 'admin-1', tenantId)).rejects.toThrow(
+        'No target assignment',
+      );
+    });
+
+    it('should swap user assignments in transaction and emit event', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        status: 'ACCEPTED',
+        originalShiftAssignment: { userId: 'user-1', shift: { shiftPattern: makeShiftPattern() } },
+        targetShiftAssignment: { userId: 'user-2', shift: { shiftPattern: makeShiftPattern() } },
+        originalShiftAssignmentId: 'assign-1',
+        targetShiftAssignmentId: 'assign-2',
+      });
+      mockTx.shiftSwapRequest.update.mockResolvedValue({
+        id: 'swap-1',
+        status: 'APPROVED',
+        approvedById: 'admin-1',
+      });
+
+      const result = await service.approveSwap('swap-1', 'admin-1', tenantId);
+
+      // Should swap user IDs on both assignments
+      expect(mockTx.shiftAssignment.update).toHaveBeenCalledWith({
+        where: { id: 'assign-1' },
+        data: { userId: 'user-2' },
+      });
+      expect(mockTx.shiftAssignment.update).toHaveBeenCalledWith({
+        where: { id: 'assign-2' },
+        data: { userId: 'user-1' },
+      });
+      expect(result.status).toBe('APPROVED');
+      expect(eventsService.emitSwapUpdated).toHaveBeenCalledWith(tenantId, {
+        swapId: 'swap-1',
+        status: 'APPROVED',
+      });
+    });
+  });
+
+  describe('rejectSwap', () => {
+    it('should throw NotFoundException when swap not found', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.rejectSwap('swap-1', 'Not suitable', 'admin-1', tenantId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update swap to REJECTED with manager note', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({ id: 'swap-1', status: 'ACCEPTED' });
+      prisma.shiftSwapRequest.update.mockResolvedValue({ id: 'swap-1', status: 'REJECTED' });
+
+      await service.rejectSwap('swap-1', 'Staffing too low', 'admin-1', tenantId);
+
+      expect(prisma.shiftSwapRequest.update).toHaveBeenCalledWith({
+        where: { id: 'swap-1' },
+        data: { status: 'REJECTED', managerNote: 'Staffing too low', approvedById: 'admin-1' },
+      });
+    });
+  });
+
+  describe('cancelSwapRequest', () => {
+    it('should throw NotFoundException when swap not found', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue(null);
+
+      await expect(service.cancelSwapRequest('swap-1', 'user-1', tenantId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should reject if user is not the requester', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        requesterId: 'user-1',
+        status: 'PENDING',
+      });
+
+      await expect(service.cancelSwapRequest('swap-1', 'user-2', tenantId)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should update swap to CANCELLED when requester cancels', async () => {
+      prisma.shiftSwapRequest.findFirst.mockResolvedValue({
+        id: 'swap-1',
+        requesterId: 'user-1',
+        status: 'PENDING',
+      });
+      prisma.shiftSwapRequest.update.mockResolvedValue({ id: 'swap-1', status: 'CANCELLED' });
+
+      await service.cancelSwapRequest('swap-1', 'user-1', tenantId);
+
+      expect(prisma.shiftSwapRequest.update).toHaveBeenCalledWith({
+        where: { id: 'swap-1' },
+        data: { status: 'CANCELLED' },
+      });
+    });
+  });
+
+  // ── Compliance Dashboard ──────────────────────────────
+
+  describe('getComplianceReport', () => {
+    it('should return report with zero violations when no shifts exist', async () => {
+      prisma.shift.findMany.mockResolvedValue([]);
+      prisma.userTenantMembership.findMany.mockResolvedValue([makeMember('u1', 'Alice', 'Smith')]);
+
+      const report = await service.getComplianceReport(tenantId, '2026-03-01', '2026-03-07');
+
+      expect(report.summary.totalStaff).toBe(1);
+      expect(report.summary.totalShifts).toBe(0);
+      expect(report.summary.violationCount).toBe(0);
+      expect(report.summary.complianceScore).toBe(100);
+    });
+
+    it('should detect weekly hours exceeded (>48h)', async () => {
+      // 7 x 10h shifts Mon-Sun in same week bucket; Sun getDay()=0 → weekStart calc pushes to next Monday
+      // So use Mon-Sat (6 shifts at 10h = 60h) to stay within one week bucket
+      const shifts = [];
+      for (let i = 0; i < 6; i++) {
+        const d = new Date('2026-03-02'); // Monday
+        d.setDate(d.getDate() + i);
+        shifts.push({
+          date: d,
+          status: 'PUBLISHED',
+          shiftPattern: { name: 'Long', startTime: '06:00', endTime: '16:00', breakMinutes: 0 },
+          location: null,
+          assignments: [
+            { userId: 'u1', user: { id: 'u1', firstName: 'Alice', lastName: 'Smith' } },
+          ],
+        });
+      }
+      prisma.shift.findMany.mockResolvedValue(shifts);
+      prisma.userTenantMembership.findMany.mockResolvedValue([makeMember('u1', 'Alice', 'Smith')]);
+
+      const report = await service.getComplianceReport(tenantId, '2026-03-01', '2026-03-08');
+
+      expect(report.workingTimeViolations.weeklyHoursExceeded.length).toBeGreaterThan(0);
+      expect(report.workingTimeViolations.weeklyHoursExceeded[0].userId).toBe('u1');
+      expect(report.workingTimeViolations.weeklyHoursExceeded[0].hours).toBe(60);
+    });
+
+    it('should detect consecutive days exceeded (>6)', async () => {
+      const shifts = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date('2026-03-02');
+        d.setDate(d.getDate() + i);
+        shifts.push({
+          date: d,
+          status: 'PUBLISHED',
+          shiftPattern: { name: 'Short', startTime: '09:00', endTime: '13:00', breakMinutes: 0 },
+          location: null,
+          assignments: [
+            { userId: 'u1', user: { id: 'u1', firstName: 'Alice', lastName: 'Smith' } },
+          ],
+        });
+      }
+      prisma.shift.findMany.mockResolvedValue(shifts);
+      prisma.userTenantMembership.findMany.mockResolvedValue([makeMember('u1', 'Alice', 'Smith')]);
+
+      const report = await service.getComplianceReport(tenantId, '2026-03-01', '2026-03-10');
+
+      expect(report.workingTimeViolations.consecutiveDaysExceeded.length).toBeGreaterThan(0);
+      expect(report.workingTimeViolations.consecutiveDaysExceeded[0].days).toBe(7);
+    });
+
+    it('should detect insufficient rest between shifts', async () => {
+      // Late shift ending 23:00 followed by early shift starting 06:00 = 7h rest < 11h
+      prisma.shift.findMany.mockResolvedValue([
+        {
+          date: new Date('2026-03-05'),
+          status: 'PUBLISHED',
+          shiftPattern: { name: 'Late', startTime: '15:00', endTime: '23:00', breakMinutes: 0 },
+          location: null,
+          assignments: [
+            { userId: 'u1', user: { id: 'u1', firstName: 'Alice', lastName: 'Smith' } },
+          ],
+        },
+        {
+          date: new Date('2026-03-06'),
+          status: 'PUBLISHED',
+          shiftPattern: { name: 'Early', startTime: '06:00', endTime: '14:00', breakMinutes: 0 },
+          location: null,
+          assignments: [
+            { userId: 'u1', user: { id: 'u1', firstName: 'Alice', lastName: 'Smith' } },
+          ],
+        },
+      ]);
+      prisma.userTenantMembership.findMany.mockResolvedValue([makeMember('u1', 'Alice', 'Smith')]);
+
+      const report = await service.getComplianceReport(tenantId, '2026-03-01', '2026-03-10');
+
+      expect(report.workingTimeViolations.insufficientRest.length).toBeGreaterThan(0);
+      expect(report.workingTimeViolations.insufficientRest[0].restHours).toBeLessThan(11);
+    });
+
+    it('should calculate overtime hours correctly', async () => {
+      // 1 week period, 6 shifts at 8h = 48h, standard = 37.5h, overtime = 10.5h
+      const shifts = [];
+      for (let i = 0; i < 6; i++) {
+        const d = new Date('2026-03-02');
+        d.setDate(d.getDate() + i);
+        shifts.push({
+          date: d,
+          status: 'PUBLISHED',
+          shiftPattern: { name: 'Day', startTime: '07:00', endTime: '15:00', breakMinutes: 0 },
+          location: null,
+          assignments: [
+            { userId: 'u1', user: { id: 'u1', firstName: 'Alice', lastName: 'Smith' } },
+          ],
+        });
+      }
+      prisma.shift.findMany.mockResolvedValue(shifts);
+      prisma.userTenantMembership.findMany.mockResolvedValue([makeMember('u1', 'Alice', 'Smith')]);
+
+      const report = await service.getComplianceReport(tenantId, '2026-03-02', '2026-03-09');
+
+      expect(report.overtimeHours.length).toBe(1);
+      expect(report.overtimeHours[0].scheduledHours).toBe(48);
+      expect(report.overtimeHours[0].overtimeHours).toBeGreaterThan(0);
     });
   });
 });

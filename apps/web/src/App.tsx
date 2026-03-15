@@ -37,11 +37,16 @@ import { PatientFlowDashboardPage } from './features/patient-flow/PatientFlowDas
 import { LocationsPage } from './features/patient-flow/LocationsPage';
 import { AdmitPatientPage } from './features/patient-flow/AdmitPatientPage';
 import { EncounterDetailPage } from './features/patient-flow/EncounterDetailPage';
+import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
+import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
+import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
+import { Toaster } from 'react-hot-toast';
 
 export function App(): React.ReactElement {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -83,6 +88,9 @@ export function App(): React.ReactElement {
             <Route path="locations" element={<LocationsPage />} />
             <Route path="admit" element={<AdmitPatientPage />} />
             <Route path="encounters/:id" element={<EncounterDetailPage />} />
+            <Route path="encounters/:id/discharge-plan" element={<DischargePlanPage />} />
+            <Route path="swap-marketplace" element={<SwapMarketplacePage />} />
+            <Route path="compliance" element={<ComplianceDashboardPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />
