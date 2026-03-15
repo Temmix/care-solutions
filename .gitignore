@@ -42,3 +42,13 @@ npm-debug.log*
 
 CLAUDE.md
 context.md
+
+
+aws-secrets.md
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example

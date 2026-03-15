@@ -1,0 +1,11 @@
+aws_region      = "eu-west-2"
+project_name    = "care-solutions"
+environment     = "minimal"
+domain_name     = "app.care-solutions.co.uk"
+route53_zone_id = ""
+github_repo     = "your-org/care-solutions"
+
+# Sensitive values — use TF_VAR_ environment variables instead
+# db_password           = ""
+# jwt_secret            = ""
+# encryption_master_key = ""

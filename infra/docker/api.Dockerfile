@@ -1,0 +1,96 @@
+# ── Stage 1: Install dependencies ───────────────────────
+FROM node:20-alpine AS deps
+
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copy workspace root files
+COPY package.json package-lock.json turbo.json ./
+
+# Copy workspace package.json files for dependency resolution
+COPY apps/api/package.json apps/api/
+COPY apps/logger/package.json apps/logger/
+COPY packages/shared/package.json packages/shared/
+
+# Install all dependencies (hoisted to root node_modules)
+RUN npm ci
+
+# Copy Prisma schema and generate client with musl target
+COPY apps/api/prisma/ apps/api/prisma/
+RUN cd apps/api && npx prisma generate
+
+# ── Stage 2: Build ──────────────────────────────────────
+FROM node:20-alpine AS builder
+
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code
+COPY package.json turbo.json tsconfig.base.json ./
+COPY packages/shared/ packages/shared/
+COPY apps/logger/ apps/logger/
+COPY apps/api/ apps/api/
+
+# Build shared → logger → API (turbo handles order)
+RUN npx turbo run build --filter=@care/api
+
+# ── Stage 3: Production dependencies ───────────────────
+FROM node:20-alpine AS production-deps
+
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/logger/package.json apps/logger/
+COPY packages/shared/package.json packages/shared/
+
+RUN npm ci --omit=dev
+
+# Re-generate Prisma client for production
+COPY apps/api/prisma/ apps/api/prisma/
+RUN cd apps/api && npx prisma generate
+
+# ── Stage 4: Runner ────────────────────────────────────
+FROM node:20-alpine AS runner
+
+RUN apk add --no-cache dumb-init openssl
+
+# Create non-root user
+RUN addgroup -S care && adduser -S care -G care
+
+WORKDIR /app
+
+# Copy production node_modules (all hoisted to root)
+COPY --from=production-deps /app/node_modules ./node_modules
+
+# Copy built output
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/logger/dist ./apps/logger/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+
+# Copy package.json files (needed for module resolution)
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/apps/logger/package.json ./apps/logger/
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+
+# Copy Prisma schema + migrations (for migrate deploy)
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+
+# Create logs directory
+RUN mkdir -p /app/logs && chown -R care:care /app
+
+USER care
+
+EXPOSE 3000
+
+ENV NODE_ENV=production
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/api/dist/main.js"]
