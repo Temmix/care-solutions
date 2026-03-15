@@ -1,4 +1,4 @@
-# Care Solutions
+# Clinvara
 
 A multi-tenant clinical care management platform built for UK health and social care providers. Manage patients, care plans, clinical assessments, practitioners, and team members — all scoped by organisation with role-based access control and FHIR R4 compliance.
 
@@ -260,12 +260,12 @@ GET    /api/dashboard               Dashboard statistics
 
 After running the seed script, these accounts are available:
 
-| Email                           | Role        | Organisation        | Password     |
-| ------------------------------- | ----------- | ------------------- | ------------ |
-| superadmin@care-solutions.local | Super Admin | Cross-tenant        | Password123! |
-| admin@sunrise-care.local        | Admin       | Sunrise Care Home   | Password123! |
-| nurse@sunrise-care.local        | Nurse       | Sunrise Care Home   | Password123! |
-| admin@oakwood-gp.local          | Admin       | Oakwood GP Practice | Password123! |
+| Email                    | Role        | Organisation        | Password     |
+| ------------------------ | ----------- | ------------------- | ------------ |
+| superadmin@clinvara.com  | Super Admin | Cross-tenant        | Password123! |
+| admin@sunrise-care.local | Admin       | Sunrise Care Home   | Password123! |
+| nurse@sunrise-care.local | Nurse       | Sunrise Care Home   | Password123! |
+| admin@oakwood-gp.local   | Admin       | Oakwood GP Practice | Password123! |
 
 ### Seed Data Includes
 

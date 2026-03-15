@@ -1011,13 +1011,13 @@ async function main() {
   // ── Create users ─────────────────────────────────────
   await prisma.user.create({
     data: {
-      email: 'superadmin@care-solutions.local',
+      email: 'superadmin@clinvara.com',
       passwordHash,
       firstName: 'Super',
       lastName: 'Admin',
       role: 'SUPER_ADMIN',
       tenantId: null,
-      emailIndex: computeEmailIndex('superadmin@care-solutions.local'),
+      emailIndex: computeEmailIndex('superadmin@clinvara.com'),
     },
   });
 
@@ -2040,9 +2040,7 @@ async function main() {
   console.log(
     '├──────────────────────────────────────────────────┼─────────────┼──────────────────────┤',
   );
-  console.log(
-    '│ superadmin@care-solutions.local                  │ SUPER_ADMIN │ (cross-tenant)       │',
-  );
+  console.log('│ superadmin@clinvara.com                  │ SUPER_ADMIN │ (cross-tenant)       │');
   console.log(
     '│ admin@sunrise-care.local                         │ ADMIN       │ Sunrise Care Home    │',
   );

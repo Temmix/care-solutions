@@ -436,7 +436,7 @@ export function Layout(): React.ReactElement {
             <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-sm">
               C
             </div>
-            <span className="text-lg font-semibold tracking-tight">Care Solutions</span>
+            <span className="text-lg font-semibold tracking-tight">Clinvara</span>
           </div>
         </div>
 

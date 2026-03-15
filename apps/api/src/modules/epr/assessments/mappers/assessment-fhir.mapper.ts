@@ -67,7 +67,7 @@ export function toFhirAssessment(
     code: {
       coding: [
         {
-          system: 'http://care-solutions.local/assessment-type',
+          system: 'http://clinvara.com/assessment-type',
           code: a.assessmentType,
           display: typeDisplayName ?? ASSESSMENT_TYPE_DISPLAY[a.assessmentType] ?? a.assessmentType,
         },
@@ -97,7 +97,7 @@ export function toFhirAssessment(
           {
             coding: [
               {
-                system: 'http://care-solutions.local/risk-level',
+                system: 'http://clinvara.com/risk-level',
                 code: a.riskLevel,
                 display: RISK_LEVEL_DISPLAY[a.riskLevel] ?? a.riskLevel,
               },
