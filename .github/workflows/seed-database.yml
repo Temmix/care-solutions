@@ -1,0 +1,137 @@
+name: Seed Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "seed" to confirm'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  ECS_CLUSTER: care-solutions-minimal
+  API_SERVICE: care-solutions-minimal-api
+
+jobs:
+  seed:
+    name: Run Database Seed
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ github.event.inputs.confirm == 'seed' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names care-solutions/care-seed 2>/dev/null || \
+          aws ecr create-repository --repository-name care-solutions/care-seed --image-tag-mutability IMMUTABLE
+
+      - name: Build and push seed image
+        id: seed_image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/care-solutions/care-seed:sha-${GITHUB_SHA::8}"
+          docker build -f infra/docker/seed.Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Get API task definition config
+        id: taskdef
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.ECS_CLUSTER }}-api --query 'taskDefinition' --output json)
+          echo "execution_role=$(echo "$TASK_DEF" | jq -r '.executionRoleArn')" >> $GITHUB_OUTPUT
+          echo "task_role=$(echo "$TASK_DEF" | jq -r '.taskRoleArn')" >> $GITHUB_OUTPUT
+
+          SUBNETS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output json | jq -c '.')
+          echo "subnets=$SUBNETS" >> $GITHUB_OUTPUT
+
+          SECURITY_GROUPS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' --output json | jq -c '.')
+          echo "security_groups=$SECURITY_GROUPS" >> $GITHUB_OUTPUT
+
+          echo "log_group=$(echo "$TASK_DEF" | jq -r '.containerDefinitions[0].logConfiguration.options["awslogs-group"]')" >> $GITHUB_OUTPUT
+
+          SECRETS=$(echo "$TASK_DEF" | jq -c '[.containerDefinitions[0].secrets[] | select(.name == "DATABASE_URL" or .name == "ENCRYPTION_MASTER_KEY" or .name == "AWS_KMS_KEY_ARN")]')
+          echo "secrets=$SECRETS" >> $GITHUB_OUTPUT
+
+      - name: Register seed task definition
+        id: seed_taskdef
+        run: |
+          TASK_DEF=$(cat <<HEREDOC
+          {
+            "family": "${{ env.ECS_CLUSTER }}-seed",
+            "requiresCompatibilities": ["FARGATE"],
+            "networkMode": "awsvpc",
+            "cpu": "512",
+            "memory": "1024",
+            "executionRoleArn": "${{ steps.taskdef.outputs.execution_role }}",
+            "taskRoleArn": "${{ steps.taskdef.outputs.task_role }}",
+            "containerDefinitions": [{
+              "name": "seed",
+              "image": "${{ steps.seed_image.outputs.image }}",
+              "essential": true,
+              "environment": [
+                { "name": "NODE_ENV", "value": "production" },
+                { "name": "ENCRYPTION_ENABLED", "value": "true" },
+                { "name": "ENCRYPTION_PROVIDER", "value": "kms" },
+                { "name": "AWS_REGION", "value": "${{ env.AWS_REGION }}" }
+              ],
+              "secrets": ${{ steps.taskdef.outputs.secrets }},
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "${{ steps.taskdef.outputs.log_group }}",
+                  "awslogs-region": "${{ env.AWS_REGION }}",
+                  "awslogs-stream-prefix": "seed"
+                }
+              }
+            }]
+          }
+          HEREDOC
+          )
+          ARN=$(aws ecs register-task-definition --cli-input-json "$TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$ARN" >> $GITHUB_OUTPUT
+
+      - name: Run seed task
+        id: run_seed
+        run: |
+          RESULT=$(aws ecs run-task \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --task-definition ${{ steps.seed_taskdef.outputs.arn }} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=${{ steps.taskdef.outputs.subnets }},securityGroups=${{ steps.taskdef.outputs.security_groups }},assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "task_arn=$RESULT" >> $GITHUB_OUTPUT
+          echo "Seed task started: $RESULT"
+
+      - name: Wait for seed to complete
+        run: |
+          echo "Waiting for seed task to finish..."
+          aws ecs wait tasks-stopped --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_seed.outputs.task_arn }}
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_seed.outputs.task_arn }} \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Seed failed with exit code $EXIT_CODE"
+            echo "Fetching seed logs..."
+            aws logs tail ${{ steps.taskdef.outputs.log_group }} --prefix seed --since 15m || true
+            exit 1
+          fi
+
+          echo "Database seeded successfully"
