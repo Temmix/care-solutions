@@ -62,10 +62,8 @@ module "acm" {
   project_name = var.project_name
   environment  = var.environment
   domain_name  = var.domain_name
-  subject_alternative_names = flatten([
-    for d in local.all_domains : d == var.domain_name ? ["*.${d}"] : [d, "*.${d}"]
-  ])
-  zone_id_map = { for d in local.all_domains : d => module.route53[d].zone_id }
+  subject_alternative_names = ["*.${var.domain_name}"]
+  zone_id_map               = { (var.domain_name) = module.route53[var.domain_name].zone_id }
 }
 
 # ── RDS (free tier) ─────────────────────────────────────

@@ -78,6 +78,12 @@ resource "aws_lb_target_group" "api" {
     matcher             = "200"
   }
 
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 86400
+    enabled         = true
+  }
+
   tags = {
     Name = "${local.name_prefix}-api-tg"
   }
@@ -126,7 +132,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# API path rule on HTTP listener (when no cert)
+# API path rules on HTTP listener (when no cert)
 resource "aws_lb_listener_rule" "api_http" {
   count        = var.enable_https ? 0 : 1
   listener_arn = aws_lb_listener.http.arn
@@ -140,6 +146,23 @@ resource "aws_lb_listener_rule" "api_http" {
   condition {
     path_pattern {
       values = ["/api/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "websocket_http" {
+  count        = var.enable_https ? 0 : 1
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/socket.io/*"]
     }
   }
 }
@@ -174,6 +197,24 @@ resource "aws_lb_listener_rule" "api_https" {
   condition {
     path_pattern {
       values = ["/api/*"]
+    }
+  }
+}
+
+# WebSocket path rule on HTTPS listener
+resource "aws_lb_listener_rule" "websocket_https" {
+  count        = var.enable_https ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/socket.io/*"]
     }
   }
 }
