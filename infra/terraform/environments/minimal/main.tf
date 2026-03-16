@@ -203,9 +203,13 @@ resource "aws_iam_role_policy" "github_ecr" {
           "ecs:UpdateService",
           "ecs:DescribeServices",
           "ecs:DescribeTaskDefinition",
+          "ecs:DescribeTasks",
           "ecs:RegisterTaskDefinition",
           "ecs:DeregisterTaskDefinition",
+          "ecs:RunTask",
           "iam:PassRole",
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
         ]
         Resource = ["*"]
       },
