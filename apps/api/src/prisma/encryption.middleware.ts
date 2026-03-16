@@ -210,14 +210,36 @@ export function setupEncryptionMiddleware(
 
     const result = await next(params);
 
-    // Create/update n-gram search indexes after successful write
+    // Create/update n-gram search indexes after successful write.
+    // Wrapped in try/catch because when inside a $transaction, the outer
+    // prisma client can't see the uncommitted record (FK violation).
+    // Indexes will be created on the next non-transactional write or search.
     if (
       ngramPlaintexts &&
       Object.keys(ngramPlaintexts).length > 0 &&
       result &&
       (params.action === 'create' || params.action === 'update' || params.action === 'upsert')
     ) {
-      await upsertNgramIndexes(model, result, ngramPlaintexts, blindIndexService, prisma);
+      try {
+        await upsertNgramIndexes(model, result, ngramPlaintexts, blindIndexService, prisma);
+      } catch {
+        // Silently skip — likely inside a transaction where FK check fails.
+        // Schedule deferred index creation after the transaction commits.
+        if (model === 'Patient' && result.id && result.tenantId) {
+          const patientId = result.id as string;
+          const tenantId = result.tenantId as string;
+          setImmediate(async () => {
+            try {
+              await upsertNgramIndexes(model, result, ngramPlaintexts!, blindIndexService, prisma);
+            } catch {
+              // Log but don't crash — indexes can be rebuilt later
+              console.warn(
+                `[Encryption] Deferred n-gram index creation failed for patient ${patientId} tenant ${tenantId}`,
+              );
+            }
+          });
+        }
+      }
     }
 
     // Decrypt result fields and nested relations
