@@ -26,8 +26,13 @@ export class ConsoleTransport implements LogTransport {
 
     if (entry.level === 'error') {
       console.error(line);
-      if (entry.error?.stack) {
-        console.error(`  ${entry.error.stack}`);
+      if (entry.error) {
+        if (entry.error.name) {
+          console.error(`  [${entry.error.name}] ${entry.error.message}`);
+        }
+        if (entry.error.stack) {
+          console.error(`  ${entry.error.stack}`);
+        }
       }
     } else if (entry.level === 'warn') {
       console.warn(line);
