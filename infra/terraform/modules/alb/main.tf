@@ -1,6 +1,5 @@
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
-  has_cert    = var.certificate_arn != ""
 }
 
 # ── Security Group ──────────────────────────────────────
@@ -19,7 +18,7 @@ resource "aws_security_group" "alb" {
   }
 
   dynamic "ingress" {
-    for_each = local.has_cert ? [1] : []
+    for_each = var.enable_https ? [1] : []
     content {
       description = "HTTPS"
       from_port   = 443
@@ -113,11 +112,11 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
-    type             = local.has_cert ? "redirect" : "forward"
-    target_group_arn = local.has_cert ? null : aws_lb_target_group.web.arn
+    type             = var.enable_https ? "redirect" : "forward"
+    target_group_arn = var.enable_https ? null : aws_lb_target_group.web.arn
 
     dynamic "redirect" {
-      for_each = local.has_cert ? [1] : []
+      for_each = var.enable_https ? [1] : []
       content {
         port        = "443"
         protocol    = "HTTPS"
@@ -129,7 +128,7 @@ resource "aws_lb_listener" "http" {
 
 # API path rule on HTTP listener (when no cert)
 resource "aws_lb_listener_rule" "api_http" {
-  count        = local.has_cert ? 0 : 1
+  count        = var.enable_https ? 0 : 1
   listener_arn = aws_lb_listener.http.arn
   priority     = 10
 
@@ -148,7 +147,7 @@ resource "aws_lb_listener_rule" "api_http" {
 # ── HTTPS Listener (only when certificate is provided) ──
 
 resource "aws_lb_listener" "https" {
-  count             = local.has_cert ? 1 : 0
+  count             = var.enable_https ? 1 : 0
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
@@ -163,7 +162,7 @@ resource "aws_lb_listener" "https" {
 
 # API path rule on HTTPS listener
 resource "aws_lb_listener_rule" "api_https" {
-  count        = local.has_cert ? 1 : 0
+  count        = var.enable_https ? 1 : 0
   listener_arn = aws_lb_listener.https[0].arn
   priority     = 10
 

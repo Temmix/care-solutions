@@ -95,10 +95,98 @@ jobs:
           push: true
           tags: ${{ steps.images.outputs.web }}
 
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get current API task definition
+        id: taskdef
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.ECS_CLUSTER }}-api --query 'taskDefinition' --output json)
+          echo "execution_role=$(echo "$TASK_DEF" | jq -r '.executionRoleArn')" >> $GITHUB_OUTPUT
+          echo "task_role=$(echo "$TASK_DEF" | jq -r '.taskRoleArn')" >> $GITHUB_OUTPUT
+          echo "subnets=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output json)" >> $GITHUB_OUTPUT
+          echo "security_groups=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' --output json)" >> $GITHUB_OUTPUT
+          echo "log_group=$(echo "$TASK_DEF" | jq -r '.containerDefinitions[0].logConfiguration.options["awslogs-group"]')" >> $GITHUB_OUTPUT
+          echo "secrets=$(echo "$TASK_DEF" | jq -c '[.containerDefinitions[0].secrets[] | select(.name == "DATABASE_URL")]')" >> $GITHUB_OUTPUT
+
+      - name: Register migration task definition
+        id: migrate_taskdef
+        run: |
+          TASK_DEF=$(cat <<HEREDOC
+          {
+            "family": "${{ env.ECS_CLUSTER }}-migrate",
+            "requiresCompatibilities": ["FARGATE"],
+            "networkMode": "awsvpc",
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "${{ steps.taskdef.outputs.execution_role }}",
+            "taskRoleArn": "${{ steps.taskdef.outputs.task_role }}",
+            "containerDefinitions": [{
+              "name": "migrate",
+              "image": "${{ needs.build-and-push.outputs.api_image }}",
+              "essential": true,
+              "command": ["npx", "prisma", "migrate", "deploy", "--schema", "apps/api/prisma/schema.prisma"],
+              "environment": [
+                { "name": "NODE_ENV", "value": "production" }
+              ],
+              "secrets": ${{ steps.taskdef.outputs.secrets }},
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "${{ steps.taskdef.outputs.log_group }}",
+                  "awslogs-region": "${{ env.AWS_REGION }}",
+                  "awslogs-stream-prefix": "migrate"
+                }
+              }
+            }]
+          }
+          HEREDOC
+          )
+          ARN=$(aws ecs register-task-definition --cli-input-json "$TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$ARN" >> $GITHUB_OUTPUT
+
+      - name: Run migration task
+        id: run_migrate
+        run: |
+          RESULT=$(aws ecs run-task \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --task-definition ${{ steps.migrate_taskdef.outputs.arn }} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=${{ steps.taskdef.outputs.subnets }},securityGroups=${{ steps.taskdef.outputs.security_groups }},assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "task_arn=$RESULT" >> $GITHUB_OUTPUT
+          echo "Migration task started: $RESULT"
+
+      - name: Wait for migration to complete
+        run: |
+          echo "Waiting for migration task to finish..."
+          aws ecs wait tasks-stopped --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_migrate.outputs.task_arn }}
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_migrate.outputs.task_arn }} \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Migration failed with exit code $EXIT_CODE"
+            echo "Fetching migration logs..."
+            aws logs tail ${{ steps.taskdef.outputs.log_group }} --prefix migrate --since 10m || true
+            exit 1
+          fi
+
+          echo "Migration completed successfully"
+
   deploy:
     name: Deploy to ECS
     runs-on: ubuntu-latest
-    needs: [build-and-push]
+    needs: [build-and-push, migrate]
     environment: production
     steps:
       - name: Configure AWS credentials

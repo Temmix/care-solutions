@@ -23,3 +23,9 @@ variable "certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "enable_https" {
+  description = "Enable HTTPS listener and HTTP→HTTPS redirect (must be known at plan time)"
+  type        = bool
+  default     = false
+}

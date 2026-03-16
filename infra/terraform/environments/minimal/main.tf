@@ -93,6 +93,7 @@ module "alb" {
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
   certificate_arn = var.enable_dns ? module.acm[0].certificate_arn : ""
+  enable_https    = var.enable_dns
 }
 
 # ── Secrets Manager ─────────────────────────────────────
@@ -202,9 +203,13 @@ resource "aws_iam_role_policy" "github_ecr" {
           "ecs:UpdateService",
           "ecs:DescribeServices",
           "ecs:DescribeTaskDefinition",
+          "ecs:DescribeTasks",
           "ecs:RegisterTaskDefinition",
           "ecs:DeregisterTaskDefinition",
+          "ecs:RunTask",
           "iam:PassRole",
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
         ]
         Resource = ["*"]
       },
