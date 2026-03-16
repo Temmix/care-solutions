@@ -17,15 +17,23 @@ import {
   type MedicationForm,
   type MedicationRequestStatus,
   type MedicationRoute,
+  type Role,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { KMSClient, GenerateDataKeyCommand, DecryptCommand } from '@aws-sdk/client-kms';
 
 const prisma = new PrismaClient();
 
 // ── Blind index helper (replicates BlindIndexService.computeGlobalBlindIndex) ──
 const ENCRYPTION_ENABLED = process.env.ENCRYPTION_ENABLED === 'true';
 const MASTER_KEY_HEX = process.env.ENCRYPTION_MASTER_KEY;
+const ENCRYPTION_PROVIDER = (process.env.ENCRYPTION_PROVIDER ?? 'local') as 'local' | 'kms';
+const AWS_KMS_KEY_ARN = process.env.AWS_KMS_KEY_ARN;
+const kmsClient =
+  ENCRYPTION_PROVIDER === 'kms'
+    ? new KMSClient({ region: process.env.AWS_REGION ?? 'eu-west-2' })
+    : null;
 
 function normalize(value: string): string {
   return value
@@ -53,13 +61,69 @@ function computeEmailIndex(email: string): string | undefined {
 const dekCache = new Map<string, Buffer>();
 const MIN_NGRAM = 3;
 
+async function unwrapDEK(encryptedDek: string): Promise<Buffer> {
+  if (ENCRYPTION_PROVIDER === 'kms') {
+    if (!kmsClient) throw new Error('KMS client not initialised');
+    const result = await kmsClient.send(
+      new DecryptCommand({ CiphertextBlob: Buffer.from(encryptedDek, 'base64') }),
+    );
+    if (!result.Plaintext) throw new Error('KMS Decrypt returned no plaintext');
+    return Buffer.from(result.Plaintext);
+  }
+
+  // Local provider
+  const masterKey = Buffer.from(MASTER_KEY_HEX!, 'hex');
+  const buf = Buffer.from(encryptedDek, 'base64');
+  const iv = buf.subarray(0, 12);
+  const tag = buf.subarray(12, 28);
+  const ciphertext = buf.subarray(28);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+async function generateWrappedDEK(): Promise<{
+  plaintext: Buffer;
+  encryptedDek: string;
+  kmsKeyArn: string | null;
+}> {
+  if (ENCRYPTION_PROVIDER === 'kms') {
+    if (!kmsClient || !AWS_KMS_KEY_ARN) throw new Error('KMS not configured (set AWS_KMS_KEY_ARN)');
+    const result = await kmsClient.send(
+      new GenerateDataKeyCommand({ KeyId: AWS_KMS_KEY_ARN, KeySpec: 'AES_256' }),
+    );
+    if (!result.Plaintext || !result.CiphertextBlob) {
+      throw new Error('KMS GenerateDataKey returned incomplete result');
+    }
+    return {
+      plaintext: Buffer.from(result.Plaintext),
+      encryptedDek: Buffer.from(result.CiphertextBlob).toString('base64'),
+      kmsKeyArn: AWS_KMS_KEY_ARN,
+    };
+  }
+
+  // Local provider
+  const masterKey = Buffer.from(MASTER_KEY_HEX!, 'hex');
+  const dek = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
+  const encrypted = Buffer.concat([cipher.update(dek), cipher.final()]);
+  return {
+    plaintext: dek,
+    encryptedDek: Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64'),
+    kmsKeyArn: null,
+  };
+}
+
 async function getOrCreateDEK(tenantId: string): Promise<Buffer> {
-  if (!ENCRYPTION_ENABLED || !MASTER_KEY_HEX) throw new Error('Encryption not configured');
+  if (!ENCRYPTION_ENABLED) throw new Error('Encryption not enabled');
+  if (ENCRYPTION_PROVIDER === 'local' && !MASTER_KEY_HEX)
+    throw new Error('ENCRYPTION_MASTER_KEY required for local provider');
+  if (ENCRYPTION_PROVIDER === 'kms' && !AWS_KMS_KEY_ARN)
+    throw new Error('AWS_KMS_KEY_ARN required for kms provider');
 
   const cached = dekCache.get(tenantId);
   if (cached) return cached;
-
-  const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
 
   // Check for existing DEK in DB
   const existing = await prisma.encryptionKey.findFirst({
@@ -68,31 +132,27 @@ async function getOrCreateDEK(tenantId: string): Promise<Buffer> {
   });
 
   if (existing) {
-    // Unwrap using local master key (same as KeyManagementService.unwrapLocal)
-    const buf = Buffer.from(existing.encryptedDek, 'base64');
-    const iv = buf.subarray(0, 12);
-    const tag = buf.subarray(12, 28);
-    const ciphertext = buf.subarray(28);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
-    decipher.setAuthTag(tag);
-    const dek = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const dek = await unwrapDEK(existing.encryptedDek);
     dekCache.set(tenantId, dek);
     return dek;
   }
 
   // Generate new DEK
-  const dek = crypto.randomBytes(32);
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv, { authTagLength: 16 });
-  const encrypted = Buffer.concat([cipher.update(dek), cipher.final()]);
-  const encryptedDek = Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64');
+  const { plaintext, encryptedDek, kmsKeyArn } = await generateWrappedDEK();
 
   await prisma.encryptionKey.create({
-    data: { tenantId, encryptedDek, keyVersion: 1, isActive: true, algorithm: 'AES-256-GCM' },
+    data: {
+      tenantId,
+      encryptedDek,
+      keyVersion: 1,
+      isActive: true,
+      algorithm: 'AES-256-GCM',
+      kmsKeyArn,
+    },
   });
 
-  dekCache.set(tenantId, dek);
-  return dek;
+  dekCache.set(tenantId, plaintext);
+  return plaintext;
 }
 
 function deriveFieldKey(dek: Buffer, fieldName: string): Buffer {
@@ -1103,12 +1163,12 @@ async function main() {
     ...sunrisePractitionerUsers.map((u, i) => ({
       userId: u.id,
       organizationId: sunriseCare.id,
-      role: sunrisePractitionerData[i].role as string,
+      role: sunrisePractitionerData[i].role as Role,
     })),
     ...oakwoodPractitionerUsers.map((u, i) => ({
       userId: u.id,
       organizationId: oakwoodGP.id,
-      role: oakwoodPractitionerData[i].role as string,
+      role: oakwoodPractitionerData[i].role as Role,
     })),
   ];
 
