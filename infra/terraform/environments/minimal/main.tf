@@ -35,7 +35,7 @@ module "ecr" {
 
   project_name     = var.project_name
   environment      = var.environment
-  repository_names = ["care-api", "care-web"]
+  repository_names = ["care-api", "care-web", "care-seed"]
 }
 
 # ── Route53 (DNS) ─────────────────────────────────────
