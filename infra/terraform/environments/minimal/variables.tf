@@ -62,6 +62,12 @@ variable "domain_name" {
   default     = "clinvara.com"
 }
 
+variable "additional_domains" {
+  description = "Additional domain names that redirect to the primary domain"
+  type        = list(string)
+  default     = ["clinvara.co.uk", "clinvara.health"]
+}
+
 variable "enable_dns" {
   description = "Enable Route53 hosted zone, ACM certificate, and HTTPS"
   type        = bool

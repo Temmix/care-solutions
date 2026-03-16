@@ -113,8 +113,10 @@ jobs:
           TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.ECS_CLUSTER }}-api --query 'taskDefinition' --output json)
           echo "execution_role=$(echo "$TASK_DEF" | jq -r '.executionRoleArn')" >> $GITHUB_OUTPUT
           echo "task_role=$(echo "$TASK_DEF" | jq -r '.taskRoleArn')" >> $GITHUB_OUTPUT
-          echo "subnets=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output json)" >> $GITHUB_OUTPUT
-          echo "security_groups=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' --output json)" >> $GITHUB_OUTPUT
+          SUBNETS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output json | jq -c '.')
+          echo "subnets=$SUBNETS" >> $GITHUB_OUTPUT
+          SECURITY_GROUPS=$(aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.API_SERVICE }} --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' --output json | jq -c '.')
+          echo "security_groups=$SECURITY_GROUPS" >> $GITHUB_OUTPUT
           echo "log_group=$(echo "$TASK_DEF" | jq -r '.containerDefinitions[0].logConfiguration.options["awslogs-group"]')" >> $GITHUB_OUTPUT
           echo "secrets=$(echo "$TASK_DEF" | jq -c '[.containerDefinitions[0].secrets[] | select(.name == "DATABASE_URL")]')" >> $GITHUB_OUTPUT
 

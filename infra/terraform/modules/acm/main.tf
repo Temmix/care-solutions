@@ -14,22 +14,33 @@ resource "aws_acm_certificate" "main" {
   }
 }
 
-# DNS validation records — always created when this module is called
-resource "aws_route53_record" "validation" {
-  for_each = {
+# Look up the correct zone ID for each domain validation option.
+# A wildcard like *.clinvara.co.uk shares the same validation record
+# as clinvara.co.uk, so we match the base domain from the zone_id_map.
+locals {
+  dvo_map = {
     for dvo in aws_acm_certificate.main.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
+      name    = dvo.resource_record_name
+      record  = dvo.resource_record_value
+      type    = dvo.resource_record_type
+      zone_id = lookup(
+        var.zone_id_map,
+        dvo.domain_name,
+        lookup(var.zone_id_map, trimprefix(dvo.domain_name, "*."), "")
+      )
     }
   }
+}
+
+resource "aws_route53_record" "validation" {
+  for_each = local.dvo_map
 
   allow_overwrite = true
   name            = each.value.name
   records         = [each.value.record]
   ttl             = 60
   type            = each.value.type
-  zone_id         = var.route53_zone_id
+  zone_id         = each.value.zone_id
 }
 
 resource "aws_acm_certificate_validation" "main" {
