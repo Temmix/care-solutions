@@ -19,8 +19,7 @@ variable "subject_alternative_names" {
   default     = []
 }
 
-variable "route53_zone_id" {
-  description = "Route53 hosted zone ID for DNS validation (empty string to skip auto-validation)"
-  type        = string
-  default     = ""
+variable "zone_id_map" {
+  description = "Map of domain name to Route53 zone ID for DNS validation"
+  type        = map(string)
 }

@@ -39,8 +39,8 @@ output "github_actions_role_arn" {
 }
 
 output "nameservers" {
-  description = "Route53 nameservers — set these at your domain registrar"
-  value       = var.enable_dns ? module.route53[0].nameservers : []
+  description = "Route53 nameservers per domain — set these at each domain registrar"
+  value       = var.enable_dns ? { for d, m in module.route53 : d => m.nameservers } : {}
 }
 
 output "domain_name" {

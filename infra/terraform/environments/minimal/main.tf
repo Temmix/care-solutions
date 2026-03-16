@@ -1,6 +1,9 @@
 locals {
   # 2 AZs only (minimum for ALB)
   availability_zones = ["${var.aws_region}a", "${var.aws_region}b"]
+
+  # All domains: primary + additional
+  all_domains = concat([var.domain_name], var.additional_domains)
 }
 
 # ── VPC (2 AZs, 1 NAT Gateway) ─────────────────────────
@@ -36,29 +39,33 @@ module "ecr" {
 }
 
 # ── Route53 (DNS) ─────────────────────────────────────
+# One hosted zone per domain
 
 module "route53" {
-  count  = var.enable_dns ? 1 : 0
-  source = "../../modules/route53"
+  for_each = var.enable_dns ? toset(local.all_domains) : toset([])
+  source   = "../../modules/route53"
 
   project_name = var.project_name
   environment  = var.environment
-  domain_name  = var.domain_name
+  domain_name  = each.value
   alb_dns_name = module.alb.alb_dns_name
   alb_zone_id  = module.alb.alb_zone_id
 }
 
 # ── ACM (SSL certificate) ────────────────────────────
+# Single certificate covering all domains + wildcards
 
 module "acm" {
   count  = var.enable_dns ? 1 : 0
   source = "../../modules/acm"
 
-  project_name              = var.project_name
-  environment               = var.environment
-  domain_name               = var.domain_name
-  subject_alternative_names = ["*.${var.domain_name}"]
-  route53_zone_id           = module.route53[0].zone_id
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+  subject_alternative_names = flatten([
+    for d in local.all_domains : d == var.domain_name ? ["*.${d}"] : [d, "*.${d}"]
+  ])
+  zone_id_map = { for d in local.all_domains : d => module.route53[d].zone_id }
 }
 
 # ── RDS (free tier) ─────────────────────────────────────
