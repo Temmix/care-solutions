@@ -12,12 +12,9 @@ COPY packages/shared/package.json packages/shared/
 
 RUN npm ci
 
-# Generate Prisma client for Alpine
+# Generate Prisma client for Alpine (prisma/ dir includes seed.ts)
 COPY apps/api/prisma/ apps/api/prisma/
 RUN cd apps/api && npx prisma generate
-
-# Copy seed script
-COPY apps/api/prisma/seed.ts apps/api/prisma/seed.ts
 
 # Install tsx for running TypeScript directly
 RUN npx tsx --version

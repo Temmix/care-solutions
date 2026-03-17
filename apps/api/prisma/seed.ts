@@ -1,8 +1,12 @@
-import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 
-// Load root .env (contains ENCRYPTION_ENABLED, ENCRYPTION_MASTER_KEY)
-loadEnv({ path: resolve(__dirname, '../../../.env') });
+// Load root .env if dotenv is available (local dev only — ECS injects env vars directly)
+try {
+  const { config: loadEnv } = require('dotenv');
+  loadEnv({ path: resolve(__dirname, '../../../.env') });
+} catch {
+  // dotenv not installed (e.g. Docker/Fargate) — env vars already set
+}
 
 import {
   PrismaClient,
