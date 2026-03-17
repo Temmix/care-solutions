@@ -19,8 +19,14 @@ variable "vpc_id" {
 }
 
 variable "private_subnet_ids" {
-  description = "Private subnet IDs for Fargate tasks"
+  description = "Subnet IDs for Fargate tasks (private or public depending on environment)"
   type        = list(string)
+}
+
+variable "assign_public_ip" {
+  description = "Assign public IP to Fargate tasks (required when using public subnets without NAT)"
+  type        = bool
+  default     = false
 }
 
 variable "alb_security_group_id" {

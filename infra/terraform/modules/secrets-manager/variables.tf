@@ -44,3 +44,21 @@ variable "stripe_webhook_secret" {
   sensitive   = true
   default     = ""
 }
+
+variable "stripe_price_starter" {
+  description = "Stripe price ID for Starter plan"
+  type        = string
+  default     = ""
+}
+
+variable "stripe_price_professional" {
+  description = "Stripe price ID for Professional plan"
+  type        = string
+  default     = ""
+}
+
+variable "stripe_price_enterprise" {
+  description = "Stripe price ID for Enterprise plan"
+  type        = string
+  default     = ""
+}

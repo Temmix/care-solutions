@@ -283,7 +283,7 @@ resource "aws_ecs_service" "api" {
   network_configuration {
     subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.tasks.id]
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {
@@ -321,7 +321,7 @@ resource "aws_ecs_service" "web" {
   network_configuration {
     subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.tasks.id]
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {
