@@ -36,11 +36,6 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names care-solutions/care-seed 2>/dev/null || \
-          aws ecr create-repository --repository-name care-solutions/care-seed --image-tag-mutability IMMUTABLE
-
       - name: Build and push seed image
         id: seed_image
         run: |
