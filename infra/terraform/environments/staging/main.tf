@@ -31,7 +31,7 @@ module "ecr" {
 
   project_name     = var.project_name
   environment      = var.environment
-  repository_names = ["care-api-staging", "care-web-staging"]
+  repository_names = ["care-api-staging", "care-web-staging", "care-seed"]
 }
 
 # ── RDS (smallest instance, no monitoring) ──────────────
