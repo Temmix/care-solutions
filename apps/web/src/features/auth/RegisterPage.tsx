@@ -48,7 +48,7 @@ export function RegisterPage(): React.ReactElement {
         city: tenantName && city ? city : undefined,
         postalCode: tenantName && postalCode ? postalCode : undefined,
       });
-      navigate('/');
+      navigate('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

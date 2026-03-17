@@ -40,6 +40,7 @@ import { EncounterDetailPage } from './features/patient-flow/EncounterDetailPage
 import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
 import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
 import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
+import { DemoPage } from './features/demo/DemoPage';
 import { Toaster } from 'react-hot-toast';
 
 export function App(): React.ReactElement {
@@ -48,10 +49,11 @@ export function App(): React.ReactElement {
       <AuthProvider>
         <Toaster position="top-right" />
         <Routes>
+          <Route path="/" element={<DemoPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
-            path="/"
+            path="/app"
             element={
               <ProtectedRoute>
                 <Layout />

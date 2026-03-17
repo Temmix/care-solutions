@@ -26,6 +26,12 @@ variable "single_nat_gateway" {
   default     = false
 }
 
+variable "enable_nat_gateway" {
+  description = "Create NAT Gateway(s). Disable for staging to save ~$32/month (ECS tasks must use public subnets)"
+  type        = bool
+  default     = true
+}
+
 variable "flow_log_retention_days" {
   description = "CloudWatch log retention for VPC flow logs"
   type        = number

@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/use-auth';
 
 const navItems = [
   {
-    to: '/',
+    to: '/app',
     label: 'Dashboard',
     icon: (
       <svg
@@ -23,7 +23,7 @@ const navItems = [
     ),
   },
   {
-    to: '/tenants',
+    to: '/app/tenants',
     label: 'Tenants',
     platformOnly: true,
     icon: (
@@ -43,7 +43,7 @@ const navItems = [
     ),
   },
   {
-    to: '/super-admins',
+    to: '/app/super-admins',
     label: 'Super Admins',
     superAdminOnly: true,
     icon: (
@@ -63,7 +63,7 @@ const navItems = [
     ),
   },
   {
-    to: '/tenant-admins',
+    to: '/app/tenant-admins',
     label: 'Tenant Admins',
     superAdminOnly: true,
     icon: (
@@ -83,7 +83,7 @@ const navItems = [
     ),
   },
   {
-    to: '/patients',
+    to: '/app/patients',
     label: 'Patients',
     icon: (
       <svg
@@ -102,7 +102,7 @@ const navItems = [
     ),
   },
   {
-    to: '/care-plans',
+    to: '/app/care-plans',
     label: 'Care Plans',
     icon: (
       <svg
@@ -121,7 +121,7 @@ const navItems = [
     ),
   },
   {
-    to: '/medications',
+    to: '/app/medications',
     label: 'Medications',
     icon: (
       <svg
@@ -140,7 +140,7 @@ const navItems = [
     ),
   },
   {
-    to: '/assessments',
+    to: '/app/assessments',
     label: 'Assessments',
     icon: (
       <svg
@@ -159,7 +159,7 @@ const navItems = [
     ),
   },
   {
-    to: '/roster',
+    to: '/app/roster',
     label: 'Roster',
     icon: (
       <svg
@@ -178,7 +178,7 @@ const navItems = [
     ),
   },
   {
-    to: '/shift-patterns',
+    to: '/app/shift-patterns',
     label: 'Shift Patterns',
     adminOnly: true,
     icon: (
@@ -198,7 +198,7 @@ const navItems = [
     ),
   },
   {
-    to: '/availability',
+    to: '/app/availability',
     label: 'Availability',
     icon: (
       <svg
@@ -217,7 +217,7 @@ const navItems = [
     ),
   },
   {
-    to: '/patient-flow',
+    to: '/app/patient-flow',
     label: 'Patient Flow',
     icon: (
       <svg
@@ -236,7 +236,7 @@ const navItems = [
     ),
   },
   {
-    to: '/swap-marketplace',
+    to: '/app/swap-marketplace',
     label: 'Shift Swaps',
     icon: (
       <svg
@@ -255,7 +255,7 @@ const navItems = [
     ),
   },
   {
-    to: '/compliance',
+    to: '/app/compliance',
     label: 'Compliance',
     adminOnly: true,
     icon: (
@@ -275,7 +275,7 @@ const navItems = [
     ),
   },
   {
-    to: '/locations',
+    to: '/app/locations',
     label: 'Locations & Beds',
     adminOnly: true,
     icon: (
@@ -295,7 +295,7 @@ const navItems = [
     ),
   },
   {
-    to: '/practitioners',
+    to: '/app/practitioners',
     label: 'Practitioners',
     adminOnly: true,
     icon: (
@@ -315,7 +315,7 @@ const navItems = [
     ),
   },
   {
-    to: '/billing',
+    to: '/app/billing',
     label: 'Billing',
     adminOnly: true,
     icon: (
@@ -335,7 +335,7 @@ const navItems = [
     ),
   },
   {
-    to: '/team',
+    to: '/app/team',
     label: 'Team',
     adminOnly: true,
     icon: (
@@ -355,7 +355,7 @@ const navItems = [
     ),
   },
   {
-    to: '/settings',
+    to: '/app/settings',
     label: 'Settings',
     adminOnly: true,
     icon: (
@@ -394,25 +394,25 @@ export function Layout(): React.ReactElement {
       !isPlatformAdmin &&
       hasMultipleMemberships &&
       !selectedTenant &&
-      location.pathname !== '/select-tenant' &&
-      location.pathname !== '/change-password'
+      location.pathname !== '/app/select-tenant' &&
+      location.pathname !== '/app/change-password'
     ) {
-      navigate('/select-tenant', { replace: true });
+      navigate('/app/select-tenant', { replace: true });
     }
   }, [isPlatformAdmin, hasMultipleMemberships, selectedTenant, location.pathname, navigate]);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const handleClearTenant = () => {
     selectTenant(null);
-    navigate(isPlatformAdmin ? '/tenants' : '/select-tenant');
+    navigate(isPlatformAdmin ? '/app/tenants' : '/app/select-tenant');
   };
 
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
+    if (path === '/app') return location.pathname === '/app';
     return location.pathname.startsWith(path);
   };
 
@@ -460,7 +460,7 @@ export function Layout(): React.ReactElement {
             <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
               <div className="text-xs text-slate-400">No tenant selected</div>
               <Link
-                to="/tenants"
+                to="/app/tenants"
                 className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
               >
                 Select a tenant
@@ -485,7 +485,7 @@ export function Layout(): React.ReactElement {
             <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
               <div className="text-xs text-slate-400">No organisation selected</div>
               <Link
-                to="/select-tenant"
+                to="/app/select-tenant"
                 className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
               >
                 Select organisation
@@ -535,7 +535,7 @@ export function Layout(): React.ReactElement {
             </div>
           </div>
           <Link
-            to="/change-password"
+            to="/app/change-password"
             className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 bg-transparent border border-white/15 text-slate-300 no-underline rounded-lg text-xs cursor-pointer hover:bg-sidebar-hover hover:text-white transition-colors"
           >
             <svg

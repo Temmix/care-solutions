@@ -74,7 +74,7 @@ export function TenantsPage(): React.ReactElement {
   const handleSelectTenant = (org: FhirOrganization) => {
     const typeCode = org.type?.[0]?.coding?.[0]?.code ?? 'OTHER';
     selectTenant({ id: org.id, name: org.name, type: typeCode });
-    navigate('/');
+    navigate('/app');
   };
 
   if (loading) {

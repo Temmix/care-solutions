@@ -88,3 +88,15 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+
+variable "monitoring_interval" {
+  description = "Enhanced monitoring interval in seconds (0 to disable)"
+  type        = number
+  default     = 60
+}
+
+variable "performance_insights_enabled" {
+  description = "Enable Performance Insights"
+  type        = bool
+  default     = true
+}

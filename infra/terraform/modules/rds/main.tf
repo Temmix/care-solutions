@@ -75,9 +75,9 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier = var.environment == "prod" ? "${local.name_prefix}-final-snapshot" : null
   copy_tags_to_snapshot     = true
 
-  performance_insights_enabled = true
-  monitoring_interval          = 60
-  monitoring_role_arn          = aws_iam_role.rds_monitoring.arn
+  performance_insights_enabled = var.performance_insights_enabled
+  monitoring_interval          = var.monitoring_interval
+  monitoring_role_arn          = var.monitoring_interval > 0 ? aws_iam_role.rds_monitoring[0].arn : null
 
   parameter_group_name = aws_db_parameter_group.main.name
 
@@ -118,7 +118,8 @@ resource "aws_db_parameter_group" "main" {
 # ── Enhanced Monitoring Role ────────────────────────────
 
 resource "aws_iam_role" "rds_monitoring" {
-  name = "${local.name_prefix}-rds-monitoring"
+  count = var.monitoring_interval > 0 ? 1 : 0
+  name  = "${local.name_prefix}-rds-monitoring"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -133,6 +134,7 @@ resource "aws_iam_role" "rds_monitoring" {
 }
 
 resource "aws_iam_role_policy_attachment" "rds_monitoring" {
-  role       = aws_iam_role.rds_monitoring.name
+  count      = var.monitoring_interval > 0 ? 1 : 0
+  role       = aws_iam_role.rds_monitoring[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }

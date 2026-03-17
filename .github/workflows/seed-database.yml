@@ -3,6 +3,14 @@ name: Seed Database
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+        default: staging
       confirm:
         description: 'Type "seed" to confirm'
         required: true
@@ -14,15 +22,17 @@ permissions:
 
 env:
   AWS_REGION: eu-west-2
-  ECS_CLUSTER: care-solutions-minimal
-  API_SERVICE: care-solutions-minimal-api
 
 jobs:
   seed:
-    name: Run Database Seed
+    name: Seed ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.event.inputs.environment }}
     if: ${{ github.event.inputs.confirm == 'seed' }}
+    env:
+      ECS_CLUSTER: ${{ github.event.inputs.environment == 'production' && 'care-solutions-minimal' || 'care-solutions-staging' }}
+      API_SERVICE: ${{ github.event.inputs.environment == 'production' && 'care-solutions-minimal-api' || 'care-solutions-staging-api' }}
+      ASSIGN_PUBLIC_IP: ${{ github.event.inputs.environment == 'staging' && 'ENABLED' || 'DISABLED' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -109,7 +119,7 @@ jobs:
             --cluster ${{ env.ECS_CLUSTER }} \
             --task-definition ${{ steps.seed_taskdef.outputs.arn }} \
             --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=${{ steps.taskdef.outputs.subnets }},securityGroups=${{ steps.taskdef.outputs.security_groups }},assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=${{ steps.taskdef.outputs.subnets }},securityGroups=${{ steps.taskdef.outputs.security_groups }},assignPublicIp=${{ env.ASSIGN_PUBLIC_IP }}}" \
             --query 'tasks[0].taskArn' --output text)
           echo "task_arn=$RESULT" >> $GITHUB_OUTPUT
           echo "Seed task started: $RESULT"

@@ -32,7 +32,7 @@ export function ChangePasswordPage({ forced }: Props): React.ReactElement {
     try {
       await api.patch('/users/change-password', { currentPassword, newPassword });
       await refreshProfile();
-      navigate('/');
+      navigate('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to change password');
     } finally {
@@ -132,7 +132,7 @@ export function ChangePasswordPage({ forced }: Props): React.ReactElement {
                 type="button"
                 onClick={() => {
                   logout();
-                  navigate('/login');
+                  navigate('/');
                 }}
                 className="w-full py-2 text-sm text-slate-500 bg-transparent border-none cursor-pointer hover:text-slate-700"
               >

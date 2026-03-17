@@ -54,7 +54,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
     });
-    expect(mockNavigate).toHaveBeenCalledWith('/');
+    expect(mockNavigate).toHaveBeenCalledWith('/app');
   });
 
   it('shows error message on login failure', async () => {
