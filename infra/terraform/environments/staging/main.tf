@@ -48,8 +48,8 @@ module "rds" {
 
   engine_version             = "16.6"
   instance_class             = "db.t3.micro"
-  allocated_storage          = 10
-  max_allocated_storage      = 10
+  allocated_storage          = 20
+  max_allocated_storage      = 20
   multi_az                   = false
   deletion_protection        = false
   backup_retention_days      = 1
