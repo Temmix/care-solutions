@@ -66,7 +66,7 @@ describe('RegisterPage', () => {
         organizationType: undefined,
       });
     });
-    expect(mockNavigate).toHaveBeenCalledWith('/');
+    expect(mockNavigate).toHaveBeenCalledWith('/app');
   });
 
   it('shows organisation type select when tenantName is entered', async () => {
