@@ -403,7 +403,7 @@ export function Layout(): React.ReactElement {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const handleClearTenant = () => {

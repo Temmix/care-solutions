@@ -258,7 +258,7 @@ export function DemoPage(): React.ReactElement {
                   ],
                   [
                     'Role-based access',
-                    'Granular permissions across Super Admin, Tenant Admin, Clinician, Nurse, and Carer roles.',
+                    'Granular permissions across Admin, Clinician, Nurse, and Carer roles.',
                   ],
                   [
                     'Real-time updates',
@@ -289,25 +289,60 @@ export function DemoPage(): React.ReactElement {
                 ))}
               </ul>
             </div>
-            <div className="bg-slate-50 rounded-xl border border-slate-100 p-8">
-              <div className="text-xs font-mono text-slate-400 mb-3">Tech Stack</div>
-              <div className="space-y-3">
-                {[
-                  ['Backend', 'NestJS, Prisma, PostgreSQL'],
-                  ['Frontend', 'React, TypeScript, Tailwind CSS'],
-                  ['Infrastructure', 'AWS ECS Fargate, RDS, KMS'],
-                  ['Standards', 'FHIR R4 compliant data model'],
-                  ['Security', 'AES-256-GCM, HMAC blind indexes'],
-                  ['CI/CD', 'GitHub Actions, Terraform'],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
-                  >
-                    <span className="text-sm font-medium text-slate-700">{label}</span>
-                    <span className="text-sm text-slate-500">{value}</span>
-                  </div>
-                ))}
+            <div className="space-y-6">
+              <div className="bg-slate-50 rounded-xl border border-slate-100 p-6">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                  Built for UK Healthcare
+                </div>
+                <div className="space-y-4">
+                  {[
+                    {
+                      label: 'Care Homes',
+                      desc: 'Resident records, care plans, medication rounds, and CQC-ready reporting.',
+                      color: 'bg-teal-50 text-teal-600',
+                    },
+                    {
+                      label: 'GP Practices',
+                      desc: 'Patient registration, clinical assessments, referrals, and appointment management.',
+                      color: 'bg-blue-50 text-blue-600',
+                    },
+                    {
+                      label: 'Hospitals',
+                      desc: 'Bed management, patient flow, discharge planning, and workforce compliance.',
+                      color: 'bg-violet-50 text-violet-600',
+                    },
+                  ].map((org) => (
+                    <div key={org.label} className="flex gap-3">
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full ${org.color} shrink-0 mt-0.5`}
+                      >
+                        {org.label}
+                      </span>
+                      <span className="text-sm text-slate-500">{org.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl border border-slate-100 p-6">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                  Compliance & Standards
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'FHIR R4', desc: 'Interoperable data model' },
+                    { label: 'RBAC', desc: '4 clinical role levels' },
+                    { label: 'Encrypted', desc: 'Data at rest & in transit' },
+                    { label: 'Audit Trail', desc: 'Full activity logging' },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="bg-white rounded-lg border border-slate-100 p-3 text-center"
+                    >
+                      <div className="text-sm font-bold text-accent">{item.label}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
