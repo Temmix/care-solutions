@@ -32,7 +32,7 @@ export function SelectTenantPage(): React.ReactElement {
       name: membership.organization.name,
       type: membership.organization.type,
     });
-    navigate('/');
+    navigate('/app');
   };
 
   return (
