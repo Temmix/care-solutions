@@ -82,7 +82,7 @@ export function AdmitPatientPage(): React.ReactElement {
         bedId: bedId || undefined,
         notes: notes || undefined,
       });
-      navigate(`/encounters/${encounter.id}`);
+      navigate(`/app/encounters/${encounter.id}`);
     } catch {
       // error
     }

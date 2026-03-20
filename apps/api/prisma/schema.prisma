@@ -63,6 +63,11 @@ enum PatientEventType {
   CARE_PLAN_UPDATED
   MEDICATION_PRESCRIBED
   MEDICATION_ADMINISTERED
+  CHC_REFERRAL
+  CHC_STATUS_CHANGE
+  VIRTUAL_WARD_ENROLLED
+  VIRTUAL_WARD_DISCHARGED
+  VIRTUAL_WARD_ALERT
 }
 
 enum OrganizationType {
@@ -387,6 +392,21 @@ model User {
   // Multi-tenancy memberships
   memberships UserTenantMembership[] @relation("UserMemberships")
 
+  // Phase 4: CHC
+  chcCasesReferred       ChcCase[]        @relation("ChcReferrer")
+  chcScreeningsPerformed ChcCase[]        @relation("ChcScreener")
+  chcDomainAssessments   ChcDomainScore[] @relation("ChcDomainAssessor")
+  chcPanelMemberships    ChcPanelMember[] @relation("ChcPanelMember")
+  chcNotesAuthored       ChcNote[]        @relation("ChcNoteAuthor")
+
+  // Phase 4: Virtual Wards
+  vwEnrolments          VirtualWardEnrolment[] @relation("VwEnroller")
+  vwDischarges          VirtualWardEnrolment[] @relation("VwDischarger")
+  vwObservations        VitalObservation[]     @relation("VwObservationRecorder")
+  vwAlertsAcknowledged  VirtualWardAlert[]     @relation("VwAlertAcknowledger")
+  vwAlertsEscalatedTo   VirtualWardAlert[]     @relation("VwAlertEscalatedTo")
+  vwAlertsResolved      VirtualWardAlert[]     @relation("VwAlertResolver")
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -471,6 +491,10 @@ model Organization {
 
   // Phase 3: Discharge Planning
   tenantDischargePlans DischargePlan[] @relation("TenantDischargePlans")
+
+  // Phase 4: CHC & Virtual Wards
+  tenantChcCases       ChcCase[]              @relation("TenantChcCases")
+  tenantVwEnrolments   VirtualWardEnrolment[] @relation("TenantVwEnrolments")
 
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
@@ -593,6 +617,10 @@ model Patient {
   // Phase 3: Patient Flow
   encounters Encounter[]
 
+  // Phase 4: Specialized Pathways
+  chcCases              ChcCase[]
+  virtualWardEnrolments VirtualWardEnrolment[]
+
   // Encryption: blind index for postal code lookup, search index for name search
   postalCodeIndex String?
   searchIndexes   PatientSearchIndex[]
@@ -697,6 +725,9 @@ model CarePlan {
   goals      CarePlanGoal[]
   activities CarePlanActivity[]
   notes      CarePlanNote[]
+
+  // Phase 4: CHC
+  chcCases ChcCase[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1131,6 +1162,10 @@ model Encounter {
   transfers     Transfer[]
   dischargePlan DischargePlan?
 
+  // Phase 4: Specialized Pathways
+  chcCases              ChcCase[]
+  virtualWardEnrolments VirtualWardEnrolment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1294,4 +1329,328 @@ model EncryptionKey {
   @@unique([tenantId, keyVersion])
   @@index([tenantId, isActive])
   @@map("encryption_keys")
+}
+
+// ═══════════════════════════════════════════════════════════
+// Phase 4: Specialized Pathways — CHC & Virtual Wards
+// ═══════════════════════════════════════════════════════════
+
+// ─── CHC Enums ───────────────────────────────────────────
+
+enum ChcStatus {
+  REFERRAL
+  SCREENING
+  ASSESSMENT
+  DECISION
+  APPROVED
+  REJECTED
+  CARE_PACKAGE_LIVE
+  ANNUAL_REVIEW
+  CLOSED
+}
+
+enum ChcFastTrackReason {
+  TERMINAL_ILLNESS
+  RAPIDLY_DETERIORATING
+}
+
+enum ChcDomain {
+  BEHAVIOUR
+  COGNITION
+  COMMUNICATION
+  PSYCHOLOGICAL
+  MOBILITY
+  NUTRITION
+  CONTINENCE
+  SKIN
+  BREATHING
+  DRUG_THERAPIES
+  ALTERED_STATES
+  OTHER
+}
+
+enum ChcDomainLevel {
+  NO_NEEDS
+  LOW
+  MODERATE
+  HIGH
+  SEVERE
+  PRIORITY
+}
+
+enum ChcDecision {
+  APPROVED
+  REJECTED
+  DEFERRED
+}
+
+enum ChcFundingBand {
+  STANDARD
+  HIGH
+  ENHANCED
+  EXCEPTIONAL
+}
+
+// ─── Virtual Wards Enums ─────────────────────────────────
+
+enum VirtualWardStatus {
+  ENROLLED
+  MONITORING
+  ESCALATED
+  PAUSED
+  DISCHARGED
+}
+
+enum VitalType {
+  HEART_RATE
+  BLOOD_PRESSURE_SYSTOLIC
+  BLOOD_PRESSURE_DIASTOLIC
+  RESPIRATORY_RATE
+  OXYGEN_SATURATION
+  TEMPERATURE
+  BLOOD_GLUCOSE
+  WEIGHT
+  OTHER
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  ESCALATED
+  RESOLVED
+}
+
+// ─── CHC Models ──────────────────────────────────────────
+
+model ChcCase {
+  id              String             @id @default(uuid())
+  status          ChcStatus          @default(REFERRAL)
+  referralDate    DateTime           @default(now())
+  referralReason  String
+  isFastTrack     Boolean            @default(false)
+  fastTrackReason ChcFastTrackReason?
+
+  screeningDate    DateTime?
+  screeningOutcome String?
+  screeningNotes   String?
+
+  decisionDate  DateTime?
+  decision      ChcDecision?
+  decisionNotes String?
+  fundingBand   ChcFundingBand?
+
+  carePackageStartDate DateTime?
+  annualReviewDate     DateTime?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+  encounter   Encounter? @relation(fields: [encounterId], references: [id])
+
+  carePlanId String?
+  carePlan   CarePlan? @relation(fields: [carePlanId], references: [id])
+
+  referrerId String
+  referrer   User @relation("ChcReferrer", fields: [referrerId], references: [id])
+
+  screenerId String?
+  screener   User? @relation("ChcScreener", fields: [screenerId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantChcCases", fields: [tenantId], references: [id])
+
+  domainScores ChcDomainScore[]
+  panelMembers ChcPanelMember[]
+  notes        ChcNote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([patientId])
+  @@index([annualReviewDate])
+  @@map("chc_cases")
+}
+
+model ChcDomainScore {
+  id       String        @id @default(uuid())
+  domain   ChcDomain
+  level    ChcDomainLevel
+  evidence String?
+  notes    String?
+
+  chcCaseId String
+  chcCase   ChcCase @relation(fields: [chcCaseId], references: [id], onDelete: Cascade)
+
+  assessorId String
+  assessor   User @relation("ChcDomainAssessor", fields: [assessorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chcCaseId, domain])
+  @@index([chcCaseId])
+  @@map("chc_domain_scores")
+}
+
+model ChcPanelMember {
+  id   String @id @default(uuid())
+  role String
+
+  chcCaseId String
+  chcCase   ChcCase @relation(fields: [chcCaseId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ChcPanelMember", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([chcCaseId, userId])
+  @@index([chcCaseId])
+  @@map("chc_panel_members")
+}
+
+model ChcNote {
+  id      String @id @default(uuid())
+  content String
+  phase   ChcStatus
+
+  chcCaseId String
+  chcCase   ChcCase @relation(fields: [chcCaseId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation("ChcNoteAuthor", fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([chcCaseId, createdAt])
+  @@map("chc_notes")
+}
+
+// ─── Virtual Wards Models ────────────────────────────────
+
+model VirtualWardEnrolment {
+  id              String            @id @default(uuid())
+  status          VirtualWardStatus @default(ENROLLED)
+  enrolmentDate   DateTime          @default(now())
+  dischargeDate   DateTime?
+  dischargeReason String?
+  clinicalSummary String?
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  enrollerId String
+  enroller   User @relation("VwEnroller", fields: [enrollerId], references: [id])
+
+  dischargerId String?
+  discharger   User? @relation("VwDischarger", fields: [dischargerId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantVwEnrolments", fields: [tenantId], references: [id])
+
+  protocols    MonitoringProtocol[]
+  observations VitalObservation[]
+  alerts       VirtualWardAlert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([patientId])
+  @@map("virtual_ward_enrolments")
+}
+
+model MonitoringProtocol {
+  id             String    @id @default(uuid())
+  vitalType      VitalType
+  frequencyHours Int
+  isActive       Boolean   @default(true)
+
+  enrolmentId String
+  enrolment   VirtualWardEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+
+  thresholds VitalThreshold[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([enrolmentId, vitalType])
+  @@index([enrolmentId])
+  @@map("monitoring_protocols")
+}
+
+model VitalThreshold {
+  id       String        @id @default(uuid())
+  minValue Float?
+  maxValue Float?
+  severity AlertSeverity
+
+  protocolId String
+  protocol   MonitoringProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@index([protocolId])
+  @@map("vital_thresholds")
+}
+
+model VitalObservation {
+  id         String    @id @default(uuid())
+  vitalType  VitalType
+  value      Float
+  unit       String
+  notes      String?
+  recordedAt DateTime  @default(now())
+
+  enrolmentId String
+  enrolment   VirtualWardEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+
+  recorderId String
+  recorder   User @relation("VwObservationRecorder", fields: [recorderId], references: [id])
+
+  @@index([enrolmentId, vitalType])
+  @@index([enrolmentId, recordedAt])
+  @@map("vital_observations")
+}
+
+model VirtualWardAlert {
+  id               String        @id @default(uuid())
+  severity         AlertSeverity
+  status           AlertStatus   @default(OPEN)
+  message          String
+  vitalType        VitalType?
+  triggerValue     Float?
+  thresholdBreached String?
+
+  enrolmentId String
+  enrolment   VirtualWardEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+
+  acknowledgerId String?
+  acknowledger   User? @relation("VwAlertAcknowledger", fields: [acknowledgerId], references: [id])
+
+  escalatedToId String?
+  escalatedTo   User? @relation("VwAlertEscalatedTo", fields: [escalatedToId], references: [id])
+
+  resolverId    String?
+  resolver      User? @relation("VwAlertResolver", fields: [resolverId], references: [id])
+  resolveNotes  String?
+
+  createdAt    DateTime  @default(now())
+  acknowledgedAt DateTime?
+  escalatedAt  DateTime?
+  resolvedAt   DateTime?
+
+  @@index([enrolmentId, status])
+  @@index([severity, status])
+  @@map("virtual_ward_alerts")
 }

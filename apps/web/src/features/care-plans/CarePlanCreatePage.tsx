@@ -97,7 +97,7 @@ export function CarePlanCreatePage(): React.ReactElement {
       if (form.nextReviewDate) data.nextReviewDate = form.nextReviewDate;
 
       const result = await createCarePlan(data);
-      navigate(`/care-plans/${result.id}`);
+      navigate(`/app/care-plans/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create care plan');
     } finally {

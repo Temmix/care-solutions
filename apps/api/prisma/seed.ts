@@ -22,6 +22,18 @@ import {
   type MedicationRequestStatus,
   type MedicationRoute,
   type Role,
+  type ChcStatus,
+  type ChcDomain,
+  type ChcDomainLevel,
+  type ChcDecision,
+  type ChcFundingBand,
+  type ChcFastTrackReason,
+  type EncounterStatus,
+  type EncounterClass,
+  type VirtualWardStatus,
+  type VitalType,
+  type AlertSeverity,
+  type AlertStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -1011,6 +1023,16 @@ async function main() {
 
   // ── Clean existing seed data ─────────────────────────
   console.log('  Cleaning existing data...');
+  // Phase 4: CHC & Virtual Wards
+  await prisma.virtualWardAlert.deleteMany();
+  await prisma.vitalObservation.deleteMany();
+  await prisma.vitalThreshold.deleteMany();
+  await prisma.monitoringProtocol.deleteMany();
+  await prisma.virtualWardEnrolment.deleteMany();
+  await prisma.chcNote.deleteMany();
+  await prisma.chcPanelMember.deleteMany();
+  await prisma.chcDomainScore.deleteMany();
+  await prisma.chcCase.deleteMany();
   await prisma.patientSearchIndex.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.assessmentTypeConfig.deleteMany();
@@ -1027,6 +1049,7 @@ async function main() {
   await prisma.patientIdentifier.deleteMany();
   await prisma.patient.deleteMany();
   await prisma.transfer.deleteMany();
+  await prisma.shiftSwapRequest.deleteMany();
   await prisma.shiftAssignment.deleteMany();
   await prisma.shift.deleteMany();
   await prisma.staffAvailability.deleteMany();
@@ -2091,6 +2114,959 @@ async function main() {
   }
 
   console.log('  Created 5 prescriptions and 2 administrations for Sunrise Care patients');
+
+  // ── Phase 4: CHC seed data (10 cases) ──────────────────
+  const chcPatients = await prisma.patient.findMany({
+    where: { tenantId: sunriseCare.id },
+    orderBy: { familyName: 'asc' },
+    take: 10,
+  });
+
+  const clinicianUser =
+    sunrisePractitionerUsers.find((u) => u.role === 'CLINICIAN') ?? sunriseAdmin;
+
+  // CHC case definitions — varied statuses across the workflow
+  const chcCaseDefs: {
+    patientIdx: number;
+    status: ChcStatus;
+    reason: string;
+    isFastTrack: boolean;
+    fastTrackReason?: ChcFastTrackReason;
+    screening?: { outcome: string; notes: string };
+    decision?: { decision: ChcDecision; fundingBand?: ChcFundingBand; notes: string };
+    carePackage?: { startDate: string; reviewDate: string };
+    domains?: { domain: ChcDomain; level: ChcDomainLevel; evidence: string }[];
+  }[] = [
+    {
+      patientIdx: 0,
+      status: 'CARE_PACKAGE_LIVE' as ChcStatus,
+      reason: 'Complex nursing needs following stroke with residual hemiplegia and dysphagia',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — proceed to full assessment',
+        notes: 'Checklist score 4/5 domains positive',
+      },
+      decision: {
+        decision: 'APPROVED' as ChcDecision,
+        fundingBand: 'HIGH' as ChcFundingBand,
+        notes: 'Panel unanimously agreed — significant nursing needs across multiple domains',
+      },
+      carePackage: { startDate: '2025-12-01', reviewDate: '2026-12-01' },
+      domains: [
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: 'Hemiplegia, wheelchair dependent, requires hoist for all transfers',
+        },
+        {
+          domain: 'NUTRITION' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Dysphagia — modified texture diet, supervised meals, PEG considered',
+        },
+        {
+          domain: 'COMMUNICATION' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Expressive dysphasia, uses communication board',
+        },
+        {
+          domain: 'CONTINENCE' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Catheterised, requires regular catheter care',
+        },
+        {
+          domain: 'SKIN' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Waterlow score 22, pressure-relieving mattress in situ, Grade 2 sacral wound',
+        },
+        {
+          domain: 'BREATHING' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Occasional aspiration risk, suction equipment at bedside',
+        },
+      ],
+    },
+    {
+      patientIdx: 1,
+      status: 'ASSESSMENT' as ChcStatus,
+      reason: 'Progressive dementia with increasing behavioural disturbance and weight loss',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — multiple domains of concern',
+        notes: 'Cognition, behaviour, nutrition all flagged',
+      },
+      domains: [
+        {
+          domain: 'COGNITION' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: 'MMSE 8/30, unable to retain new information, requires constant supervision',
+        },
+        {
+          domain: 'BEHAVIOUR' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Verbal and physical aggression towards staff 2-3 times daily',
+        },
+        {
+          domain: 'NUTRITION' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: '4kg weight loss over 3 months, refuses meals frequently',
+        },
+      ],
+    },
+    {
+      patientIdx: 2,
+      status: 'APPROVED' as ChcStatus,
+      reason: 'End-stage COPD with recurrent exacerbations requiring frequent hospital admissions',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — breathing and drug therapies significant',
+        notes: 'Three admissions in past 6 months',
+      },
+      decision: {
+        decision: 'APPROVED' as ChcDecision,
+        fundingBand: 'STANDARD' as ChcFundingBand,
+        notes: 'Approved on basis of unpredictable breathing needs and complex medication regime',
+      },
+      domains: [
+        {
+          domain: 'BREATHING' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: 'On home oxygen, nebulisers QDS, FEV1 < 30% predicted',
+        },
+        {
+          domain: 'DRUG_THERAPIES' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: '12 medications including IV antibiotics during exacerbations',
+        },
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Breathless at rest, MRC dyspnoea scale 5',
+        },
+        {
+          domain: 'PSYCHOLOGICAL' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Anxiety and depression secondary to breathlessness and prognosis',
+        },
+      ],
+    },
+    {
+      patientIdx: 3,
+      status: 'DECISION' as ChcStatus,
+      reason: "Advanced Parkinson's disease with frequent falls and hallucinations",
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — mobility and altered states significant',
+        notes: 'Falls diary shows 8 falls in past month',
+      },
+      domains: [
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: '8 falls in past month, Hoehn & Yahr Stage 4, freezing episodes',
+        },
+        {
+          domain: 'ALTERED_STATES' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Visual hallucinations daily, Lewy body pattern',
+        },
+        {
+          domain: 'DRUG_THERAPIES' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Complex dopaminergic regime requiring precise timing',
+        },
+        {
+          domain: 'CONTINENCE' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Urinary urgency and nocturnal incontinence',
+        },
+      ],
+    },
+    {
+      patientIdx: 4,
+      status: 'SCREENING' as ChcStatus,
+      reason: 'Severe dementia with wandering behaviour and risk of self-neglect',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Pending full assessment',
+        notes: 'Initial screening indicates cognition and behaviour concerns',
+      },
+    },
+    {
+      patientIdx: 5,
+      status: 'REFERRAL' as ChcStatus,
+      reason: 'Multiple sclerosis with progressive spasticity and bladder dysfunction',
+      isFastTrack: false,
+    },
+    {
+      patientIdx: 6,
+      status: 'CARE_PACKAGE_LIVE' as ChcStatus,
+      reason: 'Terminal pancreatic cancer — fast-tracked for palliative CHC funding',
+      isFastTrack: true,
+      fastTrackReason: 'TERMINAL_ILLNESS' as ChcFastTrackReason,
+      decision: {
+        decision: 'APPROVED' as ChcDecision,
+        fundingBand: 'ENHANCED' as ChcFundingBand,
+        notes: 'Fast-track approved — prognosis weeks to months',
+      },
+      carePackage: { startDate: '2026-02-15', reviewDate: '2026-05-15' },
+      domains: [
+        {
+          domain: 'DRUG_THERAPIES' as ChcDomain,
+          level: 'PRIORITY' as ChcDomainLevel,
+          evidence: 'Syringe driver for pain management, antiemetics, anxiolytics',
+        },
+        {
+          domain: 'SKIN' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Cachexia, Waterlow 25, at high risk of pressure damage',
+        },
+        {
+          domain: 'NUTRITION' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: 'Unable to tolerate oral intake, subcutaneous fluids',
+        },
+      ],
+    },
+    {
+      patientIdx: 7,
+      status: 'REJECTED' as ChcStatus,
+      reason: 'Chronic heart failure with recurrent fluid overload episodes',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — drug therapies and breathing flagged',
+        notes: 'Daily diuretics and weight monitoring',
+      },
+      decision: {
+        decision: 'REJECTED' as ChcDecision,
+        notes:
+          'Panel determined needs are primarily social care — recommend reassessment if condition deteriorates',
+      },
+      domains: [
+        {
+          domain: 'BREATHING' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Breathless on exertion, NYHA Class III',
+        },
+        {
+          domain: 'DRUG_THERAPIES' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Complex cardiac medication regime, INR monitoring',
+        },
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Limited by breathlessness, uses walking frame',
+        },
+      ],
+    },
+    {
+      patientIdx: 8,
+      status: 'ANNUAL_REVIEW' as ChcStatus,
+      reason: 'Acquired brain injury following RTA — cognitive and physical impairments',
+      isFastTrack: false,
+      screening: {
+        outcome: 'Positive — cognition, mobility, behaviour',
+        notes: 'Significant deficits across domains',
+      },
+      decision: {
+        decision: 'APPROVED' as ChcDecision,
+        fundingBand: 'HIGH' as ChcFundingBand,
+        notes: 'Approved — substantial ongoing healthcare needs',
+      },
+      carePackage: { startDate: '2025-06-01', reviewDate: '2026-03-15' },
+      domains: [
+        {
+          domain: 'COGNITION' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Executive dysfunction, impaired judgement, requires prompting for all ADLs',
+        },
+        {
+          domain: 'BEHAVIOUR' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Disinhibition, impulsivity, verbal aggression when frustrated',
+        },
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'HIGH' as ChcDomainLevel,
+          evidence: 'Left-sided weakness, uses wheelchair outdoors, walks with frame indoors',
+        },
+        {
+          domain: 'PSYCHOLOGICAL' as ChcDomain,
+          level: 'MODERATE' as ChcDomainLevel,
+          evidence: 'Adjustment disorder, emotional lability',
+        },
+      ],
+    },
+    {
+      patientIdx: 9,
+      status: 'CLOSED' as ChcStatus,
+      reason: 'Rapidly deteriorating motor neurone disease',
+      isFastTrack: true,
+      fastTrackReason: 'RAPIDLY_DETERIORATING' as ChcFastTrackReason,
+      decision: {
+        decision: 'APPROVED' as ChcDecision,
+        fundingBand: 'EXCEPTIONAL' as ChcFundingBand,
+        notes: 'Fast-track approved — rapidly progressive MND, now deceased',
+      },
+      carePackage: { startDate: '2025-09-01', reviewDate: '2026-09-01' },
+      domains: [
+        {
+          domain: 'BREATHING' as ChcDomain,
+          level: 'PRIORITY' as ChcDomainLevel,
+          evidence: 'NIV 20 hours/day, risk of respiratory arrest',
+        },
+        {
+          domain: 'NUTRITION' as ChcDomain,
+          level: 'PRIORITY' as ChcDomainLevel,
+          evidence: 'PEG fed, no oral intake',
+        },
+        {
+          domain: 'MOBILITY' as ChcDomain,
+          level: 'PRIORITY' as ChcDomainLevel,
+          evidence: 'Bedbound, hoisted for all transfers',
+        },
+        {
+          domain: 'COMMUNICATION' as ChcDomain,
+          level: 'SEVERE' as ChcDomainLevel,
+          evidence: 'Anarthric, uses eye-gaze technology',
+        },
+      ],
+    },
+  ];
+
+  for (const def of chcCaseDefs) {
+    const patient = chcPatients[def.patientIdx];
+    if (!patient) continue;
+
+    // Determine the initial status based on whether we need intermediate steps
+    const chcCase = await prisma.chcCase.create({
+      data: {
+        status: def.status,
+        referralDate: new Date('2026-01-10'),
+        referralReason: def.reason,
+        isFastTrack: def.isFastTrack,
+        fastTrackReason: def.fastTrackReason,
+        patientId: patient.id,
+        referrerId: clinicianUser.id,
+        tenantId: sunriseCare.id,
+        screeningDate: def.screening ? new Date('2026-01-20') : undefined,
+        screeningOutcome: def.screening?.outcome,
+        screeningNotes: def.screening?.notes,
+        screenerId: def.screening ? sunriseNurseUser.id : undefined,
+        decisionDate: def.decision ? new Date('2026-02-05') : undefined,
+        decision: def.decision?.decision,
+        decisionNotes: def.decision?.notes,
+        fundingBand: def.decision?.fundingBand,
+        carePackageStartDate: def.carePackage ? new Date(def.carePackage.startDate) : undefined,
+        annualReviewDate: def.carePackage ? new Date(def.carePackage.reviewDate) : undefined,
+      },
+    });
+
+    // Create domain scores
+    if (def.domains) {
+      for (const d of def.domains) {
+        await prisma.chcDomainScore.create({
+          data: {
+            chcCaseId: chcCase.id,
+            domain: d.domain,
+            level: d.level,
+            evidence: d.evidence,
+            assessorId: clinicianUser.id,
+          },
+        });
+      }
+    }
+
+    // Add panel members for cases that reached decision
+    if (def.decision) {
+      await prisma.chcPanelMember.createMany({
+        data: [
+          { chcCaseId: chcCase.id, userId: clinicianUser.id, role: 'Nurse Assessor' },
+          { chcCaseId: chcCase.id, userId: sunriseAdmin.id, role: 'Chair' },
+          { chcCaseId: chcCase.id, userId: sunriseNurseUser.id, role: 'Ward Nurse' },
+        ],
+      });
+    }
+
+    // Add notes
+    await prisma.chcNote.create({
+      data: {
+        chcCaseId: chcCase.id,
+        content: `CHC referral created for ${patient.givenName} ${patient.familyName}. ${def.reason}`,
+        phase: 'REFERRAL' as ChcStatus,
+        authorId: clinicianUser.id,
+      },
+    });
+
+    if (def.screening) {
+      await prisma.chcNote.create({
+        data: {
+          chcCaseId: chcCase.id,
+          content: `Screening completed: ${def.screening.outcome}`,
+          phase: 'SCREENING' as ChcStatus,
+          authorId: sunriseNurseUser.id,
+        },
+      });
+    }
+
+    if (def.decision) {
+      await prisma.chcNote.create({
+        data: {
+          chcCaseId: chcCase.id,
+          content: `Decision recorded: ${def.decision.decision}. ${def.decision.notes}`,
+          phase: 'DECISION' as ChcStatus,
+          authorId: clinicianUser.id,
+        },
+      });
+    }
+
+    // Patient timeline event
+    await prisma.patientEvent.create({
+      data: {
+        patientId: patient.id,
+        eventType: 'CHC_REFERRAL',
+        summary: `CHC ${def.isFastTrack ? 'fast-track ' : ''}referral created`,
+        detail: { caseId: chcCase.id, reason: def.reason } as any,
+        recordedById: clinicianUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  console.log(
+    `  Created ${chcCaseDefs.length} CHC cases with domain scores, panel members, and notes`,
+  );
+
+  // ── Phase 4: Virtual Wards seed data (8 enrolments) ──────────────────
+
+  // Virtual Wards need encounters, so create HOME_HEALTH encounters for selected patients
+  const vwPatients = await prisma.patient.findMany({
+    where: { tenantId: sunriseCare.id },
+    orderBy: { familyName: 'asc' },
+    take: 10,
+  });
+
+  const vwDefs: {
+    patientIdx: number;
+    status: VirtualWardStatus;
+    summary: string;
+    admissionDaysAgo: number;
+    discharged?: { reason: string; daysAgo: number };
+    protocols: {
+      vitalType: VitalType;
+      frequencyHours: number;
+      thresholds: { minValue?: number; maxValue?: number; severity: AlertSeverity }[];
+    }[];
+    observations: {
+      vitalType: VitalType;
+      value: number;
+      unit: string;
+      daysAgo: number;
+      hoursAgo?: number;
+    }[];
+    alerts: {
+      severity: AlertSeverity;
+      status: AlertStatus;
+      message: string;
+      vitalType?: VitalType;
+      triggerValue?: number;
+    }[];
+  }[] = [
+    {
+      patientIdx: 0,
+      status: 'MONITORING' as VirtualWardStatus,
+      summary:
+        'Post-pneumonia recovery, stepped down from acute ward. Requires SpO2 and respiratory monitoring.',
+      admissionDaysAgo: 12,
+      protocols: [
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          frequencyHours: 4,
+          thresholds: [
+            { minValue: 92, severity: 'LOW' as AlertSeverity },
+            { minValue: 88, severity: 'HIGH' as AlertSeverity },
+            { minValue: 85, severity: 'CRITICAL' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'RESPIRATORY_RATE' as VitalType,
+          frequencyHours: 4,
+          thresholds: [
+            { maxValue: 24, severity: 'LOW' as AlertSeverity },
+            { maxValue: 28, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'TEMPERATURE' as VitalType,
+          frequencyHours: 8,
+          thresholds: [
+            { maxValue: 37.8, severity: 'LOW' as AlertSeverity },
+            { maxValue: 38.5, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+      ],
+      observations: [
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 95,
+          unit: '%',
+          daysAgo: 0,
+          hoursAgo: 2,
+        },
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 94,
+          unit: '%',
+          daysAgo: 0,
+          hoursAgo: 6,
+        },
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 96,
+          unit: '%',
+          daysAgo: 1,
+          hoursAgo: 0,
+        },
+        {
+          vitalType: 'RESPIRATORY_RATE' as VitalType,
+          value: 18,
+          unit: 'breaths/min',
+          daysAgo: 0,
+          hoursAgo: 2,
+        },
+        {
+          vitalType: 'RESPIRATORY_RATE' as VitalType,
+          value: 20,
+          unit: 'breaths/min',
+          daysAgo: 0,
+          hoursAgo: 6,
+        },
+        { vitalType: 'TEMPERATURE' as VitalType, value: 36.8, unit: '°C', daysAgo: 0, hoursAgo: 4 },
+      ],
+      alerts: [],
+    },
+    {
+      patientIdx: 1,
+      status: 'ESCALATED' as VirtualWardStatus,
+      summary:
+        'Heart failure exacerbation. Daily weight and vitals monitoring to detect fluid overload.',
+      admissionDaysAgo: 8,
+      protocols: [
+        {
+          vitalType: 'WEIGHT' as VitalType,
+          frequencyHours: 24,
+          thresholds: [
+            { maxValue: 82, severity: 'MEDIUM' as AlertSeverity },
+            { maxValue: 85, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'HEART_RATE' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { maxValue: 100, severity: 'LOW' as AlertSeverity },
+            { maxValue: 120, severity: 'HIGH' as AlertSeverity },
+            { minValue: 50, severity: 'MEDIUM' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'BLOOD_PRESSURE_SYSTOLIC' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { maxValue: 160, severity: 'MEDIUM' as AlertSeverity },
+            { minValue: 90, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { minValue: 92, severity: 'MEDIUM' as AlertSeverity },
+            { minValue: 88, severity: 'CRITICAL' as AlertSeverity },
+          ],
+        },
+      ],
+      observations: [
+        { vitalType: 'WEIGHT' as VitalType, value: 83.5, unit: 'kg', daysAgo: 0 },
+        { vitalType: 'WEIGHT' as VitalType, value: 82.1, unit: 'kg', daysAgo: 1 },
+        { vitalType: 'WEIGHT' as VitalType, value: 80.8, unit: 'kg', daysAgo: 2 },
+        { vitalType: 'HEART_RATE' as VitalType, value: 108, unit: 'bpm', daysAgo: 0, hoursAgo: 3 },
+        { vitalType: 'HEART_RATE' as VitalType, value: 95, unit: 'bpm', daysAgo: 0, hoursAgo: 9 },
+        {
+          vitalType: 'BLOOD_PRESSURE_SYSTOLIC' as VitalType,
+          value: 145,
+          unit: 'mmHg',
+          daysAgo: 0,
+          hoursAgo: 3,
+        },
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 91,
+          unit: '%',
+          daysAgo: 0,
+          hoursAgo: 3,
+        },
+      ],
+      alerts: [
+        {
+          severity: 'MEDIUM' as AlertSeverity,
+          status: 'OPEN' as AlertStatus,
+          message: 'Weight gain 2.7kg in 2 days — possible fluid retention',
+          vitalType: 'WEIGHT' as VitalType,
+          triggerValue: 83.5,
+        },
+        {
+          severity: 'MEDIUM' as AlertSeverity,
+          status: 'ACKNOWLEDGED' as AlertStatus,
+          message: 'SpO2 dropped to 91% — below 92% threshold',
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          triggerValue: 91,
+        },
+        {
+          severity: 'LOW' as AlertSeverity,
+          status: 'RESOLVED' as AlertStatus,
+          message: 'Heart rate elevated at 108 bpm',
+          vitalType: 'HEART_RATE' as VitalType,
+          triggerValue: 108,
+        },
+      ],
+    },
+    {
+      patientIdx: 2,
+      status: 'MONITORING' as VirtualWardStatus,
+      summary:
+        'COPD exacerbation, stepped down after IV antibiotics. Monitoring respiratory function.',
+      admissionDaysAgo: 6,
+      protocols: [
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          frequencyHours: 4,
+          thresholds: [
+            { minValue: 90, severity: 'MEDIUM' as AlertSeverity },
+            { minValue: 86, severity: 'CRITICAL' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'RESPIRATORY_RATE' as VitalType,
+          frequencyHours: 4,
+          thresholds: [
+            { maxValue: 22, severity: 'LOW' as AlertSeverity },
+            { maxValue: 26, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+      ],
+      observations: [
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 93,
+          unit: '%',
+          daysAgo: 0,
+          hoursAgo: 1,
+        },
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          value: 92,
+          unit: '%',
+          daysAgo: 0,
+          hoursAgo: 5,
+        },
+        {
+          vitalType: 'RESPIRATORY_RATE' as VitalType,
+          value: 19,
+          unit: 'breaths/min',
+          daysAgo: 0,
+          hoursAgo: 1,
+        },
+      ],
+      alerts: [],
+    },
+    {
+      patientIdx: 3,
+      status: 'MONITORING' as VirtualWardStatus,
+      summary: 'Post-hip replacement rehabilitation. Monitoring for infection and DVT risk.',
+      admissionDaysAgo: 5,
+      protocols: [
+        {
+          vitalType: 'TEMPERATURE' as VitalType,
+          frequencyHours: 8,
+          thresholds: [
+            { maxValue: 37.5, severity: 'LOW' as AlertSeverity },
+            { maxValue: 38.0, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'HEART_RATE' as VitalType,
+          frequencyHours: 8,
+          thresholds: [{ maxValue: 100, severity: 'MEDIUM' as AlertSeverity }],
+        },
+      ],
+      observations: [
+        { vitalType: 'TEMPERATURE' as VitalType, value: 36.6, unit: '°C', daysAgo: 0, hoursAgo: 3 },
+        { vitalType: 'TEMPERATURE' as VitalType, value: 36.9, unit: '°C', daysAgo: 1 },
+        { vitalType: 'HEART_RATE' as VitalType, value: 78, unit: 'bpm', daysAgo: 0, hoursAgo: 3 },
+      ],
+      alerts: [],
+    },
+    {
+      patientIdx: 4,
+      status: 'ENROLLED' as VirtualWardStatus,
+      summary: 'Cellulitis requiring IV antibiotics at home. Awaiting protocol setup.',
+      admissionDaysAgo: 1,
+      protocols: [],
+      observations: [],
+      alerts: [],
+    },
+    {
+      patientIdx: 5,
+      status: 'PAUSED' as VirtualWardStatus,
+      summary:
+        'Diabetic foot ulcer management. Monitoring paused — patient admitted briefly for debridement.',
+      admissionDaysAgo: 14,
+      protocols: [
+        {
+          vitalType: 'BLOOD_GLUCOSE' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { maxValue: 12, severity: 'LOW' as AlertSeverity },
+            { maxValue: 16, severity: 'MEDIUM' as AlertSeverity },
+            { maxValue: 20, severity: 'HIGH' as AlertSeverity },
+            { minValue: 4, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'TEMPERATURE' as VitalType,
+          frequencyHours: 12,
+          thresholds: [{ maxValue: 37.8, severity: 'MEDIUM' as AlertSeverity }],
+        },
+      ],
+      observations: [
+        { vitalType: 'BLOOD_GLUCOSE' as VitalType, value: 9.2, unit: 'mmol/L', daysAgo: 2 },
+        { vitalType: 'BLOOD_GLUCOSE' as VitalType, value: 11.5, unit: 'mmol/L', daysAgo: 3 },
+        { vitalType: 'TEMPERATURE' as VitalType, value: 37.1, unit: '°C', daysAgo: 2 },
+      ],
+      alerts: [
+        {
+          severity: 'LOW' as AlertSeverity,
+          status: 'RESOLVED' as AlertStatus,
+          message: 'Blood glucose 11.5 mmol/L — above 12 threshold trending',
+          vitalType: 'BLOOD_GLUCOSE' as VitalType,
+          triggerValue: 11.5,
+        },
+      ],
+    },
+    {
+      patientIdx: 6,
+      status: 'DISCHARGED' as VirtualWardStatus,
+      summary: 'Community-acquired pneumonia — completed 7-day IV antibiotic course at home.',
+      admissionDaysAgo: 21,
+      discharged: {
+        reason:
+          'Treatment completed, clinically stable. SpO2 consistently >95%. Stepped down to oral antibiotics via GP.',
+        daysAgo: 3,
+      },
+      protocols: [
+        {
+          vitalType: 'OXYGEN_SATURATION' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { minValue: 93, severity: 'MEDIUM' as AlertSeverity },
+            { minValue: 90, severity: 'CRITICAL' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'TEMPERATURE' as VitalType,
+          frequencyHours: 8,
+          thresholds: [{ maxValue: 38.0, severity: 'MEDIUM' as AlertSeverity }],
+        },
+      ],
+      observations: [
+        { vitalType: 'OXYGEN_SATURATION' as VitalType, value: 97, unit: '%', daysAgo: 4 },
+        { vitalType: 'OXYGEN_SATURATION' as VitalType, value: 96, unit: '%', daysAgo: 5 },
+        { vitalType: 'TEMPERATURE' as VitalType, value: 36.5, unit: '°C', daysAgo: 4 },
+      ],
+      alerts: [
+        {
+          severity: 'MEDIUM' as AlertSeverity,
+          status: 'RESOLVED' as AlertStatus,
+          message: 'Temperature 38.2°C on day 3 — resolved after dose adjustment',
+          vitalType: 'TEMPERATURE' as VitalType,
+          triggerValue: 38.2,
+        },
+      ],
+    },
+    {
+      patientIdx: 7,
+      status: 'MONITORING' as VirtualWardStatus,
+      summary:
+        'Acute kidney injury stage 2, stepped down. Monitoring fluid balance and blood pressure.',
+      admissionDaysAgo: 4,
+      protocols: [
+        {
+          vitalType: 'BLOOD_PRESSURE_SYSTOLIC' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { maxValue: 150, severity: 'LOW' as AlertSeverity },
+            { maxValue: 170, severity: 'HIGH' as AlertSeverity },
+            { minValue: 100, severity: 'MEDIUM' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'BLOOD_PRESSURE_DIASTOLIC' as VitalType,
+          frequencyHours: 6,
+          thresholds: [
+            { maxValue: 90, severity: 'LOW' as AlertSeverity },
+            { maxValue: 100, severity: 'HIGH' as AlertSeverity },
+          ],
+        },
+        {
+          vitalType: 'HEART_RATE' as VitalType,
+          frequencyHours: 6,
+          thresholds: [{ maxValue: 100, severity: 'LOW' as AlertSeverity }],
+        },
+      ],
+      observations: [
+        {
+          vitalType: 'BLOOD_PRESSURE_SYSTOLIC' as VitalType,
+          value: 138,
+          unit: 'mmHg',
+          daysAgo: 0,
+          hoursAgo: 2,
+        },
+        {
+          vitalType: 'BLOOD_PRESSURE_SYSTOLIC' as VitalType,
+          value: 142,
+          unit: 'mmHg',
+          daysAgo: 0,
+          hoursAgo: 8,
+        },
+        {
+          vitalType: 'BLOOD_PRESSURE_DIASTOLIC' as VitalType,
+          value: 82,
+          unit: 'mmHg',
+          daysAgo: 0,
+          hoursAgo: 2,
+        },
+        { vitalType: 'HEART_RATE' as VitalType, value: 72, unit: 'bpm', daysAgo: 0, hoursAgo: 2 },
+      ],
+      alerts: [],
+    },
+  ];
+
+  for (const def of vwDefs) {
+    const patient = vwPatients[def.patientIdx];
+    if (!patient) continue;
+
+    // Create a HOME_HEALTH encounter for the enrolment
+    const encounter = await prisma.encounter.create({
+      data: {
+        status: def.discharged
+          ? ('FINISHED' as EncounterStatus)
+          : ('IN_PROGRESS' as EncounterStatus),
+        class: 'HOME_HEALTH' as EncounterClass,
+        admissionDate: new Date(Date.now() - def.admissionDaysAgo * 86400000),
+        dischargeDate: def.discharged
+          ? new Date(Date.now() - def.discharged.daysAgo * 86400000)
+          : undefined,
+        notes: def.summary,
+        patientId: patient.id,
+        primaryPractitionerId: clinicianUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Create VW enrolment
+    const enrolment = await prisma.virtualWardEnrolment.create({
+      data: {
+        status: def.status,
+        enrolmentDate: new Date(Date.now() - def.admissionDaysAgo * 86400000),
+        dischargeDate: def.discharged
+          ? new Date(Date.now() - def.discharged.daysAgo * 86400000)
+          : undefined,
+        dischargeReason: def.discharged?.reason,
+        clinicalSummary: def.summary,
+        patientId: patient.id,
+        encounterId: encounter.id,
+        enrollerId: clinicianUser.id,
+        dischargerId: def.discharged ? clinicianUser.id : undefined,
+        tenantId: sunriseCare.id,
+      },
+    });
+
+    // Create monitoring protocols with thresholds
+    for (const proto of def.protocols) {
+      const protocol = await prisma.monitoringProtocol.create({
+        data: {
+          vitalType: proto.vitalType,
+          frequencyHours: proto.frequencyHours,
+          isActive: def.status !== 'DISCHARGED',
+          enrolmentId: enrolment.id,
+        },
+      });
+
+      for (const th of proto.thresholds) {
+        await prisma.vitalThreshold.create({
+          data: {
+            minValue: th.minValue,
+            maxValue: th.maxValue,
+            severity: th.severity,
+            protocolId: protocol.id,
+          },
+        });
+      }
+    }
+
+    // Create observations
+    for (const obs of def.observations) {
+      const recordedAt = new Date(
+        Date.now() - obs.daysAgo * 86400000 - (obs.hoursAgo ?? 0) * 3600000,
+      );
+      await prisma.vitalObservation.create({
+        data: {
+          vitalType: obs.vitalType,
+          value: obs.value,
+          unit: obs.unit,
+          recordedAt,
+          enrolmentId: enrolment.id,
+          recorderId: sunriseNurseUser.id,
+        },
+      });
+    }
+
+    // Create alerts
+    for (const alert of def.alerts) {
+      await prisma.virtualWardAlert.create({
+        data: {
+          severity: alert.severity,
+          status: alert.status,
+          message: alert.message,
+          vitalType: alert.vitalType,
+          triggerValue: alert.triggerValue,
+          enrolmentId: enrolment.id,
+          acknowledgerId: alert.status !== 'OPEN' ? sunriseNurseUser.id : undefined,
+          acknowledgedAt: alert.status !== 'OPEN' ? new Date() : undefined,
+          resolverId: alert.status === 'RESOLVED' ? clinicianUser.id : undefined,
+          resolvedAt: alert.status === 'RESOLVED' ? new Date() : undefined,
+          resolveNotes: alert.status === 'RESOLVED' ? 'Reviewed and resolved' : undefined,
+        },
+      });
+    }
+
+    // Patient timeline event
+    await prisma.patientEvent.create({
+      data: {
+        patientId: patient.id,
+        eventType: 'VIRTUAL_WARD_ENROLLED',
+        summary: `Enrolled in virtual ward: ${def.summary.split('.')[0]}`,
+        detail: { enrolmentId: enrolment.id } as any,
+        recordedById: clinicianUser.id,
+        tenantId: sunriseCare.id,
+      },
+    });
+  }
+
+  console.log(
+    `  Created ${vwDefs.length} virtual ward enrolments with protocols, observations, and alerts`,
+  );
 
   // ── Summary ──────────────────────────────────────────
   console.log('\n✅ Seed complete!\n');

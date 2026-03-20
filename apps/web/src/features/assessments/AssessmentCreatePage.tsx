@@ -95,7 +95,7 @@ export function AssessmentCreatePage(): React.ReactElement {
       }
 
       const created = await createAssessment(data);
-      navigate(`/assessments/${created.id}`);
+      navigate(`/app/assessments/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assessment');
     } finally {

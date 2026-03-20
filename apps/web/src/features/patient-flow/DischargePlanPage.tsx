@@ -106,7 +106,7 @@ export function DischargePlanPage(): React.ReactElement {
       <div className="flex justify-between items-center">
         <div>
           <button
-            onClick={() => navigate(`/encounters/${encounterId}`)}
+            onClick={() => navigate(`/app/encounters/${encounterId}`)}
             className="text-sm text-blue-600 hover:underline mb-1"
           >
             &larr; Back to Encounter
