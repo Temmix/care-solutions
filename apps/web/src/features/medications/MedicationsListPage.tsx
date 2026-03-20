@@ -119,7 +119,7 @@ export function MedicationsListPage(): React.ReactElement {
                 >
                   <td className="px-6 py-4">
                     <Link
-                      to={`/medications/${rx.id}`}
+                      to={`/app/medications/${rx.id}`}
                       className="text-slate-900 font-medium no-underline hover:text-accent transition-colors"
                     >
                       {rx.medicationReference?.display ?? '-'}

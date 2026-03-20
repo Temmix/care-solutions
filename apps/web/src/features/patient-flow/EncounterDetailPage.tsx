@@ -141,7 +141,7 @@ export function EncounterDetailPage(): React.ReactElement {
               <dt className="text-slate-500">Patient</dt>
               <dd className="text-slate-900 font-medium">
                 <Link
-                  to={`/patients/${encounter.patient.id}`}
+                  to={`/app/patients/${encounter.patient.id}`}
                   className="text-accent no-underline hover:underline"
                 >
                   {encounter.patient.givenName} {encounter.patient.familyName}

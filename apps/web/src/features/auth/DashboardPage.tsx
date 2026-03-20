@@ -305,7 +305,7 @@ export function DashboardPage(): React.ReactElement {
                 {stats.recentPatients.map((p) => (
                   <Link
                     key={p.id}
-                    to={`/patients/${p.id}`}
+                    to={`/app/patients/${p.id}`}
                     className="flex items-center justify-between px-6 py-3.5 no-underline hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">

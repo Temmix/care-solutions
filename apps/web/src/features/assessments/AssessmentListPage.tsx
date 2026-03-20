@@ -134,7 +134,7 @@ export function AssessmentListPage(): React.ReactElement {
                   <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-3">
                       <Link
-                        to={`/assessments/${a.id}`}
+                        to={`/app/assessments/${a.id}`}
                         className="text-sm font-medium text-accent no-underline hover:underline"
                       >
                         {a.title}

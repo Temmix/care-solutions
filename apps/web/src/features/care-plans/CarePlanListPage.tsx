@@ -142,7 +142,7 @@ export function CarePlanListPage(): React.ReactElement {
                 >
                   <td className="px-6 py-4">
                     <Link
-                      to={`/care-plans/${cp.id}`}
+                      to={`/app/care-plans/${cp.id}`}
                       className="text-slate-900 font-medium no-underline hover:text-accent transition-colors"
                     >
                       {cp.title}

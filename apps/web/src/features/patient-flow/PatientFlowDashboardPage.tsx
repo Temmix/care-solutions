@@ -191,7 +191,7 @@ export function PatientFlowDashboardPage(): React.ReactElement {
             {encounters.map((enc) => (
               <Link
                 key={enc.id}
-                to={`/encounters/${enc.id}`}
+                to={`/app/encounters/${enc.id}`}
                 className="flex items-center justify-between px-6 py-3.5 no-underline hover:bg-slate-50 transition-colors"
               >
                 <div>

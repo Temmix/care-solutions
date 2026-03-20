@@ -217,7 +217,10 @@ export function PatientListPage(): React.ReactElement {
               return (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-3.5">
-                    <Link to={`/patients/${p.id}`} className="flex items-center gap-3 no-underline">
+                    <Link
+                      to={`/app/patients/${p.id}`}
+                      className="flex items-center gap-3 no-underline"
+                    >
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-semibold shrink-0">
                         {initials}
                       </div>
