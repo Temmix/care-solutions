@@ -50,9 +50,9 @@ const mockPlans = [
   {
     tier: 'STARTER',
     label: 'Starter',
-    priceMonthlyGBP: 39,
-    patientLimit: 50,
-    userLimit: 10,
+    priceMonthlyGBP: 59,
+    patientLimit: 200,
+    userLimit: 20,
     priceId: 'price_starter',
   },
   {
@@ -81,9 +81,9 @@ const mockSubscription = {
   stripeSubscriptionId: 'sub_stripe_1',
   currentPeriodEnd: '2026-04-12T00:00:00Z',
   cancelAtPeriodEnd: false,
-  patientLimit: 50,
-  userLimit: 10,
-  limits: { patientLimit: 50, userLimit: 10, label: 'Starter', priceMonthlyGBP: 29 },
+  patientLimit: 200,
+  userLimit: 20,
+  limits: { patientLimit: 200, userLimit: 20, label: 'Starter', priceMonthlyGBP: 59 },
   organization: { name: 'Sunrise Care', stripeCustomerId: 'cus_test' },
 };
 
@@ -177,7 +177,7 @@ describe('BillingPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Available Plans')).toBeInTheDocument();
     });
-    expect(screen.getByText('£39')).toBeInTheDocument();
+    expect(screen.getByText('£59')).toBeInTheDocument();
     expect(screen.getByText('£99')).toBeInTheDocument();
     expect(screen.getByText('£299')).toBeInTheDocument();
   });
@@ -189,8 +189,8 @@ describe('BillingPage', () => {
       expect(screen.getByText('Available Plans')).toBeInTheDocument();
     });
     expect(screen.getByText('5 patients')).toBeInTheDocument();
-    // 50 patients may appear in both subscription card and plan card
-    expect(screen.getAllByText('50 patients').length).toBeGreaterThanOrEqual(1);
+    // 200 patients may appear in both subscription card and plan card
+    expect(screen.getAllByText('200 patients').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('500 patients')).toBeInTheDocument();
     expect(screen.getByText('Unlimited patients')).toBeInTheDocument();
   });
