@@ -51,7 +51,7 @@ export function CarePlanListPage(): React.ReactElement {
           </p>
         </div>
         <Link
-          to="/care-plans/new"
+          to="/app/care-plans/new"
           className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           <svg
@@ -112,7 +112,10 @@ export function CarePlanListPage(): React.ReactElement {
       {!loading && carePlans.length === 0 && (
         <div className="text-center py-20">
           <p className="text-slate-400 text-sm mb-4 m-0">No care plans found</p>
-          <Link to="/care-plans/new" className="text-accent text-sm no-underline hover:underline">
+          <Link
+            to="/app/care-plans/new"
+            className="text-accent text-sm no-underline hover:underline"
+          >
             Create your first care plan
           </Link>
         </div>

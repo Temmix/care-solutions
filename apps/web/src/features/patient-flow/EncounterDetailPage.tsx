@@ -358,7 +358,7 @@ export function EncounterDetailPage(): React.ReactElement {
       )}
 
       <button
-        onClick={() => navigate('/patient-flow')}
+        onClick={() => navigate('/app/patient-flow')}
         className="text-sm text-slate-500 bg-transparent border-none cursor-pointer hover:text-accent transition-colors"
       >
         &larr; Back to Patient Flow

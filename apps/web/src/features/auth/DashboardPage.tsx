@@ -129,7 +129,7 @@ export function DashboardPage(): React.ReactElement {
             Select a tenant to view dashboard statistics and manage their data.
           </p>
           <Link
-            to="/tenants"
+            to="/app/tenants"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
           >
             Select a Tenant
@@ -292,7 +292,7 @@ export function DashboardPage(): React.ReactElement {
               <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
                 <h2 className="text-sm font-semibold text-slate-900">Recent Patients</h2>
                 <Link
-                  to="/patients"
+                  to="/app/patients"
                   className="text-xs text-accent font-medium no-underline hover:text-accent-dark transition-colors"
                 >
                   View all

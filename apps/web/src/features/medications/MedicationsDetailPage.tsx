@@ -113,7 +113,7 @@ export function MedicationsDetailPage(): React.ReactElement {
       {/* Breadcrumb + header */}
       <div className="mb-6">
         <Link
-          to="/medications"
+          to="/app/medications"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg

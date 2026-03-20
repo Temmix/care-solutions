@@ -116,7 +116,7 @@ export function CarePlanCreatePage(): React.ReactElement {
     <div className="max-w-2xl">
       <div className="mb-6">
         <Link
-          to="/care-plans"
+          to="/app/care-plans"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg
@@ -252,7 +252,7 @@ export function CarePlanCreatePage(): React.ReactElement {
             {saving ? 'Creating...' : 'Create Care Plan'}
           </button>
           <Link
-            to="/care-plans"
+            to="/app/care-plans"
             className="px-6 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium no-underline hover:bg-slate-50 transition-colors"
           >
             Cancel
