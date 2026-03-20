@@ -94,7 +94,7 @@ export function AdmitPatientPage(): React.ReactElement {
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Select a Tenant First</h2>
         <p className="text-slate-500 text-sm mb-6">Select a tenant to admit patients.</p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant
@@ -222,7 +222,7 @@ export function AdmitPatientPage(): React.ReactElement {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/patient-flow')}
+            onClick={() => navigate('/app/patient-flow')}
             className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm cursor-pointer hover:bg-slate-50 transition-colors"
           >
             Cancel

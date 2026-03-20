@@ -284,7 +284,7 @@ export function PractitionersPage(): React.ReactElement {
           Select a tenant from the Tenants page before managing practitioners.
         </p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant

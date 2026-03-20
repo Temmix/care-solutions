@@ -64,7 +64,7 @@ export function AssessmentDetailPage(): React.ReactElement {
       {/* Breadcrumb + header */}
       <div className="mb-6">
         <Link
-          to="/assessments"
+          to="/app/assessments"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg

@@ -71,7 +71,7 @@ export function PatientCreatePage(): React.ReactElement {
           Select a tenant from the Tenants page before creating a patient.
         </p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant
@@ -163,7 +163,7 @@ export function PatientCreatePage(): React.ReactElement {
       {/* Breadcrumb + header */}
       <div className="mb-6">
         <Link
-          to="/patients"
+          to="/app/patients"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg

@@ -139,7 +139,7 @@ export function OrganisationSettingsPage(): React.ReactElement {
     <div>
       <div className="mb-6">
         <Link
-          to="/settings"
+          to="/app/settings"
           className="text-sm text-accent no-underline hover:underline inline-flex items-center gap-1 mb-3"
         >
           <svg

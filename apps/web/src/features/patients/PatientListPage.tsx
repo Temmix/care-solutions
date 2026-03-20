@@ -74,7 +74,7 @@ export function PatientListPage(): React.ReactElement {
           As a Super Admin, select a tenant to view their patients.
         </p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant
@@ -113,7 +113,7 @@ export function PatientListPage(): React.ReactElement {
           </span>
         ) : (
           <Link
-            to="/patients/new"
+            to="/app/patients/new"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
           >
             <svg
@@ -217,7 +217,10 @@ export function PatientListPage(): React.ReactElement {
               return (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-3.5">
-                    <Link to={`/patients/${p.id}`} className="flex items-center gap-3 no-underline">
+                    <Link
+                      to={`/app/patients/${p.id}`}
+                      className="flex items-center gap-3 no-underline"
+                    >
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-semibold shrink-0">
                         {initials}
                       </div>

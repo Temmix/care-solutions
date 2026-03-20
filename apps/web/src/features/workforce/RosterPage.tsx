@@ -324,7 +324,7 @@ export function RosterPage(): React.ReactElement {
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Select a Tenant First</h2>
         <p className="text-slate-500 text-sm mb-6">Select a tenant to view the roster.</p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant

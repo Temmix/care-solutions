@@ -52,3 +52,4 @@ aws-secrets.md
 *.tfstate.backup
 *.tfvars
 !*.tfvars.example
+*.tfplan

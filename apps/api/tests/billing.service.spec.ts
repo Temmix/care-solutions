@@ -68,9 +68,9 @@ describe('BillingService', () => {
       const result = await service.getSubscription('org-1');
 
       expect(result.tier).toBe('STARTER');
-      expect(result.limits.patientLimit).toBe(50);
-      expect(result.limits.userLimit).toBe(10);
-      expect(result.limits.priceMonthlyGBP).toBe(39);
+      expect(result.limits.patientLimit).toBe(200);
+      expect(result.limits.userLimit).toBe(20);
+      expect(result.limits.priceMonthlyGBP).toBe(59);
     });
 
     it('throws NotFoundException when no subscription', async () => {
@@ -130,7 +130,7 @@ describe('BillingService', () => {
       expect(plans).toHaveLength(4);
       expect(plans.map((p) => p.tier)).toEqual(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']);
       expect(plans[0].priceMonthlyGBP).toBe(0);
-      expect(plans[1].priceMonthlyGBP).toBe(39);
+      expect(plans[1].priceMonthlyGBP).toBe(59);
       expect(plans[2].priceMonthlyGBP).toBe(99);
       expect(plans[3].priceMonthlyGBP).toBe(299);
     });

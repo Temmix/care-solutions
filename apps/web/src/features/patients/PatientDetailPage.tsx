@@ -311,7 +311,7 @@ export function PatientDetailPage(): React.ReactElement {
       {/* Breadcrumb + header */}
       <div className="mb-6">
         <Link
-          to="/patients"
+          to="/app/patients"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg
@@ -551,7 +551,7 @@ export function PatientDetailPage(): React.ReactElement {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-900">Care Plans</h2>
               <Link
-                to={`/care-plans/new?patientId=${id}`}
+                to={`/app/care-plans/new?patientId=${id}`}
                 className="text-xs text-accent no-underline hover:underline"
               >
                 + New
@@ -564,7 +564,7 @@ export function PatientDetailPage(): React.ReactElement {
                 {patientCarePlans.map((cp) => (
                   <Link
                     key={cp.id}
-                    to={`/care-plans/${cp.id}`}
+                    to={`/app/care-plans/${cp.id}`}
                     className="flex items-center justify-between p-3 rounded-lg border border-slate-100 no-underline hover:border-slate-200 transition-colors"
                   >
                     <div>
@@ -586,7 +586,7 @@ export function PatientDetailPage(): React.ReactElement {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-900">Assessments</h2>
               <Link
-                to={`/assessments/new?patientId=${id}`}
+                to={`/app/assessments/new?patientId=${id}`}
                 className="text-xs text-accent no-underline hover:underline"
               >
                 + New
@@ -601,7 +601,7 @@ export function PatientDetailPage(): React.ReactElement {
                   return (
                     <Link
                       key={a.id}
-                      to={`/assessments/${a.id}`}
+                      to={`/app/assessments/${a.id}`}
                       className="flex items-center justify-between p-3 rounded-lg border border-slate-100 no-underline hover:border-slate-200 transition-colors"
                     >
                       <div>
@@ -632,7 +632,7 @@ export function PatientDetailPage(): React.ReactElement {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-900">Medications</h2>
               <Link
-                to={`/medications/new?patientId=${id}`}
+                to={`/app/medications/new?patientId=${id}`}
                 className="text-xs text-accent no-underline hover:underline"
               >
                 + New
@@ -645,7 +645,7 @@ export function PatientDetailPage(): React.ReactElement {
                 {patientMedications.map((rx) => (
                   <Link
                     key={rx.id}
-                    to={`/medications/${rx.id}`}
+                    to={`/app/medications/${rx.id}`}
                     className="flex items-center justify-between p-3 rounded-lg border border-slate-100 no-underline hover:border-slate-200 transition-colors"
                   >
                     <div>

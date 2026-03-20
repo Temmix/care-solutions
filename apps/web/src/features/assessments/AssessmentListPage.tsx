@@ -59,7 +59,7 @@ export function AssessmentListPage(): React.ReactElement {
           </p>
         </div>
         <Link
-          to="/assessments/new"
+          to="/app/assessments/new"
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/90 text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           <svg
@@ -134,7 +134,7 @@ export function AssessmentListPage(): React.ReactElement {
                   <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-3">
                       <Link
-                        to={`/assessments/${a.id}`}
+                        to={`/app/assessments/${a.id}`}
                         className="text-sm font-medium text-accent no-underline hover:underline"
                       >
                         {a.title}

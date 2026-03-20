@@ -134,7 +134,7 @@ export function MedicationTypesSettingsPage(): React.ReactElement {
     <div>
       <div className="mb-6">
         <Link
-          to="/settings"
+          to="/app/settings"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg

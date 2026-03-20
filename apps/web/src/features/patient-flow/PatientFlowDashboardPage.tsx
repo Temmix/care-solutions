@@ -73,7 +73,7 @@ export function PatientFlowDashboardPage(): React.ReactElement {
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Select a Tenant First</h2>
         <p className="text-slate-500 text-sm mb-6">Select a tenant to view patient flow.</p>
         <Link
-          to="/tenants"
+          to="/app/tenants"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           Select a Tenant
@@ -90,7 +90,7 @@ export function PatientFlowDashboardPage(): React.ReactElement {
           <p className="text-slate-500 text-sm">Overview of bed occupancy and active encounters</p>
         </div>
         <Link
-          to="/admit"
+          to="/app/admit"
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-dark text-white no-underline rounded-lg text-sm font-medium transition-colors"
         >
           <svg
@@ -140,7 +140,7 @@ export function PatientFlowDashboardPage(): React.ReactElement {
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
             <h2 className="text-sm font-semibold text-slate-900">Bed Overview</h2>
             <Link
-              to="/locations"
+              to="/app/locations"
               className="text-xs text-accent font-medium no-underline hover:underline"
             >
               Manage Locations
@@ -191,7 +191,7 @@ export function PatientFlowDashboardPage(): React.ReactElement {
             {encounters.map((enc) => (
               <Link
                 key={enc.id}
-                to={`/encounters/${enc.id}`}
+                to={`/app/encounters/${enc.id}`}
                 className="flex items-center justify-between px-6 py-3.5 no-underline hover:bg-slate-50 transition-colors"
               >
                 <div>

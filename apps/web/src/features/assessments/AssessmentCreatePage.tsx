@@ -107,7 +107,7 @@ export function AssessmentCreatePage(): React.ReactElement {
     <div>
       <div className="mb-6">
         <Link
-          to="/assessments"
+          to="/app/assessments"
           className="inline-flex items-center gap-1 text-slate-400 no-underline text-sm hover:text-slate-600 transition-colors mb-3"
         >
           <svg
@@ -288,7 +288,7 @@ export function AssessmentCreatePage(): React.ReactElement {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/assessments')}
+            onClick={() => navigate('/app/assessments')}
             className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
           >
             Cancel
