@@ -64,6 +64,42 @@ const TENANT_RESOLUTION: Record<string, TenantResolution> = {
     foreignKey: 'organizationId',
   },
   StaffAvailability: { type: 'direct', field: 'tenantId' },
+
+  // ── CHC ───────────────────────────────────────────────
+  ChcCase: { type: 'direct', field: 'tenantId' },
+  ChcDomainScore: {
+    type: 'parent',
+    field: 'tenantId',
+    parentModel: 'chcCase',
+    foreignKey: 'chcCaseId',
+  },
+  ChcPanelMember: {
+    type: 'parent',
+    field: 'tenantId',
+    parentModel: 'chcCase',
+    foreignKey: 'chcCaseId',
+  },
+  ChcNote: {
+    type: 'parent',
+    field: 'tenantId',
+    parentModel: 'chcCase',
+    foreignKey: 'chcCaseId',
+  },
+
+  // ── Virtual Wards ─────────────────────────────────────
+  VirtualWardEnrolment: { type: 'direct', field: 'tenantId' },
+  VitalObservation: {
+    type: 'parent',
+    field: 'tenantId',
+    parentModel: 'virtualWardEnrolment',
+    foreignKey: 'enrolmentId',
+  },
+  VirtualWardAlert: {
+    type: 'parent',
+    field: 'tenantId',
+    parentModel: 'virtualWardEnrolment',
+    foreignKey: 'enrolmentId',
+  },
 };
 
 /**
@@ -149,6 +185,44 @@ const NESTED_RELATIONS: Record<string, Record<string, string>> = {
   },
   Subscription: {
     organization: 'Organization',
+  },
+
+  // ── CHC ─────────────────────────────────────────────────
+  ChcCase: {
+    patient: 'Patient',
+    referrer: 'User',
+    screener: 'User',
+    encounter: 'Encounter',
+    domainScores: 'ChcDomainScore',
+    panelMembers: 'ChcPanelMember',
+    notes: 'ChcNote',
+  },
+  ChcDomainScore: {
+    assessor: 'User',
+  },
+  ChcPanelMember: {
+    user: 'User',
+  },
+  ChcNote: {
+    author: 'User',
+  },
+
+  // ── Virtual Wards ───────────────────────────────────────
+  VirtualWardEnrolment: {
+    patient: 'Patient',
+    enroller: 'User',
+    discharger: 'User',
+    encounter: 'Encounter',
+    observations: 'VitalObservation',
+    alerts: 'VirtualWardAlert',
+  },
+  VitalObservation: {
+    recorder: 'User',
+  },
+  VirtualWardAlert: {
+    acknowledger: 'User',
+    escalatedTo: 'User',
+    resolver: 'User',
   },
 };
 

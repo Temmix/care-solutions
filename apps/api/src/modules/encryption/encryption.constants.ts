@@ -118,4 +118,35 @@ export const ENCRYPTED_FIELDS: FieldEncryptionMap = {
   StaffAvailability: {
     notes: {},
   },
+
+  // ── Tier 1: PHI — CHC ─────────────────────────────────
+  ChcCase: {
+    referralReason: {},
+    screeningNotes: {},
+    decisionNotes: {},
+  },
+
+  ChcDomainScore: {
+    evidence: {},
+    notes: {},
+  },
+
+  ChcNote: {
+    content: {},
+  },
+
+  // ── Tier 1: PHI — Virtual Wards ───────────────────────
+  VirtualWardEnrolment: {
+    clinicalSummary: {},
+    dischargeReason: {},
+  },
+
+  VitalObservation: {
+    notes: {},
+  },
+
+  VirtualWardAlert: {
+    message: {},
+    resolveNotes: {},
+  },
 };
