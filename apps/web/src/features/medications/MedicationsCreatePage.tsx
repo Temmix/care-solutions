@@ -139,7 +139,7 @@ export function MedicationsCreatePage(): React.ReactElement {
       if (form.maxDosePerDay.trim()) data.maxDosePerDay = form.maxDosePerDay.trim();
 
       const result = await createPrescription(data);
-      navigate(`/medications/${result.id}`);
+      navigate(`/app/medications/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create prescription');
     } finally {

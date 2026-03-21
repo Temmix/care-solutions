@@ -39,4 +39,20 @@ export class EventsService {
   ): void {
     this.emit(tenantId, 'discharge-plan:updated', data);
   }
+
+  // Phase 4: Specialized Pathways
+
+  emitChcStatusChanged(
+    tenantId: string,
+    data: { caseId: string; status: string; patientName: string },
+  ): void {
+    this.emit(tenantId, 'chc:status-changed', data);
+  }
+
+  emitVirtualWardAlert(
+    tenantId: string,
+    data: { enrolmentId: string; alertId: string; severity: string; message: string },
+  ): void {
+    this.emit(tenantId, 'virtual-ward:alert', data);
+  }
 }

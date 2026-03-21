@@ -144,7 +144,7 @@ export function PatientCreatePage(): React.ReactElement {
       if (form.mrn) data.mrn = form.mrn.trim();
 
       const patient = await createPatient(data);
-      navigate(`/patients/${patient.id}`);
+      navigate(`/app/patients/${patient.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create patient');
     } finally {

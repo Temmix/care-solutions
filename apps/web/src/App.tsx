@@ -40,6 +40,12 @@ import { EncounterDetailPage } from './features/patient-flow/EncounterDetailPage
 import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
 import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
 import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
+import { ChcListPage } from './features/chc/ChcListPage';
+import { ChcCreatePage } from './features/chc/ChcCreatePage';
+import { ChcDetailPage } from './features/chc/ChcDetailPage';
+import { VirtualWardsDashboardPage } from './features/virtual-wards/VirtualWardsDashboardPage';
+import { VirtualWardsEnrolPage } from './features/virtual-wards/VirtualWardsEnrolPage';
+import { VirtualWardsDetailPage } from './features/virtual-wards/VirtualWardsDetailPage';
 import { DemoPage } from './features/demo/DemoPage';
 import { Toaster } from 'react-hot-toast';
 
@@ -93,6 +99,12 @@ export function App(): React.ReactElement {
             <Route path="encounters/:id/discharge-plan" element={<DischargePlanPage />} />
             <Route path="swap-marketplace" element={<SwapMarketplacePage />} />
             <Route path="compliance" element={<ComplianceDashboardPage />} />
+            <Route path="chc" element={<ChcListPage />} />
+            <Route path="chc/new" element={<ChcCreatePage />} />
+            <Route path="chc/:id" element={<ChcDetailPage />} />
+            <Route path="virtual-wards" element={<VirtualWardsDashboardPage />} />
+            <Route path="virtual-wards/enrol" element={<VirtualWardsEnrolPage />} />
+            <Route path="virtual-wards/:id" element={<VirtualWardsDetailPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />

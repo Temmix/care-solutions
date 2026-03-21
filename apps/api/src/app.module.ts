@@ -12,6 +12,8 @@ import { PatientFlowModule } from './modules/patient-flow/patient-flow.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { EncryptionModule } from './modules/encryption/encryption.module';
 import { EventsModule } from './modules/events/events.module';
+import { ChcModule } from './modules/chc/chc.module';
+import { VirtualWardsModule } from './modules/virtual-wards/virtual-wards.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -40,6 +42,8 @@ import { HealthController } from './health.controller';
     WorkforceModule,
     PatientFlowModule,
     MembershipsModule,
+    ChcModule,
+    VirtualWardsModule,
   ],
   controllers: [HealthController],
 })
