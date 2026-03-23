@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 const settingsItems = [
   {
-    to: '/settings/organisation',
+    to: '/app/settings/organisation',
     label: 'Organisation',
     description: "Update your organisation's name, contact details, and address.",
     icon: (
@@ -22,7 +22,7 @@ const settingsItems = [
     ),
   },
   {
-    to: '/settings/assessment-types',
+    to: '/app/settings/assessment-types',
     label: 'Assessment Types',
     description: 'Configure the types of clinical assessments available to your team.',
     icon: (
@@ -42,7 +42,7 @@ const settingsItems = [
     ),
   },
   {
-    to: '/settings/specialty-types',
+    to: '/app/settings/specialty-types',
     label: 'Specialty Types',
     description: 'Configure the types of practitioner specialties available to your organisation.',
     icon: (
@@ -62,7 +62,7 @@ const settingsItems = [
     ),
   },
   {
-    to: '/settings/medication-types',
+    to: '/app/settings/medication-types',
     label: 'Medication Types',
     description: 'Manage the medication catalogue available for prescriptions.',
     icon: (
