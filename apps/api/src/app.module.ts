@@ -14,6 +14,10 @@ import { EncryptionModule } from './modules/encryption/encryption.module';
 import { EventsModule } from './modules/events/events.module';
 import { ChcModule } from './modules/chc/chc.module';
 import { VirtualWardsModule } from './modules/virtual-wards/virtual-wards.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { IotModule } from './modules/iot/iot.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -44,6 +48,10 @@ import { HealthController } from './health.controller';
     MembershipsModule,
     ChcModule,
     VirtualWardsModule,
+    AuditModule,
+    NotificationsModule,
+    ReportsModule,
+    IotModule,
   ],
   controllers: [HealthController],
 })

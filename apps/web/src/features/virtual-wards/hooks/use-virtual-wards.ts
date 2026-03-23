@@ -32,7 +32,7 @@ export interface VwObservation {
   unit: string;
   notes?: string;
   recordedAt: string;
-  recorder: { firstName: string; lastName: string };
+  recorder: { firstName: string; lastName: string } | null;
 }
 
 export interface VwAlert {

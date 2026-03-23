@@ -121,7 +121,14 @@ describe('WorkforceService', () => {
     // Reset transaction mocks
     mockTx.shiftAssignment.update.mockReset();
     mockTx.shiftSwapRequest.update.mockReset();
-    service = new WorkforceService(prisma as any, eventsService as any);
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    service = new WorkforceService(
+      prisma as any,
+      eventsService as any,
+      audit as any,
+      notifications as any,
+    );
   });
 
   // ── Shift Patterns ──────────────────────────────────

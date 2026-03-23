@@ -2,6 +2,8 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { ChcStatus, ChcDecision } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateChcCaseDto,
   UpdateChcScreeningDto,
@@ -31,6 +33,8 @@ export class ChcService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private events: EventsService,
+    @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   // ── Create referral ──────────────────────────────────────
@@ -69,6 +73,17 @@ export class ChcService {
       status: chcCase.status,
       patientName: `${chcCase.patient.givenName} ${chcCase.patient.familyName}`,
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'CREATE',
+        resource: 'ChcCase',
+        resourceId: chcCase.id,
+        tenantId,
+        metadata: { patientId: dto.patientId },
+      })
+      .catch(() => {});
 
     return chcCase;
   }
@@ -170,6 +185,18 @@ export class ChcService {
     });
 
     await this.recordStatusChange(id, chcCase.patientId, 'SCREENING', userId, tenantId);
+
+    this.audit
+      .log({
+        userId,
+        action: 'UPDATE_SCREENING',
+        resource: 'ChcCase',
+        resourceId: id,
+        tenantId,
+        metadata: { status: 'SCREENING' },
+      })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -259,6 +286,29 @@ export class ChcService {
     });
 
     await this.recordStatusChange(id, chcCase.patientId, newStatus, userId, tenantId);
+
+    this.audit
+      .log({
+        userId,
+        action: 'RECORD_DECISION',
+        resource: 'ChcCase',
+        resourceId: id,
+        tenantId,
+        metadata: { decision: dto.decision },
+      })
+      .catch(() => {});
+
+    this.notifications
+      .notify({
+        userId: chcCase.referrerId,
+        tenantId,
+        type: 'CHC_STATUS_CHANGE' as any,
+        title: 'CHC Decision Recorded',
+        message: `Decision "${dto.decision}" has been recorded for CHC case`,
+        link: `/app/chc/${id}`,
+      })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -279,6 +329,11 @@ export class ChcService {
     });
 
     await this.recordStatusChange(id, chcCase.patientId, 'CARE_PACKAGE_LIVE', userId, tenantId);
+
+    this.audit
+      .log({ userId, action: 'SETUP_CARE_PACKAGE', resource: 'ChcCase', resourceId: id, tenantId })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -311,6 +366,11 @@ export class ChcService {
     });
 
     await this.recordStatusChange(id, chcCase.patientId, 'CLOSED', userId, tenantId);
+
+    this.audit
+      .log({ userId, action: 'CLOSE', resource: 'ChcCase', resourceId: id, tenantId })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -319,7 +379,7 @@ export class ChcService {
   async addNote(caseId: string, dto: AddChcNoteDto, userId: string, tenantId: string) {
     const chcCase = await this.requireCase(caseId, tenantId);
 
-    return this.prisma.chcNote.create({
+    const note = await this.prisma.chcNote.create({
       data: {
         chcCaseId: caseId,
         content: dto.content,
@@ -328,6 +388,19 @@ export class ChcService {
       },
       include: { author: { select: { firstName: true, lastName: true } } },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'ADD_NOTE',
+        resource: 'ChcCase',
+        resourceId: caseId,
+        tenantId,
+        metadata: { caseId },
+      })
+      .catch(() => {});
+
+    return note;
   }
 
   // ── Helpers ──────────────────────────────────────────────

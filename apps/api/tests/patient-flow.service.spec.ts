@@ -81,7 +81,8 @@ describe('PatientFlowService — Discharge Planning', () => {
     mockTx.encounter.update.mockReset();
     mockTx.bed.update.mockReset();
     mockTx.patientEvent.create.mockReset();
-    service = new PatientFlowService(prisma as any, eventsService as any);
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    service = new PatientFlowService(prisma as any, eventsService as any, audit as any);
   });
 
   // ── createDischargePlan ───────────────────────────────

@@ -32,9 +32,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       (client as Socket & { userId?: string }).userId = payload.sub;
 
+      // Join tenant room for broadcast events
       if (tenantId) {
         client.join(`tenant:${tenantId}`);
       }
+
+      // Join user-specific room for targeted notifications
+      client.join(`user:${payload.sub}`);
 
       this.logger.log(`Client connected: ${payload.sub} (tenant: ${tenantId})`);
     } catch {

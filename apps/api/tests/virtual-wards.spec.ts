@@ -63,7 +63,14 @@ describe('VirtualWardsService', () => {
     jest.clearAllMocks();
     prisma = makePrisma();
     events = makeEvents();
-    service = new VirtualWardsService(prisma as any, events as any);
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    service = new VirtualWardsService(
+      prisma as any,
+      events as any,
+      audit as any,
+      notifications as any,
+    );
   });
 
   // ── enrolPatient ────────────────────────────────────
