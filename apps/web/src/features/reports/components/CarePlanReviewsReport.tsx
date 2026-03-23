@@ -38,7 +38,7 @@ export function CarePlanReviewsReport({ data }: Props): React.ReactElement {
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
-                  label={({ category }: { category: string }) => category}
+                  label={(props) => String(props.name ?? '')}
                   labelLine={false}
                 >
                   {(data.byCategory ?? []).map((_, i) => (

@@ -121,13 +121,12 @@ export function ComplianceDashboardPage(): React.ReactElement {
                   />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
-                    labelFormatter={
-                      ((d: string) =>
-                        new Date(d).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })) as (d: string) => string
+                    labelFormatter={(d) =>
+                      new Date(String(d)).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })
                     }
                   />
                   <Area
@@ -154,7 +153,7 @@ export function ComplianceDashboardPage(): React.ReactElement {
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ resource }: { resource: string }) => resource}
+                    label={(props) => String(props.name ?? '')}
                     labelLine={false}
                   >
                     {summary.resourceBreakdown.map((_, i) => (
@@ -192,7 +191,7 @@ export function ComplianceDashboardPage(): React.ReactElement {
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ action }: { action: string }) => action}
+                    label={(props) => String(props.name ?? '')}
                     labelLine={false}
                   >
                     {summary.actionBreakdown.map((_, i) => (

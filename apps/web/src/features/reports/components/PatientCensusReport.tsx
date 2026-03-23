@@ -46,13 +46,12 @@ export function PatientCensusReport({ data }: Props): React.ReactElement {
               />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
-                labelFormatter={
-                  ((d: string) =>
-                    new Date(d).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })) as (d: string) => string
+                labelFormatter={(d) =>
+                  new Date(String(d)).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })
                 }
               />
               <Legend />
