@@ -44,7 +44,7 @@ export function VirtualWardsSummaryReport({ data }: Props): React.ReactElement {
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
-                  label={({ severity }: any) => severity}
+                  label={({ severity }: { severity: string }) => severity}
                   labelLine={false}
                 >
                   {(data.alertsBySeverity ?? []).map((_, i) => (

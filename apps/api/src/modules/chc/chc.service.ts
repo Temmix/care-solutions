@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ChcStatus, ChcDecision } from '@prisma/client';
+import { ChcStatus, ChcDecision, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
 import { AuditService } from '../audit/audit.service';
@@ -302,7 +302,7 @@ export class ChcService {
       .notify({
         userId: chcCase.referrerId,
         tenantId,
-        type: 'CHC_STATUS_CHANGE' as any,
+        type: NotificationType.CHC_STATUS_CHANGE,
         title: 'CHC Decision Recorded',
         message: `Decision "${dto.decision}" has been recorded for CHC case`,
         link: `/app/chc/${id}`,

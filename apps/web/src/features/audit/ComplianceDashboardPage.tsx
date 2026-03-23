@@ -127,7 +127,7 @@ export function ComplianceDashboardPage(): React.ReactElement {
                           day: 'numeric',
                           month: 'long',
                           year: 'numeric',
-                        })) as any
+                        })) as (d: string) => string
                     }
                   />
                   <Area
@@ -154,7 +154,7 @@ export function ComplianceDashboardPage(): React.ReactElement {
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ resource }: any) => resource}
+                    label={({ resource }: { resource: string }) => resource}
                     labelLine={false}
                   >
                     {summary.resourceBreakdown.map((_, i) => (
@@ -192,7 +192,7 @@ export function ComplianceDashboardPage(): React.ReactElement {
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ action }: any) => action}
+                    label={({ action }: { action: string }) => action}
                     labelLine={false}
                   >
                     {summary.actionBreakdown.map((_, i) => (

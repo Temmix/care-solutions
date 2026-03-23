@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, ShiftStatus, AvailabilityType } from '@prisma/client';
+import { Prisma, ShiftStatus, AvailabilityType, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -944,7 +944,7 @@ export class WorkforceService {
           .notify({
             userId: targetAssignment.userId,
             tenantId,
-            type: 'SHIFT_SWAP_REQUEST' as any,
+            type: NotificationType.SHIFT_SWAP_REQUEST,
             title: 'Shift Swap Request',
             message: 'You have received a new shift swap request',
             link: '/app/swap-marketplace',
@@ -1056,7 +1056,7 @@ export class WorkforceService {
       .notify({
         userId: swap.requesterId,
         tenantId,
-        type: 'SHIFT_SWAP_RESPONSE' as any,
+        type: NotificationType.SHIFT_SWAP_RESPONSE,
         title: 'Shift Swap Response',
         message: 'Your shift swap request has received a response',
         link: '/app/swap-marketplace',

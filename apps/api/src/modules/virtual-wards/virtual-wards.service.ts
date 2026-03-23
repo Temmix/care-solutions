@@ -1,4 +1,5 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
 import { AuditService } from '../audit/audit.service';
@@ -378,7 +379,7 @@ export class VirtualWardsService {
       .notify({
         userId: escalatedToId,
         tenantId,
-        type: 'VW_ALERT_ESCALATED' as any,
+        type: NotificationType.VW_ALERT_ESCALATED,
         title: 'Alert Escalated to You',
         message: 'A virtual ward alert has been escalated and requires your attention',
         link: `/app/virtual-wards/${enrolmentId}`,
@@ -551,7 +552,7 @@ export class VirtualWardsService {
               .notify({
                 userId: enrolment.enrollerId,
                 tenantId,
-                type: 'VW_THRESHOLD_BREACH' as any,
+                type: NotificationType.VW_THRESHOLD_BREACH,
                 title: 'Threshold Breach Detected',
                 message: `A vital observation has breached the configured threshold`,
                 link: `/app/virtual-wards/${enrolmentId}`,

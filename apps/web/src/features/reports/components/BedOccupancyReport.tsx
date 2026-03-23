@@ -40,7 +40,7 @@ export function BedOccupancyReport({ data }: Props): React.ReactElement {
                   cy="50%"
                   innerRadius={60}
                   outerRadius={90}
-                  label={({ name, value }: any) => `${name}: ${value}`}
+                  label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
                   labelLine={false}
                 >
                   {donutData.map((_, i) => (

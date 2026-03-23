@@ -52,7 +52,7 @@ export function PatientCensusReport({ data }: Props): React.ReactElement {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
-                    })) as any
+                    })) as (d: string) => string
                 }
               />
               <Legend />
