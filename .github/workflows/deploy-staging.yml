@@ -1,9 +1,12 @@
 name: Deploy (Staging)
 
 on:
-  push:
-    branches:
-      - development
+  # Disabled — staging environment is destroyed to save costs.
+  # Re-enable by uncommenting the push trigger below.
+  # push:
+  #   branches:
+  #     - development
+  workflow_dispatch: # Manual trigger only
 
 permissions:
   id-token: write

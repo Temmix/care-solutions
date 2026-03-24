@@ -146,6 +146,18 @@ module "ecs" {
   log_retention_days = 14
 }
 
+# ── SES (email sending + domain verification) ────────────
+
+module "ses" {
+  count  = var.enable_dns ? 1 : 0
+  source = "../../modules/ses"
+
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+  zone_id      = module.route53[var.domain_name].zone_id
+}
+
 # ── GitHub Actions IAM (OIDC) ──────────────────────────
 
 resource "aws_iam_openid_connect_provider" "github" {
