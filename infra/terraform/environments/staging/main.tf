@@ -121,11 +121,12 @@ module "ecs" {
 module "route53" {
   source = "../../modules/route53"
 
-  project_name = var.project_name
-  environment  = var.environment
-  domain_name  = var.domain_name
-  alb_dns_name = module.alb.alb_dns_name
-  alb_zone_id  = module.alb.alb_zone_id
+  project_name     = var.project_name
+  environment      = var.environment
+  domain_name      = var.domain_name
+  alb_dns_name     = module.alb.alb_dns_name
+  alb_zone_id      = module.alb.alb_zone_id
+  subdomain_prefix = "staging"  # staging.clinvara.com, staging-app.clinvara.com, staging-api.clinvara.com
 }
 
 # ── SES (email sending + domain verification) ────────────
