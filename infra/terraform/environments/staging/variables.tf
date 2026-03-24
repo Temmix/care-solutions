@@ -54,3 +54,9 @@ variable "stripe_webhook_secret" {
   sensitive   = true
   default     = ""
 }
+
+variable "domain_name" {
+  description = "Primary domain name"
+  type        = string
+  default     = "clinvara.com"
+}

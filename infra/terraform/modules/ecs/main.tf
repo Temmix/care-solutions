@@ -121,6 +121,23 @@ resource "aws_iam_role_policy" "api_kms" {
   })
 }
 
+resource "aws_iam_role_policy" "api_ses" {
+  name = "${local.name_prefix}-api-ses"
+  role = aws_iam_role.api_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+      ]
+      Resource = ["*"]
+    }]
+  })
+}
+
 # ── Security Group for Tasks ───────────────────────────
 
 resource "aws_security_group" "tasks" {
@@ -188,6 +205,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ENCRYPTION_ENABLED", value = "true" },
         { name = "ENCRYPTION_PROVIDER", value = "kms" },
         { name = "AWS_REGION", value = var.aws_region },
+        { name = "SES_FROM_EMAIL", value = var.ses_from_email },
       ]
 
       secrets = [
