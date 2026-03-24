@@ -1,9 +1,12 @@
 name: Deploy (ECS)
 
 on:
-  push:
-    branches:
-      - main
+  # Disabled — minimal environment not yet deployed.
+  # Re-enable by uncommenting the push trigger below.
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch: # Manual trigger only
 
 permissions:
   id-token: write
