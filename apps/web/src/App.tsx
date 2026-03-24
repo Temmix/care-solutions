@@ -46,6 +46,14 @@ import { ChcDetailPage } from './features/chc/ChcDetailPage';
 import { VirtualWardsDashboardPage } from './features/virtual-wards/VirtualWardsDashboardPage';
 import { VirtualWardsEnrolPage } from './features/virtual-wards/VirtualWardsEnrolPage';
 import { VirtualWardsDetailPage } from './features/virtual-wards/VirtualWardsDetailPage';
+import { AuditLogPage } from './features/audit/AuditLogPage';
+import { ComplianceDashboardPage as AuditCompliancePage } from './features/audit/ComplianceDashboardPage';
+import { NotificationsPage } from './features/notifications/NotificationsPage';
+import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
+import { ReportsPage } from './features/reports/ReportsPage';
+import { DevicesListPage } from './features/iot/DevicesListPage';
+import { DeviceDetailPage } from './features/iot/DeviceDetailPage';
+import { ApiKeysPage } from './features/iot/ApiKeysPage';
 import { DemoPage } from './features/demo/DemoPage';
 import { Toaster } from 'react-hot-toast';
 
@@ -105,6 +113,14 @@ export function App(): React.ReactElement {
             <Route path="virtual-wards" element={<VirtualWardsDashboardPage />} />
             <Route path="virtual-wards/enrol" element={<VirtualWardsEnrolPage />} />
             <Route path="virtual-wards/:id" element={<VirtualWardsDetailPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
+            <Route path="audit/compliance" element={<AuditCompliancePage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="settings/notifications" element={<NotificationPreferencesPage />} />
+            <Route path="iot/devices" element={<DevicesListPage />} />
+            <Route path="iot/devices/:id" element={<DeviceDetailPage />} />
+            <Route path="iot/api-keys" element={<ApiKeysPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
             <Route path="change-password" element={<ChangePasswordPage />} />

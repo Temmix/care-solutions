@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useVirtualWards, type VwEnrolment } from './hooks/use-virtual-wards';
+import { useIot, type IotDevice } from '../iot/hooks/use-iot';
+import { DeviceStatusBadge } from '../iot/components/DeviceStatusBadge';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
-const TABS = ['Overview', 'Protocols', 'Observations', 'Alerts'] as const;
+const TABS = ['Overview', 'Protocols', 'Observations', 'Alerts', 'Devices'] as const;
 type Tab = (typeof TABS)[number];
 
 const VITAL_TYPES = [
@@ -75,10 +77,12 @@ export function VirtualWardsDetailPage(): React.ReactElement {
     error,
   } = useVirtualWards();
 
+  const { listDevices } = useIot();
   const [enrolment, setEnrolment] = useState<VwEnrolment | null>(null);
   const [tab, setTab] = useState<Tab>('Overview');
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [devices, setDevices] = useState<IotDevice[]>([]);
 
   const loadEnrolment = useCallback(async () => {
     if (!id) return;
@@ -93,6 +97,23 @@ export function VirtualWardsDetailPage(): React.ReactElement {
   useEffect(() => {
     loadEnrolment();
   }, [loadEnrolment]);
+
+  // Load devices assigned to this enrolment
+  const loadDevices = useCallback(() => {
+    listDevices({ limit: 100 })
+      .then((r) => {
+        // Filter to devices assigned to this enrolment
+        const assigned = r.data.filter((d) =>
+          d.assignments?.some((a) => a.isActive && a.enrolment?.id === id),
+        );
+        setDevices(assigned);
+      })
+      .catch(() => {});
+  }, [listDevices, id]);
+
+  useEffect(() => {
+    if (tab === 'Devices') loadDevices();
+  }, [tab, loadDevices]);
 
   // ── Protocol form state ─────────────────────────────────
   const [protVitalType, setProtVitalType] = useState('');
@@ -486,7 +507,7 @@ export function VirtualWardsDetailPage(): React.ReactElement {
                         <td className="px-3 py-2 text-slate-500">{o.unit}</td>
                         <td className="px-3 py-2 text-slate-500">{formatDateTime(o.recordedAt)}</td>
                         <td className="px-3 py-2 text-slate-500">
-                          {o.recorder.firstName} {o.recorder.lastName}
+                          {o.recorder ? `${o.recorder.firstName} ${o.recorder.lastName}` : 'Device'}
                         </td>
                       </tr>
                     ))}
@@ -547,6 +568,69 @@ export function VirtualWardsDetailPage(): React.ReactElement {
               </div>
             ) : (
               <p className="text-sm text-slate-500">No alerts.</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Devices ───────────────────────────────── */}
+        {tab === 'Devices' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">Assigned Devices</h3>
+              {enrolment.status !== 'DISCHARGED' && (
+                <Link
+                  to="/app/iot/devices"
+                  className="px-3 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent/90 no-underline"
+                >
+                  Manage Devices
+                </Link>
+              )}
+            </div>
+            {devices.length > 0 ? (
+              <div className="space-y-3">
+                {devices.map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center justify-between border border-slate-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <DeviceStatusBadge
+                        status={d.status}
+                        isOnline={d.isOnline}
+                        lastSeenAt={d.lastSeenAt}
+                      />
+                      <div>
+                        <Link
+                          to={`/app/iot/devices/${d.id}`}
+                          className="text-sm font-medium text-accent hover:underline"
+                        >
+                          {d.serialNumber}
+                        </Link>
+                        <div className="text-xs text-slate-500">
+                          {d.deviceType.replace(/_/g, ' ')}
+                          {d.manufacturer && ` — ${d.manufacturer}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {d.batteryLevel != null && (
+                        <span
+                          className={`text-sm font-medium ${d.batteryLevel < 20 ? 'text-red-500' : 'text-slate-600'}`}
+                        >
+                          {d.batteryLevel}%
+                        </span>
+                      )}
+                      {d.lastSeenAt && (
+                        <div className="text-xs text-slate-400">
+                          Last seen {formatDateTime(d.lastSeenAt)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">No devices assigned to this enrolment.</p>
             )}
           </div>
         )}

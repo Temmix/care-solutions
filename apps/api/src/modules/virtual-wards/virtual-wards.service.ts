@@ -1,6 +1,9 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   EnrolPatientDto,
   CreateProtocolDto,
@@ -16,6 +19,8 @@ export class VirtualWardsService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private events: EventsService,
+    @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   // ── Enrol patient ────────────────────────────────────────
@@ -45,6 +50,17 @@ export class VirtualWardsService {
         tenantId,
       },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'ENROL',
+        resource: 'VirtualWardEnrolment',
+        resourceId: enrolment.id,
+        tenantId,
+        metadata: { patientId: dto.patientId },
+      })
+      .catch(() => {});
 
     return enrolment;
   }
@@ -245,7 +261,18 @@ export class VirtualWardsService {
     });
 
     // Check thresholds for auto-alerts
-    await this.checkThresholds(enrolmentId, dto.vitalType, dto.value, enrolment.tenantId);
+    await this.checkThresholdsForVital(enrolmentId, dto.vitalType, dto.value, enrolment.tenantId);
+
+    this.audit
+      .log({
+        userId,
+        action: 'RECORD_OBSERVATION',
+        resource: 'VirtualWardEnrolment',
+        resourceId: enrolmentId,
+        tenantId,
+        metadata: { vitalType: dto.vitalType, value: dto.value },
+      })
+      .catch(() => {});
 
     return observation;
   }
@@ -285,7 +312,7 @@ export class VirtualWardsService {
       throw new BadRequestException('Alert is not in OPEN status');
     }
 
-    return this.prisma.virtualWardAlert.update({
+    const updated = await this.prisma.virtualWardAlert.update({
       where: { id: alertId },
       data: {
         status: 'ACKNOWLEDGED',
@@ -293,6 +320,19 @@ export class VirtualWardsService {
         acknowledgedAt: new Date(),
       },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'ACKNOWLEDGE_ALERT',
+        resource: 'VirtualWardAlert',
+        resourceId: alertId,
+        tenantId,
+        metadata: { enrolmentId },
+      })
+      .catch(() => {});
+
+    return updated;
   }
 
   async escalateAlert(
@@ -324,6 +364,28 @@ export class VirtualWardsService {
       data: { status: 'ESCALATED' },
     });
 
+    this.audit
+      .log({
+        userId,
+        action: 'ESCALATE_ALERT',
+        resource: 'VirtualWardAlert',
+        resourceId: alertId,
+        tenantId,
+        metadata: { enrolmentId, escalatedToId },
+      })
+      .catch(() => {});
+
+    this.notifications
+      .notify({
+        userId: escalatedToId,
+        tenantId,
+        type: NotificationType.VW_ALERT_ESCALATED,
+        title: 'Alert Escalated to You',
+        message: 'A virtual ward alert has been escalated and requires your attention',
+        link: `/app/virtual-wards/${enrolmentId}`,
+      })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -337,7 +399,7 @@ export class VirtualWardsService {
     await this.requireEnrolment(enrolmentId, tenantId);
     await this.requireAlert(alertId, enrolmentId);
 
-    return this.prisma.virtualWardAlert.update({
+    const updated = await this.prisma.virtualWardAlert.update({
       where: { id: alertId },
       data: {
         status: 'RESOLVED',
@@ -346,6 +408,19 @@ export class VirtualWardsService {
         resolvedAt: new Date(),
       },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'RESOLVE_ALERT',
+        resource: 'VirtualWardAlert',
+        resourceId: alertId,
+        tenantId,
+        metadata: { enrolmentId },
+      })
+      .catch(() => {});
+
+    return updated;
   }
 
   // ── Discharge ────────────────────────────────────────────
@@ -379,6 +454,17 @@ export class VirtualWardsService {
       },
     });
 
+    this.audit
+      .log({
+        userId,
+        action: 'DISCHARGE',
+        resource: 'VirtualWardEnrolment',
+        resourceId: id,
+        tenantId,
+        metadata: { dischargeReason: dto.dischargeReason },
+      })
+      .catch(() => {});
+
     return updated;
   }
 
@@ -404,7 +490,7 @@ export class VirtualWardsService {
     return alert;
   }
 
-  private async checkThresholds(
+  async checkThresholdsForVital(
     enrolmentId: string,
     vitalType: string,
     value: number,
@@ -461,6 +547,17 @@ export class VirtualWardsService {
                 tenantId,
               },
             });
+
+            this.notifications
+              .notify({
+                userId: enrolment.enrollerId,
+                tenantId,
+                type: NotificationType.VW_THRESHOLD_BREACH,
+                title: 'Threshold Breach Detected',
+                message: `A vital observation has breached the configured threshold`,
+                link: `/app/virtual-wards/${enrolmentId}`,
+              })
+              .catch(() => {});
           }
         }
       }

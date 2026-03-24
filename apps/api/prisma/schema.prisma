@@ -407,6 +407,10 @@ model User {
   vwAlertsEscalatedTo   VirtualWardAlert[]     @relation("VwAlertEscalatedTo")
   vwAlertsResolved      VirtualWardAlert[]     @relation("VwAlertResolver")
 
+  // Phase 5: Notifications
+  notifications           Notification[]             @relation("UserNotifications")
+  notificationPreferences NotificationPreference[]   @relation("UserNotificationPreferences")
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -495,6 +499,13 @@ model Organization {
   // Phase 4: CHC & Virtual Wards
   tenantChcCases       ChcCase[]              @relation("TenantChcCases")
   tenantVwEnrolments   VirtualWardEnrolment[] @relation("TenantVwEnrolments")
+
+  // Phase 5: Notifications
+  tenantNotifications  Notification[]         @relation("TenantNotifications")
+
+  // Phase 6: IoT
+  tenantIotDevices IotDevice[] @relation("TenantIotDevices")
+  tenantIotApiKeys IotApiKey[] @relation("TenantIotApiKeys")
 
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
@@ -1560,9 +1571,10 @@ model VirtualWardEnrolment {
   tenantId String
   tenant   Organization @relation("TenantVwEnrolments", fields: [tenantId], references: [id])
 
-  protocols    MonitoringProtocol[]
-  observations VitalObservation[]
-  alerts       VirtualWardAlert[]
+  protocols         MonitoringProtocol[]
+  observations      VitalObservation[]
+  alerts            VirtualWardAlert[]
+  deviceAssignments IotDeviceAssignment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1615,8 +1627,11 @@ model VitalObservation {
   enrolmentId String
   enrolment   VirtualWardEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
 
-  recorderId String
-  recorder   User @relation("VwObservationRecorder", fields: [recorderId], references: [id])
+  recorderId String?
+  recorder   User? @relation("VwObservationRecorder", fields: [recorderId], references: [id])
+
+  deviceId String?
+  device   IotDevice? @relation(fields: [deviceId], references: [id])
 
   @@index([enrolmentId, vitalType])
   @@index([enrolmentId, recordedAt])
@@ -1653,4 +1668,150 @@ model VirtualWardAlert {
   @@index([enrolmentId, status])
   @@index([severity, status])
   @@map("virtual_ward_alerts")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 5: Notifications
+// ═══════════════════════════════════════════════════════════════════
+
+enum NotificationType {
+  VW_THRESHOLD_BREACH
+  VW_ALERT_ESCALATED
+  CHC_STATUS_CHANGE
+  CHC_REVIEW_DUE
+  CARE_PLAN_REVIEW_DUE
+  SHIFT_SWAP_REQUEST
+  SHIFT_SWAP_RESPONSE
+  SHIFT_GAP_DETECTED
+  DISCHARGE_PLAN_READY
+  DEVICE_BATTERY_LOW
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+model Notification {
+  id      String           @id @default(uuid())
+  type    NotificationType
+  title   String
+  message String
+  link    String?
+  read    Boolean          @default(false)
+  readAt  DateTime?
+
+  userId   String
+  user     User         @relation("UserNotifications", fields: [userId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantNotifications", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid())
+  eventType NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+
+  userId String
+  user   User   @relation("UserNotificationPreferences", fields: [userId], references: [id])
+
+  @@unique([userId, eventType, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+// ─── Phase 6: IoT ──────────────────────────────────────
+
+enum DeviceType {
+  PULSE_OXIMETER
+  BLOOD_PRESSURE_MONITOR
+  THERMOMETER
+  GLUCOMETER
+  WEIGHT_SCALE
+  WEARABLE
+  SPIROMETER
+  ECG_MONITOR
+  OTHER
+}
+
+enum DeviceStatus {
+  REGISTERED
+  ACTIVE
+  OFFLINE
+  DECOMMISSIONED
+}
+
+model IotDevice {
+  id              String       @id @default(uuid())
+  serialNumber    String
+  deviceType      DeviceType
+  manufacturer    String?
+  model           String?
+  firmwareVersion String?
+  status          DeviceStatus @default(REGISTERED)
+  lastSeenAt      DateTime?
+  batteryLevel    Int?
+
+  tenantId String
+  tenant   Organization @relation("TenantIotDevices", fields: [tenantId], references: [id])
+
+  assignments  IotDeviceAssignment[]
+  apiKey       IotApiKey?            @relation("DeviceScopedKey")
+  observations VitalObservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serialNumber, tenantId])
+  @@index([tenantId, status])
+  @@map("iot_devices")
+}
+
+model IotDeviceAssignment {
+  id           String    @id @default(uuid())
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+  isActive     Boolean   @default(true)
+
+  deviceId String
+  device   IotDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  enrolmentId String
+  enrolment   VirtualWardEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, enrolmentId, isActive])
+  @@index([deviceId])
+  @@index([enrolmentId])
+  @@map("iot_device_assignments")
+}
+
+model IotApiKey {
+  id         String    @id @default(uuid())
+  keyHash    String    @unique
+  keyPrefix  String
+  name       String
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+
+  deviceId String?    @unique
+  device   IotDevice? @relation("DeviceScopedKey", fields: [deviceId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantIotApiKeys", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([keyHash])
+  @@map("iot_api_keys")
 }

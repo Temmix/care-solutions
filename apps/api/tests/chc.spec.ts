@@ -52,7 +52,9 @@ describe('ChcService', () => {
     jest.clearAllMocks();
     prisma = makePrisma();
     events = makeEvents();
-    service = new ChcService(prisma as any, events as any);
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    service = new ChcService(prisma as any, events as any, audit as any, notifications as any);
   });
 
   // ── createCase ──────────────────────────────────────

@@ -118,6 +118,12 @@ variable "web_max_count" {
   default     = 3
 }
 
+variable "ses_from_email" {
+  description = "Verified SES sender email address for notifications"
+  type        = string
+  default     = "noreply@clinvara.com"
+}
+
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"
   type        = number

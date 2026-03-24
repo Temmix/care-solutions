@@ -55,4 +55,33 @@ export class EventsService {
   ): void {
     this.emit(tenantId, 'virtual-ward:alert', data);
   }
+
+  // Phase 6: IoT
+
+  emitVirtualWardVitals(
+    tenantId: string,
+    data: {
+      enrolmentId: string;
+      observationId: string;
+      vitalType: string;
+      value: number;
+      unit: string;
+      deviceSerialNumber: string;
+    },
+  ): void {
+    this.emit(tenantId, 'virtual-ward:vitals', data);
+  }
+
+  // Phase 5: Notifications
+
+  emitNotification(
+    userId: string,
+    data: { id: string; type: string; title: string; message: string; link?: string },
+  ): void {
+    if (!this.gateway?.server) {
+      this.logger.warn('WebSocket server not ready, skipping notification');
+      return;
+    }
+    this.gateway.server.to(`user:${userId}`).emit('notification:new', data);
+  }
 }

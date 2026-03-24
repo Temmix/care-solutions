@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, ShiftStatus, AvailabilityType } from '@prisma/client';
+import { Prisma, ShiftStatus, AvailabilityType, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -16,6 +16,8 @@ import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { CreateSwapRequestDto } from './dto/create-swap-request.dto';
 import { RespondSwapDto } from './dto/respond-swap.dto';
 import { EventsService } from '../events/events.service';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // ── Time helpers ──────────────────────────────────────
 
@@ -70,14 +72,29 @@ export class WorkforceService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private eventsService: EventsService,
+    @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   // ── Shift Patterns ──────────────────────────────────
 
   async createShiftPattern(dto: CreateShiftPatternDto, tenantId: string) {
-    return this.prisma.shiftPattern.create({
+    const pattern = await this.prisma.shiftPattern.create({
       data: { ...dto, tenantId },
     });
+
+    this.audit
+      .log({
+        userId: 'system',
+        action: 'CREATE',
+        resource: 'ShiftPattern',
+        resourceId: pattern.id,
+        tenantId,
+        metadata: { name: dto.name },
+      })
+      .catch(() => {});
+
+    return pattern;
   }
 
   async listShiftPatterns(tenantId: string | null) {
@@ -131,7 +148,7 @@ export class WorkforceService {
         'The selected shift pattern no longer exists. Please refresh and select a different pattern.',
       );
 
-    return this.prisma.shift.create({
+    const shift = await this.prisma.shift.create({
       data: {
         date: new Date(dto.date),
         shiftPatternId: dto.shiftPatternId,
@@ -147,6 +164,19 @@ export class WorkforceService {
         },
       },
     });
+
+    this.audit
+      .log({
+        userId: 'system',
+        action: 'CREATE',
+        resource: 'Shift',
+        resourceId: shift.id,
+        tenantId,
+        metadata: { date: dto.date, shiftPatternId: dto.shiftPatternId },
+      })
+      .catch(() => {});
+
+    return shift;
   }
 
   async listShifts(
@@ -518,6 +548,18 @@ export class WorkforceService {
       },
     });
 
+    if (tenantId)
+      this.audit
+        .log({
+          userId: 'system',
+          action: 'ASSIGN',
+          resource: 'Shift',
+          resourceId: shiftId,
+          tenantId,
+          metadata: { userId: dto.userId, role: dto.role },
+        })
+        .catch(() => {});
+
     return { ...assignment, warnings };
   }
 
@@ -882,6 +924,35 @@ export class WorkforceService {
       shiftDate: swapRequest.originalShiftAssignment.shift.date.toISOString().split('T')[0],
     });
 
+    this.audit
+      .log({
+        userId,
+        action: 'CREATE_SWAP',
+        resource: 'ShiftSwapRequest',
+        resourceId: swapRequest.id,
+        tenantId,
+        metadata: { originalShiftAssignmentId: dto.originalShiftAssignmentId },
+      })
+      .catch(() => {});
+
+    if (dto.targetShiftAssignmentId) {
+      const targetAssignment = await this.prisma.shiftAssignment.findFirst({
+        where: { id: dto.targetShiftAssignmentId },
+      });
+      if (targetAssignment) {
+        this.notifications
+          .notify({
+            userId: targetAssignment.userId,
+            tenantId,
+            type: NotificationType.SHIFT_SWAP_REQUEST,
+            title: 'Shift Swap Request',
+            message: 'You have received a new shift swap request',
+            link: '/app/swap-marketplace',
+          })
+          .catch(() => {});
+      }
+    }
+
     return swapRequest;
   }
 
@@ -951,7 +1022,7 @@ export class WorkforceService {
     });
     if (!assignment) throw new NotFoundException('The shift assignment does not belong to you.');
 
-    return this.prisma.shiftSwapRequest.update({
+    const updatedSwap = await this.prisma.shiftSwapRequest.update({
       where: { id: swapId },
       data: {
         status: 'ACCEPTED',
@@ -969,6 +1040,30 @@ export class WorkforceService {
         },
       },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'RESPOND_SWAP',
+        resource: 'ShiftSwapRequest',
+        resourceId: swapId,
+        tenantId,
+        metadata: { targetShiftAssignmentId: dto.targetShiftAssignmentId },
+      })
+      .catch(() => {});
+
+    this.notifications
+      .notify({
+        userId: swap.requesterId,
+        tenantId,
+        type: NotificationType.SHIFT_SWAP_RESPONSE,
+        title: 'Shift Swap Response',
+        message: 'Your shift swap request has received a response',
+        link: '/app/swap-marketplace',
+      })
+      .catch(() => {});
+
+    return updatedSwap;
   }
 
   async approveSwap(swapId: string, approvedById: string, tenantId: string) {
@@ -1017,6 +1112,18 @@ export class WorkforceService {
 
       this.logger.log(`Transaction completed successfully for swap ${swapId}`);
       this.eventsService.emitSwapUpdated(tenantId, { swapId, status: 'APPROVED' });
+
+      this.audit
+        .log({
+          userId: approvedById,
+          action: 'APPROVE_SWAP',
+          resource: 'ShiftSwapRequest',
+          resourceId: swapId,
+          tenantId,
+          metadata: { originalUserId, targetUserId },
+        })
+        .catch(() => {});
+
       return result;
     } catch (error) {
       this.logger.error(`approveSwap failed: ${error}`);
@@ -1036,10 +1143,23 @@ export class WorkforceService {
     });
     if (!swap) throw new NotFoundException('Swap request not found.');
 
-    return this.prisma.shiftSwapRequest.update({
+    const rejected = await this.prisma.shiftSwapRequest.update({
       where: { id: swapId },
       data: { status: 'REJECTED', managerNote, approvedById },
     });
+
+    this.audit
+      .log({
+        userId: approvedById,
+        action: 'REJECT_SWAP',
+        resource: 'ShiftSwapRequest',
+        resourceId: swapId,
+        tenantId,
+        metadata: { managerNote },
+      })
+      .catch(() => {});
+
+    return rejected;
   }
 
   async cancelSwapRequest(swapId: string, userId: string, tenantId: string) {

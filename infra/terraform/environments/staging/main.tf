@@ -116,6 +116,29 @@ module "ecs" {
   log_retention_days = 7
 }
 
+# ── Route53 ───────────────────────────────────────────────
+
+module "route53" {
+  source = "../../modules/route53"
+
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+  alb_dns_name = module.alb.alb_dns_name
+  alb_zone_id  = module.alb.alb_zone_id
+}
+
+# ── SES (email sending + domain verification) ────────────
+
+module "ses" {
+  source = "../../modules/ses"
+
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+  zone_id      = module.route53.zone_id
+}
+
 # ── GitHub Actions IAM (OIDC) ──────────────────────────
 
 resource "aws_iam_openid_connect_provider" "github" {

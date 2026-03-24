@@ -11,12 +11,14 @@ import { CreateDischargePlanDto } from './dto/create-discharge-plan.dto';
 import { CreateDischargeTaskDto } from './dto/create-discharge-task.dto';
 import { UpdateDischargeTaskDto } from './dto/update-discharge-task.dto';
 import { EventsService } from '../events/events.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PatientFlowService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private eventsService: EventsService,
+    @Inject(AuditService) private audit: AuditService,
   ) {}
 
   // ── Locations ───────────────────────────────────────
@@ -32,10 +34,22 @@ export class PatientFlowService {
         );
     }
 
-    return this.prisma.location.create({
+    const result = await this.prisma.location.create({
       data: { ...dto, tenantId },
       include: { children: true, beds: true },
     });
+
+    this.audit
+      .log({
+        userId: 'system',
+        action: 'CREATE',
+        resource: 'Location',
+        resourceId: result.id,
+        tenantId,
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   async listLocations(tenantId: string | null) {
@@ -78,7 +92,7 @@ export class PatientFlowService {
         'Location not found. It may have been deleted or belongs to another organisation.',
       );
 
-    return this.prisma.bed.create({
+    const result = await this.prisma.bed.create({
       data: {
         identifier: dto.identifier,
         locationId: dto.locationId,
@@ -87,6 +101,12 @@ export class PatientFlowService {
       },
       include: { location: true },
     });
+
+    this.audit
+      .log({ userId: 'system', action: 'CREATE', resource: 'Bed', resourceId: result.id, tenantId })
+      .catch(() => {});
+
+    return result;
   }
 
   async listBeds(tenantId: string | null, filters: { locationId?: string; status?: string }) {
@@ -193,6 +213,17 @@ export class PatientFlowService {
           encounterAction: 'ADMISSION',
         });
       }
+
+      this.audit
+        .log({
+          userId,
+          action: 'ADMIT',
+          resource: 'Encounter',
+          resourceId: encounter.id,
+          tenantId,
+          metadata: { patientId: dto.patientId, bedId: dto.bedId },
+        })
+        .catch(() => {});
 
       return encounter;
     });
@@ -327,6 +358,18 @@ export class PatientFlowService {
         },
       });
 
+      if (tenantId)
+        this.audit
+          .log({
+            userId,
+            action: 'TRANSFER',
+            resource: 'Encounter',
+            resourceId: encounterId,
+            tenantId,
+            metadata: { toBedId: dto.toBedId },
+          })
+          .catch(() => {});
+
       return transfer;
     });
   }
@@ -388,6 +431,17 @@ export class PatientFlowService {
         });
       }
 
+      if (tenantId)
+        this.audit
+          .log({
+            userId,
+            action: 'DISCHARGE',
+            resource: 'Encounter',
+            resourceId: encounterId,
+            tenantId,
+          })
+          .catch(() => {});
+
       return updated;
     });
   }
@@ -411,7 +465,7 @@ export class PatientFlowService {
     if (existing)
       throw new BadRequestException('A discharge plan already exists for this encounter.');
 
-    return this.prisma.dischargePlan.create({
+    const result = await this.prisma.dischargePlan.create({
       data: {
         encounterId,
         plannedDate: dto.plannedDate ? new Date(dto.plannedDate) : null,
@@ -421,6 +475,12 @@ export class PatientFlowService {
       },
       include: { tasks: true },
     });
+
+    this.audit
+      .log({ userId, action: 'CREATE', resource: 'DischargePlan', resourceId: result.id, tenantId })
+      .catch(() => {});
+
+    return result;
   }
 
   async getDischargePlan(encounterId: string, tenantId: string | null) {
@@ -587,6 +647,17 @@ export class PatientFlowService {
           tenantId: encounter.tenantId,
         },
       });
+
+      if (tenantId)
+        this.audit
+          .log({
+            userId,
+            action: 'COMPLETE_DISCHARGE_PLAN',
+            resource: 'DischargePlan',
+            resourceId: completedPlan.id,
+            tenantId,
+          })
+          .catch(() => {});
 
       return completedPlan;
     });
