@@ -13,12 +13,21 @@ resource "aws_route53_zone" "main" {
   }
 }
 
-# ── A Record (apex → ALB) ──────────────────────────────
-# clinvara.com → ALB
+locals {
+  # When subdomain_prefix is set (e.g. "staging"), records become:
+  #   staging.clinvara.com, staging-app.clinvara.com, staging-api.clinvara.com
+  # When empty, records are: clinvara.com, www.clinvara.com, app.clinvara.com, api.clinvara.com
+  prefix     = var.subdomain_prefix != "" ? "${var.subdomain_prefix}." : ""
+  app_prefix = var.subdomain_prefix != "" ? "${var.subdomain_prefix}-app." : "app."
+  api_prefix = var.subdomain_prefix != "" ? "${var.subdomain_prefix}-api." : "api."
+}
+
+# ── A Record (apex or subdomain → ALB) ────────────────
 
 resource "aws_route53_record" "apex" {
+  count   = var.create_records ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
-  name    = var.domain_name
+  name    = "${local.prefix}${var.domain_name}"
   type    = "A"
 
   alias {
@@ -28,10 +37,10 @@ resource "aws_route53_record" "apex" {
   }
 }
 
-# ── CNAME: www → apex ──────────────────────────────────
-# www.clinvara.com → clinvara.com
+# ── CNAME: www → apex (only for apex records) ─────────
 
 resource "aws_route53_record" "www" {
+  count   = var.create_records && var.subdomain_prefix == "" ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
   name    = "www.${var.domain_name}"
   type    = "CNAME"
@@ -39,12 +48,12 @@ resource "aws_route53_record" "www" {
   records = [var.domain_name]
 }
 
-# ── CNAME: app → ALB ──────────────────────────────────
-# app.clinvara.com → ALB (for future subdomain split)
+# ── app → ALB ────────────────────────────────────────
 
 resource "aws_route53_record" "app" {
+  count   = var.create_records ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
-  name    = "app.${var.domain_name}"
+  name    = "${local.app_prefix}${var.domain_name}"
   type    = "A"
 
   alias {
@@ -54,12 +63,12 @@ resource "aws_route53_record" "app" {
   }
 }
 
-# ── CNAME: api → ALB ──────────────────────────────────
-# api.clinvara.com → ALB (for future API subdomain)
+# ── api → ALB ────────────────────────────────────────
 
 resource "aws_route53_record" "api" {
+  count   = var.create_records ? 1 : 0
   zone_id = aws_route53_zone.main.zone_id
-  name    = "api.${var.domain_name}"
+  name    = "${local.api_prefix}${var.domain_name}"
   type    = "A"
 
   alias {
