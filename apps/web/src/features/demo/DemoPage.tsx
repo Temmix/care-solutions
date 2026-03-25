@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 
 const features = [
   {
-    title: 'Electronic Patient Records',
+    title: 'Every patient, every record, one place',
     description:
-      'Comprehensive patient management with encrypted records, care plans, assessments, and medication tracking.',
+      'No more chasing paper files or logging into three systems. Patient demographics, care plans, medications, and assessments — all encrypted, all audited, all accessible from any device.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -22,9 +22,9 @@ const features = [
     ),
   },
   {
-    title: 'Care Plan Management',
+    title: 'Care plans that actually get followed',
     description:
-      'Create and track structured care plans with goals, activities, and progress monitoring for each patient.',
+      'Structured goals, activities, and progress notes your whole team can see and update. No more care plans sitting in a drawer — everyone stays aligned on what matters.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -42,9 +42,9 @@ const features = [
     ),
   },
   {
-    title: 'Workforce Management',
+    title: 'Rosters that build themselves',
     description:
-      'Shift patterns, roster scheduling, availability tracking, and compliance monitoring with working time regulations.',
+      'Shift patterns, availability, swap marketplace, and working time compliance — all in one view. Your managers spend time caring, not wrestling with spreadsheets.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -62,9 +62,9 @@ const features = [
     ),
   },
   {
-    title: 'Patient Flow & Bed Management',
+    title: 'Know every bed, every minute',
     description:
-      'Real-time bed occupancy, admission and discharge workflows, transfer management, and discharge planning checklists.',
+      'Real-time occupancy dashboards, admission and discharge workflows, and transfer tracking. No more ringing wards to find a bed — it is all on one screen.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -82,9 +82,9 @@ const features = [
     ),
   },
   {
-    title: 'Medication Administration',
+    title: 'Medication rounds without the paper trail',
     description:
-      'Prescribe, dispense, and track medications with full audit trails. Supports multiple routes and dosage forms.',
+      'Prescribe, dispense, and record administration with a full audit trail. No more illegible MAR charts or missed signatures — every dose is tracked digitally.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -102,9 +102,9 @@ const features = [
     ),
   },
   {
-    title: 'Security & Compliance',
+    title: 'Inspection-ready from day one',
     description:
-      'Field-level AES-256 encryption, KMS key management, role-based access control, and full audit logging.',
+      'Field-level encryption, complete audit trails, role-based access, and compliance dashboards. When the regulator calls, your data is already in order.',
     icon: (
       <svg
         className="w-6 h-6"
@@ -124,10 +124,127 @@ const features = [
 ];
 
 const stats = [
-  { label: 'FHIR R4', description: 'Standards compliant' },
-  { label: 'AES-256', description: 'Field-level encryption' },
-  { label: 'Multi-tenant', description: 'Full data isolation' },
-  { label: 'Real-time', description: 'WebSocket updates' },
+  { label: '13 Modules', description: 'One platform, zero integrations' },
+  { label: 'NHS-Ready', description: 'FHIR R4 compliant from day one' },
+  { label: '256-bit', description: 'Field-level patient data encryption' },
+  { label: '< 5 min', description: 'From sign-up to first patient record' },
+];
+
+const replacements = [
+  {
+    from: 'Spreadsheet rosters',
+    to: 'Roster & Shift Management',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"
+        />
+      </svg>
+    ),
+  },
+  {
+    from: 'Paper MAR charts',
+    to: 'Digital Medication Rounds',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082"
+        />
+      </svg>
+    ),
+  },
+  {
+    from: 'Separate HR system',
+    to: 'Training & Compliance',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342"
+        />
+      </svg>
+    ),
+  },
+  {
+    from: 'Whiteboard bed boards',
+    to: 'Patient Flow Dashboard',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75"
+        />
+      </svg>
+    ),
+  },
+  {
+    from: 'Disconnected IoT vendors',
+    to: 'Unified Device Management',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"
+        />
+      </svg>
+    ),
+  },
+  {
+    from: 'Manual CQC prep',
+    to: 'Audit & Compliance',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export function DemoPage(): React.ReactElement {
@@ -168,13 +285,14 @@ export function DemoPage(): React.ReactElement {
               Healthcare SaaS Platform
             </div>
             <h1 className="text-4xl lg:text-5xl font-bold leading-tight tracking-tight mb-6">
-              Modern healthcare
+              Stop juggling 6 systems
               <br />
-              management platform
+              to run one care organisation
             </h1>
             <p className="text-lg text-slate-300 leading-relaxed mb-10 max-w-lg">
-              Unified electronic patient records, care coordination, workforce management, and
-              operational tools for care homes, GP practices, and hospitals.
+              Clinvara replaces your disconnected patient records, rostering spreadsheets, and
+              paper-based compliance tracking with one unified platform — purpose-built for UK
+              healthcare.
             </p>
             <div className="flex items-center gap-4">
               <Link
@@ -204,8 +322,104 @@ export function DemoPage(): React.ReactElement {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Who It's For */}
       <section className="py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
+              Built for the way you work
+            </h2>
+            <p className="text-slate-500 text-base max-w-xl mx-auto">
+              One platform, configured for your organisation type. Only see the features that matter
+              to your team.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                label: 'Care Homes',
+                color: 'bg-teal-500',
+                lightColor: 'bg-teal-50 border-teal-100',
+                textColor: 'text-teal-600',
+                description:
+                  'Replace your paper MARs, whiteboard rosters, and CQC prep folders. Clinvara gives your team medication rounds, care plans, staff training tracking, and CHC assessments — all in one login.',
+                highlights: [
+                  'Digital medication rounds',
+                  'Care plan management',
+                  'CHC assessments',
+                  'Staff training & compliance',
+                  'CQC-ready audit trails',
+                ],
+              },
+              {
+                label: 'GP Practices',
+                color: 'bg-blue-500',
+                lightColor: 'bg-blue-50 border-blue-100',
+                textColor: 'text-blue-600',
+                description:
+                  'Patient records, clinical assessments, and practitioner scheduling without the NHS IT overhead. Lightweight enough for a single practice, powerful enough for a federation.',
+                highlights: [
+                  'Patient demographics',
+                  'Clinical assessments',
+                  'Practitioner management',
+                  'Reporting & analytics',
+                  'FHIR R4 interoperability',
+                ],
+              },
+              {
+                label: 'Hospitals & Trusts',
+                color: 'bg-violet-500',
+                lightColor: 'bg-violet-50 border-violet-100',
+                textColor: 'text-violet-600',
+                description:
+                  'Real-time bed management, patient flow dashboards, virtual ward monitoring, and IoT device integration. See your entire operation on one screen.',
+                highlights: [
+                  'Real-time bed occupancy',
+                  'Patient flow & transfers',
+                  'Virtual ward monitoring',
+                  'IoT device integration',
+                  'Discharge planning',
+                ],
+              },
+            ].map((org) => (
+              <div
+                key={org.label}
+                className={`rounded-xl border p-6 ${org.lightColor} transition-colors`}
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`w-2 h-2 rounded-full ${org.color}`} />
+                  <span className={`text-sm font-bold ${org.textColor}`}>{org.label}</span>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed mb-5">{org.description}</p>
+                <ul className="space-y-2">
+                  {org.highlights.map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-slate-500">
+                      <svg
+                        className={`w-4 h-4 shrink-0 ${org.textColor}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m4.5 12.75 6 6 9-13.5"
+                        />
+                      </svg>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-20 lg:py-24 bg-white border-y border-slate-100">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
@@ -221,13 +435,58 @@ export function DemoPage(): React.ReactElement {
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="bg-white rounded-xl border border-slate-100 p-6 hover:border-slate-200 transition-colors"
+                className="bg-slate-50 rounded-xl border border-slate-100 p-6 hover:border-slate-200 transition-colors"
               >
                 <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center text-accent mb-4">
                   {feature.icon}
                 </div>
                 <h3 className="text-base font-semibold text-slate-900 mb-2">{feature.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Replace Your Stack */}
+      <section className="py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
+              Replace your entire stack
+            </h2>
+            <p className="text-slate-500 text-base max-w-xl mx-auto">
+              Every tool you are paying for separately, Clinvara handles in one platform with one
+              login and one bill.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {replacements.map((item) => (
+              <div
+                key={item.from}
+                className="bg-white rounded-xl border border-slate-100 p-5 hover:border-slate-200 transition-colors"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center text-red-400">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div className="text-xs text-red-400 font-medium line-through">{item.from}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-accent shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-900">{item.to}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -266,7 +525,7 @@ export function DemoPage(): React.ReactElement {
                   ],
                 ].map(([title, desc]) => (
                   <li key={title} className="flex gap-3">
-                    <div className="mt-1 w-5 h-5 bg-accent/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="mt-1 w-5 h-5 bg-accent/10 rounded-full flex items-center justify-center shrink-0">
                       <svg
                         className="w-3 h-3 text-accent"
                         fill="none"
@@ -292,23 +551,23 @@ export function DemoPage(): React.ReactElement {
             <div className="space-y-6">
               <div className="bg-slate-50 rounded-xl border border-slate-100 p-6">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                  Built for UK Healthcare
+                  Trusted by UK Healthcare
                 </div>
                 <div className="space-y-4">
                   {[
                     {
-                      label: 'Care Homes',
-                      desc: 'Resident records, care plans, medication rounds, and CQC-ready reporting.',
+                      label: 'CQC & ICO',
+                      desc: 'Built to meet Care Quality Commission and Information Commissioner standards.',
                       color: 'bg-teal-50 text-teal-600',
                     },
                     {
-                      label: 'GP Practices',
-                      desc: 'Patient registration, clinical assessments, referrals, and appointment management.',
+                      label: 'NHS Digital',
+                      desc: 'FHIR R4 data model aligned with NHS Digital interoperability requirements.',
                       color: 'bg-blue-50 text-blue-600',
                     },
                     {
-                      label: 'Hospitals',
-                      desc: 'Bed management, patient flow, discharge planning, and workforce compliance.',
+                      label: 'DSPT Ready',
+                      desc: 'Architecture designed to satisfy Data Security and Protection Toolkit criteria.',
                       color: 'bg-violet-50 text-violet-600',
                     },
                   ].map((org) => (
@@ -349,210 +608,28 @@ export function DemoPage(): React.ReactElement {
         </div>
       </section>
 
-      {/* Platform Roadmap */}
-      <section className="py-20 lg:py-24">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
-              Platform Roadmap
-            </h2>
-            <p className="text-slate-500 text-base max-w-xl mx-auto">
-              Our development journey — from core clinical systems to a fully integrated healthcare
-              platform.
-            </p>
-          </div>
-
-          <div className="relative">
-            {/* Vertical timeline line */}
-            <div className="absolute left-6 lg:left-1/2 top-0 bottom-0 w-px bg-slate-200 -translate-x-1/2 hidden sm:block" />
-
-            <div className="space-y-8 sm:space-y-12">
-              {[
-                {
-                  phase: 'Phase 1',
-                  title: 'Core Clinical Platform',
-                  status: 'complete' as const,
-                  items: [
-                    'Electronic Patient Records (FHIR R4)',
-                    'Care Plan management with goals & activities',
-                    'Clinical assessments & observations',
-                    'Medication prescribing & administration',
-                    'Multi-tenant architecture with data isolation',
-                    'Role-based access control (Admin, Clinician, Nurse, Carer)',
-                  ],
-                },
-                {
-                  phase: 'Phase 2',
-                  title: 'Workforce & Operations',
-                  status: 'complete' as const,
-                  items: [
-                    'Shift pattern builder & roster scheduling',
-                    'Staff availability & leave management',
-                    'Shift swap marketplace',
-                    'Working time compliance monitoring',
-                    'Staff training records & certification tracking',
-                    'Notification system with preferences',
-                  ],
-                },
-                {
-                  phase: 'Phase 3',
-                  title: 'Specialist Modules',
-                  status: 'complete' as const,
-                  items: [
-                    'Patient flow & real-time bed management',
-                    'Admission, transfer & discharge workflows',
-                    'Discharge planning checklists',
-                    'Continuing Healthcare (CHC) assessments',
-                    'Virtual ward enrolment & monitoring',
-                    'IoT device integration & API key management',
-                  ],
-                },
-                {
-                  phase: 'Phase 4',
-                  title: 'Intelligence & Configuration',
-                  status: 'in-progress' as const,
-                  items: [
-                    'Module visibility — org-type-aware feature toggling',
-                    'Audit log & compliance dashboard',
-                    'Reporting & analytics engine',
-                    'Billing & subscription management',
-                    'Organisation settings & customisation',
-                    'Field-level AES-256 encryption with KMS',
-                  ],
-                },
-                {
-                  phase: 'Phase 5',
-                  title: 'Interoperability & Scale',
-                  status: 'planned' as const,
-                  items: [
-                    'FHIR R4 API for third-party integrations',
-                    'NHS Spine / PDS patient demographic lookup',
-                    'E-referral service (e-RS) integration',
-                    'GP Connect appointment booking',
-                    'Webhooks & event-driven notifications',
-                    'White-label & multi-region deployment',
-                  ],
-                },
-                {
-                  phase: 'Phase 6',
-                  title: 'AI & Advanced Analytics',
-                  status: 'planned' as const,
-                  items: [
-                    'AI-assisted care plan recommendations',
-                    'Predictive deterioration scoring (NEWS2)',
-                    'Automated roster optimisation',
-                    'Natural language clinical note summarisation',
-                    'Population health dashboards',
-                    'Outcome benchmarking across organisations',
-                  ],
-                },
-              ].map((milestone, index) => (
-                <div
-                  key={milestone.phase}
-                  className={`relative sm:grid sm:grid-cols-2 sm:gap-8 ${index % 2 === 0 ? '' : 'sm:direction-rtl'}`}
-                >
-                  {/* Timeline dot */}
-                  <div className="absolute left-6 lg:left-1/2 -translate-x-1/2 hidden sm:flex items-center justify-center">
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 ${
-                        milestone.status === 'complete'
-                          ? 'bg-accent border-accent'
-                          : milestone.status === 'in-progress'
-                            ? 'bg-amber-400 border-amber-400'
-                            : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Content card — alternating sides on lg */}
-                  <div
-                    className={`sm:col-span-1 ${index % 2 === 0 ? 'lg:col-start-1' : 'lg:col-start-2'} sm:pl-12 lg:pl-0`}
-                  >
-                    <div className="bg-white rounded-xl border border-slate-100 p-6 hover:border-slate-200 transition-colors">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          {milestone.phase}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                            milestone.status === 'complete'
-                              ? 'bg-accent/10 text-accent'
-                              : milestone.status === 'in-progress'
-                                ? 'bg-amber-50 text-amber-600'
-                                : 'bg-slate-50 text-slate-400'
-                          }`}
-                        >
-                          {milestone.status === 'complete'
-                            ? 'Complete'
-                            : milestone.status === 'in-progress'
-                              ? 'In Progress'
-                              : 'Planned'}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-semibold text-slate-900 mb-3">
-                        {milestone.title}
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {milestone.items.map((item) => (
-                          <li key={item} className="flex items-start gap-2 text-sm text-slate-500">
-                            <svg
-                              className={`w-4 h-4 mt-0.5 shrink-0 ${
-                                milestone.status === 'complete'
-                                  ? 'text-accent'
-                                  : milestone.status === 'in-progress'
-                                    ? 'text-amber-400'
-                                    : 'text-slate-300'
-                              }`}
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              {milestone.status === 'complete' ? (
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m4.5 12.75 6 6 9-13.5"
-                                />
-                              ) : (
-                                <circle cx="12" cy="12" r="8" />
-                              )}
-                            </svg>
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
-      <section className="py-20 lg:py-24">
+      <section className="py-20 lg:py-24 bg-white border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
-            Ready to get started?
+            See Clinvara in action with your own data
           </h2>
-          <p className="text-slate-500 text-base mb-8 max-w-md mx-auto">
-            Create your organisation account and start managing patients, staff, and operations in
-            minutes.
+          <p className="text-slate-500 text-base mb-8 max-w-lg mx-auto">
+            Start your free trial — no credit card, no commitment. Import your existing patient
+            records or explore every feature with our demo dataset.
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link
               to="/register"
               className="px-6 py-3 bg-accent hover:bg-accent-dark text-white text-sm font-semibold rounded-lg transition-colors no-underline"
             >
-              Create Account
+              Start Free Trial
             </Link>
             <Link
               to="/login"
               className="px-6 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold rounded-lg transition-colors no-underline"
             >
-              Sign In
+              Book a Demo
             </Link>
           </div>
         </div>

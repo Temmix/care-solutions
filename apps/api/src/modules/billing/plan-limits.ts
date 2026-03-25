@@ -12,6 +12,9 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   ENTERPRISE: { patientLimit: -1, userLimit: -1, label: 'Enterprise', priceMonthlyGBP: 299 },
 };
 
+export const TRIAL_DURATION_DAYS = 60;
+export const TRIAL_TIER = 'PROFESSIONAL' as const;
+
 /** -1 means unlimited */
 export function isWithinLimit(current: number, limit: number): boolean {
   return limit === -1 || current < limit;

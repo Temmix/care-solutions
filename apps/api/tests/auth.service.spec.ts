@@ -129,6 +129,7 @@ describe('AuthService', () => {
           organization: { create: jest.fn().mockResolvedValue(mockOrg) },
           user: { create: jest.fn().mockResolvedValue(mockUser) },
           userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
+          subscription: { create: jest.fn().mockResolvedValue({}) },
         };
         return cb(tx);
       });

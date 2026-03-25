@@ -2,10 +2,17 @@ import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isWithinLimit, PLAN_LIMITS } from './plan-limits';
 
+export interface TrialInfo {
+  active: boolean;
+  endsAt: string;
+  daysRemaining: number;
+}
+
 export interface UsageInfo {
   users: { current: number; limit: number };
   patients: { current: number; limit: number };
   tier: string;
+  trial?: TrialInfo;
 }
 
 @Injectable()
@@ -25,6 +32,16 @@ export class SubscriptionLimitService {
     });
 
     if (!subscription) {
+      const free = PLAN_LIMITS.FREE;
+      return { userLimit: free.userLimit, patientLimit: free.patientLimit, tier: 'FREE' };
+    }
+
+    // Lazy trial expiry: enforce FREE limits immediately if trial has ended
+    if (
+      subscription.status === 'TRIALING' &&
+      subscription.trialEndsAt &&
+      new Date() > subscription.trialEndsAt
+    ) {
       const free = PLAN_LIMITS.FREE;
       return { userLimit: free.userLimit, patientLimit: free.patientLimit, tier: 'FREE' };
     }
@@ -87,16 +104,35 @@ export class SubscriptionLimitService {
    * Used by the billing/usage endpoint so the frontend can display progress bars.
    */
   async getUsage(tenantId: string): Promise<UsageInfo> {
-    const [limits, userCount, patientCount] = await Promise.all([
+    const [limits, userCount, patientCount, subscription] = await Promise.all([
       this.getLimits(tenantId),
       this.countUsers(tenantId),
       this.countPatients(tenantId),
+      this.prisma.subscription.findUnique({
+        where: { organizationId: tenantId },
+        select: { status: true, trialEndsAt: true },
+      }),
     ]);
+
+    let trial: TrialInfo | undefined;
+    if (subscription?.status === 'TRIALING' && subscription.trialEndsAt) {
+      const now = new Date();
+      const daysRemaining = Math.max(
+        0,
+        Math.ceil((subscription.trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      );
+      trial = {
+        active: now < subscription.trialEndsAt,
+        endsAt: subscription.trialEndsAt.toISOString(),
+        daysRemaining,
+      };
+    }
 
     return {
       users: { current: userCount, limit: limits.userLimit },
       patients: { current: patientCount, limit: limits.patientLimit },
       tier: limits.tier,
+      trial,
     };
   }
 }

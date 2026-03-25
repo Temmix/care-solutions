@@ -119,16 +119,18 @@ describe('BillingPage', () => {
     expect(screen.getByText('Manage Billing')).toBeInTheDocument();
   });
 
-  it('displays available plans', async () => {
+  it('displays available plans (excludes FREE tier)', async () => {
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Available Plans')).toBeInTheDocument();
     });
-    // "Free" appears as both label (h3) and price text
-    expect(screen.getAllByText('Free').length).toBeGreaterThanOrEqual(1);
+    // Starter appears in both subscription card and plan grid
+    expect(screen.getAllByText('Starter').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Professional')).toBeInTheDocument();
     expect(screen.getByText('Enterprise')).toBeInTheDocument();
+    // FREE plan should not appear in the plans grid
+    expect(screen.queryByText('5 patients')).not.toBeInTheDocument();
   });
 
   it('marks current plan', async () => {
@@ -182,13 +184,14 @@ describe('BillingPage', () => {
     expect(screen.getByText('£299')).toBeInTheDocument();
   });
 
-  it('shows patient and user limits for each plan', async () => {
+  it('shows patient and user limits for each plan (excludes FREE)', async () => {
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Available Plans')).toBeInTheDocument();
     });
-    expect(screen.getByText('5 patients')).toBeInTheDocument();
+    // FREE plan (5 patients) should not appear
+    expect(screen.queryByText('5 patients')).not.toBeInTheDocument();
     // 200 patients may appear in both subscription card and plan card
     expect(screen.getAllByText('200 patients').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('500 patients')).toBeInTheDocument();
