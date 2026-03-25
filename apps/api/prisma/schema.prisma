@@ -411,6 +411,10 @@ model User {
   notifications           Notification[]             @relation("UserNotifications")
   notificationPreferences NotificationPreference[]   @relation("UserNotificationPreferences")
 
+  // Staff Training
+  trainingRecords        TrainingRecord[] @relation("UserTrainingRecords")
+  trainingRecordsCreated TrainingRecord[] @relation("TrainingRecordCreator")
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -506,6 +510,11 @@ model Organization {
   // Phase 6: IoT
   tenantIotDevices IotDevice[] @relation("TenantIotDevices")
   tenantIotApiKeys IotApiKey[] @relation("TenantIotApiKeys")
+
+  // Staff Training
+  tenantTrainingRecords      TrainingRecord[]       @relation("TenantTrainingRecords")
+  tenantTrainingCertificates TrainingCertificate[]  @relation("TenantTrainingCertificates")
+  tenantTrainingTypes        TrainingTypeConfig[]   @relation("TenantTrainingTypes")
 
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
@@ -1743,6 +1752,22 @@ enum DeviceType {
   OTHER
 }
 
+// ─── Staff Training Enums ────────────────────────────
+
+enum TrainingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  OVERDUE
+}
+
+enum TrainingPriority {
+  MANDATORY
+  RECOMMENDED
+  OPTIONAL
+}
+
 enum DeviceStatus {
   REGISTERED
   ACTIVE
@@ -1814,4 +1839,92 @@ model IotApiKey {
   @@index([tenantId])
   @@index([keyHash])
   @@map("iot_api_keys")
+}
+
+// ─── Staff Training ──────────────────────────────────
+
+model TrainingRecord {
+  id                  String           @id @default(uuid())
+  title               String
+  description         String?
+  category            String
+  priority            TrainingPriority @default(MANDATORY)
+  status              TrainingStatus   @default(SCHEDULED)
+  provider            String?
+  scheduledDate       DateTime?
+  startedDate         DateTime?
+  completedDate       DateTime?
+  expiryDate          DateTime?
+  renewalPeriodMonths Int?
+  hoursCompleted      Float?
+  score               Float?
+  notes               String?
+
+  userId      String
+  user        User         @relation("UserTrainingRecords", fields: [userId], references: [id])
+
+  createdById String
+  createdBy   User         @relation("TrainingRecordCreator", fields: [createdById], references: [id])
+
+  certificates TrainingCertificate[]
+
+  tenantId String
+  tenant   Organization @relation("TenantTrainingRecords", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([expiryDate])
+  @@index([tenantId, userId])
+  @@map("training_records")
+}
+
+model TrainingCertificate {
+  id                String    @id @default(uuid())
+  name              String
+  issuer            String
+  certificateNumber String?
+  issueDate         DateTime
+  expiryDate        DateTime?
+
+  trainingRecordId String
+  trainingRecord   TrainingRecord @relation(fields: [trainingRecordId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantTrainingCertificates", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([trainingRecordId])
+  @@index([expiryDate])
+  @@map("training_certificates")
+}
+
+// ─── Staff Training Type Config ─────────────────────
+
+model TrainingTypeConfig {
+  id          String  @id @default(uuid())
+  code        String
+  name        String
+  description String?
+  category    String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  tenantId String?
+  tenant   Organization? @relation("TenantTrainingTypes", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, tenantId])
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("training_type_configs")
 }

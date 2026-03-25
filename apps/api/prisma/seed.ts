@@ -1033,6 +1033,9 @@ async function main() {
   await prisma.chcPanelMember.deleteMany();
   await prisma.chcDomainScore.deleteMany();
   await prisma.chcCase.deleteMany();
+  await prisma.trainingCertificate.deleteMany();
+  await prisma.trainingRecord.deleteMany();
+  await prisma.trainingTypeConfig.deleteMany();
   await prisma.patientSearchIndex.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.assessmentTypeConfig.deleteMany();
@@ -1058,7 +1061,12 @@ async function main() {
   await prisma.location.deleteMany();
   await prisma.shiftPattern.deleteMany();
   await prisma.medication.deleteMany();
+  await prisma.dischargePlan.deleteMany();
+  await prisma.iotApiKey.deleteMany();
+  await prisma.iotDevice.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.notificationPreference.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.userTenantMembership.deleteMany();
   await prisma.user.deleteMany();
@@ -3066,6 +3074,299 @@ async function main() {
 
   console.log(
     `  Created ${vwDefs.length} virtual ward enrolments with protocols, observations, and alerts`,
+  );
+
+  // ── Training Types & Records ────────────────────────────
+  const systemTrainingTypes = [
+    { code: 'SAFEGUARDING', name: 'Safeguarding', category: 'Compliance', sortOrder: 1 },
+    { code: 'MANUAL_HANDLING', name: 'Manual Handling', category: 'Health & Safety', sortOrder: 2 },
+    { code: 'FIRE_SAFETY', name: 'Fire Safety', category: 'Health & Safety', sortOrder: 3 },
+    { code: 'INFECTION_CONTROL', name: 'Infection Control', category: 'Clinical', sortOrder: 4 },
+    {
+      code: 'BLS_FIRST_AID',
+      name: 'Basic Life Support & First Aid',
+      category: 'Clinical',
+      sortOrder: 5,
+    },
+    { code: 'MENTAL_HEALTH', name: 'Mental Health Awareness', category: 'Clinical', sortOrder: 6 },
+    {
+      code: 'DATA_PROTECTION',
+      name: 'Data Protection & GDPR',
+      category: 'Compliance',
+      sortOrder: 7,
+    },
+    {
+      code: 'MEDICATION_MANAGEMENT',
+      name: 'Medication Management',
+      category: 'Clinical',
+      sortOrder: 8,
+    },
+    {
+      code: 'HEALTH_AND_SAFETY',
+      name: 'Health & Safety',
+      category: 'Health & Safety',
+      sortOrder: 9,
+    },
+    {
+      code: 'EQUALITY_DIVERSITY',
+      name: 'Equality, Diversity & Inclusion',
+      category: 'Compliance',
+      sortOrder: 10,
+    },
+  ];
+
+  for (const t of systemTrainingTypes) {
+    await prisma.trainingTypeConfig.create({
+      data: {
+        code: t.code,
+        name: t.name,
+        category: t.category,
+        sortOrder: t.sortOrder,
+        tenantId: null,
+      },
+    });
+  }
+
+  console.log(`  Created ${systemTrainingTypes.length} system training types`);
+
+  // Collect all staff users per tenant
+  const sunriseStaff = [sunriseAdmin, sunriseNurseUser, ...sunrisePractitionerUsers];
+  const oakwoodStaff = [oakwoodAdmin, ...oakwoodPractitionerUsers];
+
+  const now = new Date();
+  const daysMs = 24 * 60 * 60 * 1000;
+
+  // Training definitions — each staff member gets a selection of these
+  const trainingDefs: {
+    title: string;
+    category: string;
+    priority: 'MANDATORY' | 'RECOMMENDED' | 'OPTIONAL';
+    provider: string;
+    renewalMonths: number | null;
+    hours: number;
+    status: 'COMPLETED' | 'IN_PROGRESS' | 'SCHEDULED' | 'EXPIRED';
+    expiryOffset: number | null; // days from now (negative = past, null = no expiry)
+    completedOffset: number | null; // days ago completed
+    score: number | null;
+  }[] = [
+    // Completed, expiring in 15 days
+    {
+      title: 'Fire Safety Annual Refresher',
+      category: 'FIRE_SAFETY',
+      priority: 'MANDATORY',
+      provider: 'SafeTraining UK',
+      renewalMonths: 12,
+      hours: 4,
+      status: 'COMPLETED',
+      expiryOffset: 15,
+      completedOffset: 350,
+      score: 92,
+    },
+    // Completed, no expiry
+    {
+      title: 'Equality, Diversity & Inclusion',
+      category: 'EQUALITY_DIVERSITY',
+      priority: 'MANDATORY',
+      provider: 'NHS eLearning',
+      renewalMonths: null,
+      hours: 2,
+      status: 'COMPLETED',
+      expiryOffset: null,
+      completedOffset: 180,
+      score: 88,
+    },
+    // Completed, expiring in 6 months
+    {
+      title: 'Safeguarding Adults Level 2',
+      category: 'SAFEGUARDING',
+      priority: 'MANDATORY',
+      provider: 'Skills for Care',
+      renewalMonths: 36,
+      hours: 8,
+      status: 'COMPLETED',
+      expiryOffset: 180,
+      completedOffset: 900,
+      score: 95,
+    },
+    // In progress (started 5 days ago)
+    {
+      title: 'Mental Health First Aid',
+      category: 'MENTAL_HEALTH',
+      priority: 'RECOMMENDED',
+      provider: 'MHFA England',
+      renewalMonths: 24,
+      hours: 16,
+      status: 'IN_PROGRESS',
+      expiryOffset: null,
+      completedOffset: null,
+      score: null,
+    },
+    // Scheduled (30 days from now)
+    {
+      title: 'Manual Handling Refresher',
+      category: 'MANUAL_HANDLING',
+      priority: 'MANDATORY',
+      provider: 'BackCare UK',
+      renewalMonths: 12,
+      hours: 4,
+      status: 'SCHEDULED',
+      expiryOffset: null,
+      completedOffset: null,
+      score: null,
+    },
+    // Expired 10 days ago
+    {
+      title: 'Infection Prevention & Control',
+      category: 'INFECTION_CONTROL',
+      priority: 'MANDATORY',
+      provider: 'NHS eLearning',
+      renewalMonths: 12,
+      hours: 3,
+      status: 'EXPIRED',
+      expiryOffset: -10,
+      completedOffset: 375,
+      score: 78,
+    },
+    // Completed, expiring in 25 days
+    {
+      title: 'Data Protection & GDPR',
+      category: 'DATA_PROTECTION',
+      priority: 'MANDATORY',
+      provider: 'ICO Online',
+      renewalMonths: 12,
+      hours: 2,
+      status: 'COMPLETED',
+      expiryOffset: 25,
+      completedOffset: 340,
+      score: 100,
+    },
+    // Completed, no expiry
+    {
+      title: 'Basic Life Support',
+      category: 'BLS_FIRST_AID',
+      priority: 'MANDATORY',
+      provider: 'Resuscitation Council UK',
+      renewalMonths: null,
+      hours: 6,
+      status: 'COMPLETED',
+      expiryOffset: null,
+      completedOffset: 60,
+      score: 90,
+    },
+    // Optional, completed
+    {
+      title: 'Health & Safety Induction',
+      category: 'HEALTH_AND_SAFETY',
+      priority: 'OPTIONAL',
+      provider: 'Internal',
+      renewalMonths: null,
+      hours: 1,
+      status: 'COMPLETED',
+      expiryOffset: null,
+      completedOffset: 400,
+      score: null,
+    },
+    // Medication management (recommended, in progress)
+    {
+      title: 'Medication Administration Level 3',
+      category: 'MEDICATION_MANAGEMENT',
+      priority: 'RECOMMENDED',
+      provider: 'Skills for Health',
+      renewalMonths: 24,
+      hours: 12,
+      status: 'IN_PROGRESS',
+      expiryOffset: null,
+      completedOffset: null,
+      score: null,
+    },
+  ];
+
+  // Each user gets a varied subset (indices into trainingDefs)
+  const userTrainingAssignments = [
+    [0, 1, 2, 3, 4], // user 0 — mix of completed, in-progress, scheduled
+    [0, 2, 5, 6, 7], // user 1 — includes expired
+    [1, 3, 4, 5, 8], // user 2
+    [0, 1, 6, 7, 9], // user 3
+    [2, 3, 5, 7, 8], // user 4
+    [0, 4, 6, 8, 9], // user 5 (if exists)
+  ];
+
+  async function seedTrainingForTenant(staff: { id: string }[], tenantId: string, adminId: string) {
+    let recordCount = 0;
+    let certCount = 0;
+
+    for (let i = 0; i < staff.length; i++) {
+      const user = staff[i];
+      const assignments = userTrainingAssignments[i % userTrainingAssignments.length];
+
+      for (const idx of assignments) {
+        const def = trainingDefs[idx];
+        const completedDate = def.completedOffset
+          ? new Date(now.getTime() - def.completedOffset * daysMs)
+          : null;
+        const expiryDate =
+          def.expiryOffset !== null ? new Date(now.getTime() + def.expiryOffset * daysMs) : null;
+        const scheduledDate =
+          def.status === 'SCHEDULED' ? new Date(now.getTime() + 30 * daysMs) : null;
+        const startedDate =
+          def.status === 'IN_PROGRESS'
+            ? new Date(now.getTime() - 5 * daysMs)
+            : completedDate
+              ? new Date(completedDate.getTime() - def.hours * 60 * 60 * 1000)
+              : null;
+
+        const record = await prisma.trainingRecord.create({
+          data: {
+            title: def.title,
+            category: def.category,
+            priority: def.priority as any,
+            status: def.status as any,
+            provider: def.provider,
+            scheduledDate,
+            startedDate,
+            completedDate,
+            expiryDate,
+            renewalPeriodMonths: def.renewalMonths,
+            hoursCompleted:
+              def.status === 'COMPLETED' || def.status === 'EXPIRED' ? def.hours : null,
+            score: def.score,
+            userId: user.id,
+            createdById: adminId,
+            tenantId,
+          },
+        });
+        recordCount++;
+
+        // Add certificate for completed training
+        if (def.status === 'COMPLETED' && completedDate) {
+          await prisma.trainingCertificate.create({
+            data: {
+              name: `${def.title} Certificate`,
+              issuer: def.provider,
+              certificateNumber: `CERT-${def.category.substring(0, 4)}-${String(i + 1).padStart(3, '0')}`,
+              issueDate: completedDate,
+              expiryDate,
+              trainingRecordId: record.id,
+              tenantId,
+            },
+          });
+          certCount++;
+        }
+      }
+    }
+
+    return { recordCount, certCount };
+  }
+
+  const sunriseTraining = await seedTrainingForTenant(
+    sunriseStaff,
+    sunriseCare.id,
+    sunriseAdmin.id,
+  );
+  const oakwoodTraining = await seedTrainingForTenant(oakwoodStaff, oakwoodGP.id, oakwoodAdmin.id);
+
+  console.log(
+    `  Created ${sunriseTraining.recordCount + oakwoodTraining.recordCount} training records, ${sunriseTraining.certCount + oakwoodTraining.certCount} certificates`,
   );
 
   // ── Summary ──────────────────────────────────────────
