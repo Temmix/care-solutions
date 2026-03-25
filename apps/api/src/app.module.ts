@@ -18,6 +18,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { IotModule } from './modules/iot/iot.module';
+import { TrainingModule } from './modules/training/training.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -52,6 +53,7 @@ import { HealthController } from './health.controller';
     NotificationsModule,
     ReportsModule,
     IotModule,
+    TrainingModule,
   ],
   controllers: [HealthController],
 })

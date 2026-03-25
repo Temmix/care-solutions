@@ -26,6 +26,7 @@ import { AssessmentTypesSettingsPage } from './features/settings/AssessmentTypes
 import { SpecialtyTypesSettingsPage } from './features/settings/SpecialtyTypesSettingsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { MedicationTypesSettingsPage } from './features/settings/MedicationTypesSettingsPage';
+import { TrainingTypesSettingsPage } from './features/settings/TrainingTypesSettingsPage';
 import { OrganisationSettingsPage } from './features/settings/OrganisationSettingsPage';
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
@@ -54,6 +55,9 @@ import { ReportsPage } from './features/reports/ReportsPage';
 import { DevicesListPage } from './features/iot/DevicesListPage';
 import { DeviceDetailPage } from './features/iot/DeviceDetailPage';
 import { ApiKeysPage } from './features/iot/ApiKeysPage';
+import { TrainingListPage } from './features/training/TrainingListPage';
+import { TrainingDetailPage } from './features/training/TrainingDetailPage';
+import { MyTrainingPage } from './features/training/MyTrainingPage';
 import { DemoPage } from './features/demo/DemoPage';
 import { Toaster } from 'react-hot-toast';
 
@@ -96,6 +100,7 @@ export function App(): React.ReactElement {
             <Route path="settings/assessment-types" element={<AssessmentTypesSettingsPage />} />
             <Route path="settings/specialty-types" element={<SpecialtyTypesSettingsPage />} />
             <Route path="settings/medication-types" element={<MedicationTypesSettingsPage />} />
+            <Route path="settings/training-types" element={<TrainingTypesSettingsPage />} />
             <Route path="settings/organisation" element={<OrganisationSettingsPage />} />
             <Route path="roster" element={<RosterPage />} />
             <Route path="shift-patterns" element={<ShiftPatternsPage />} />
@@ -120,6 +125,9 @@ export function App(): React.ReactElement {
             <Route path="iot/devices" element={<DevicesListPage />} />
             <Route path="iot/devices/:id" element={<DeviceDetailPage />} />
             <Route path="iot/api-keys" element={<ApiKeysPage />} />
+            <Route path="training" element={<TrainingListPage />} />
+            <Route path="training/:id" element={<TrainingDetailPage />} />
+            <Route path="my-training" element={<MyTrainingPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="billing" element={<BillingPage />} />
