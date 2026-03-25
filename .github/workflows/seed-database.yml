@@ -129,13 +129,22 @@ jobs:
           echo "Waiting for seed task to finish..."
           aws ecs wait tasks-stopped --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_seed.outputs.task_arn }}
 
-          EXIT_CODE=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_seed.outputs.task_arn }} \
-            --query 'tasks[0].containers[0].exitCode' --output text)
+          TASK_DETAIL=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks ${{ steps.run_seed.outputs.task_arn }} --output json)
+
+          EXIT_CODE=$(echo "$TASK_DETAIL" | jq -r '.tasks[0].containers[0].exitCode // "null"')
+          STOP_REASON=$(echo "$TASK_DETAIL" | jq -r '.tasks[0].stoppedReason // "none"')
+          CONTAINER_REASON=$(echo "$TASK_DETAIL" | jq -r '.tasks[0].containers[0].reason // "none"')
+          LAST_STATUS=$(echo "$TASK_DETAIL" | jq -r '.tasks[0].lastStatus // "unknown"')
+
+          echo "Task status: $LAST_STATUS"
+          echo "Stop reason: $STOP_REASON"
+          echo "Container reason: $CONTAINER_REASON"
+          echo "Exit code: $EXIT_CODE"
 
           if [ "$EXIT_CODE" != "0" ]; then
-            echo "::error::Seed failed with exit code $EXIT_CODE"
+            echo "::error::Seed failed — exit=$EXIT_CODE, stop reason=$STOP_REASON, container reason=$CONTAINER_REASON"
             echo "Fetching seed logs..."
-            aws logs tail ${{ steps.taskdef.outputs.log_group }} --prefix seed --since 15m || true
+            aws logs tail ${{ steps.taskdef.outputs.log_group }} --log-stream-name-prefix seed --since 15m || true
             exit 1
           fi
 
