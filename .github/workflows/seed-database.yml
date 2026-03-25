@@ -49,7 +49,7 @@ jobs:
       - name: Build and push seed image
         id: seed_image
         run: |
-          IMAGE="${{ steps.ecr.outputs.registry }}/care-solutions/care-seed:sha-${GITHUB_SHA::8}"
+          IMAGE="${{ steps.ecr.outputs.registry }}/care-solutions/care-seed:sha-${GITHUB_SHA::8}-$(date +%s)"
           docker build -f infra/docker/seed.Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
