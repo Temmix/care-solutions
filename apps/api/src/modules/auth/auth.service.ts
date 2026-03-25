@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { BlindIndexService } from '../encryption/blind-index.service';
 import { RegisterDto, LoginDto } from './dto';
+import { PLAN_LIMITS, TRIAL_DURATION_DAYS, TRIAL_TIER } from '../billing/plan-limits';
 
 const MEMBERSHIP_SELECT = {
   organizationId: true,
@@ -70,6 +71,19 @@ export class AuthService {
             organizationId: org.id,
             role: 'ADMIN',
             status: 'ACTIVE',
+          },
+        });
+
+        // Create 60-day Professional trial subscription
+        const trialLimits = PLAN_LIMITS[TRIAL_TIER];
+        await tx.subscription.create({
+          data: {
+            organizationId: org.id,
+            tier: TRIAL_TIER,
+            status: 'TRIALING',
+            trialEndsAt: new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000),
+            patientLimit: trialLimits.patientLimit,
+            userLimit: trialLimits.userLimit,
           },
         });
 

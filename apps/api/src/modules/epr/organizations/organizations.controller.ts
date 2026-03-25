@@ -56,6 +56,11 @@ export class OrganizationsController {
     return this.organizationsService.update(id, dto, tenantId);
   }
 
+  @Get(':id/modules')
+  getModules(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.organizationsService.getEnabledModules(id, tenantId);
+  }
+
   @Delete(':id')
   @Roles(Role.ADMIN)
   deactivate(@Param('id') id: string, @CurrentTenant() tenantId: string) {

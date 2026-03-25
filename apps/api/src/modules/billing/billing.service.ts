@@ -35,6 +35,29 @@ export class BillingService {
       include: { organization: { select: { name: true, stripeCustomerId: true } } },
     });
 
+    // Lazy trial expiry: if trial has ended, downgrade to FREE
+    if (sub && sub.status === 'TRIALING' && sub.trialEndsAt && new Date() > sub.trialEndsAt) {
+      await this.expireTrial(organizationId);
+      const org = sub.organization;
+      const limits = PLAN_LIMITS.FREE;
+      return {
+        id: sub.id,
+        organizationId,
+        tier: 'FREE',
+        status: 'ACTIVE',
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        trialEndsAt: null,
+        patientLimit: limits.patientLimit,
+        userLimit: limits.userLimit,
+        limits,
+        organization: org,
+      };
+    }
+
     if (!sub) {
       const org = await this.prisma.organization.findUnique({
         where: { id: organizationId },
@@ -77,6 +100,20 @@ export class BillingService {
       where: { organizationId: tenantId },
     });
     return sub;
+  }
+
+  private async expireTrial(organizationId: string): Promise<void> {
+    const freeLimits = PLAN_LIMITS.FREE;
+    await this.prisma.subscription.update({
+      where: { organizationId },
+      data: {
+        tier: 'FREE',
+        status: 'ACTIVE',
+        trialEndsAt: null,
+        patientLimit: freeLimits.patientLimit,
+        userLimit: freeLimits.userLimit,
+      },
+    });
   }
 
   // ── Stripe Customer ─────────────────────────────────────

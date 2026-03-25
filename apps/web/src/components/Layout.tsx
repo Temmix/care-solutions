@@ -86,6 +86,7 @@ const navItems = [
   {
     to: '/app/patients',
     label: 'Patients',
+    moduleCode: 'PATIENTS',
     icon: (
       <svg
         className="w-5 h-5"
@@ -105,6 +106,7 @@ const navItems = [
   {
     to: '/app/care-plans',
     label: 'Care Plans',
+    moduleCode: 'CARE_PLANS',
     icon: (
       <svg
         className="w-5 h-5"
@@ -124,6 +126,7 @@ const navItems = [
   {
     to: '/app/medications',
     label: 'Medications',
+    moduleCode: 'MEDICATIONS',
     icon: (
       <svg
         className="w-5 h-5"
@@ -143,6 +146,7 @@ const navItems = [
   {
     to: '/app/assessments',
     label: 'Assessments',
+    moduleCode: 'ASSESSMENTS',
     icon: (
       <svg
         className="w-5 h-5"
@@ -162,6 +166,7 @@ const navItems = [
   {
     to: '/app/roster',
     label: 'Roster',
+    moduleCode: 'ROSTER',
     icon: (
       <svg
         className="w-5 h-5"
@@ -181,6 +186,7 @@ const navItems = [
   {
     to: '/app/shift-patterns',
     label: 'Shift Patterns',
+    moduleCode: 'ROSTER',
     adminOnly: true,
     icon: (
       <svg
@@ -201,6 +207,7 @@ const navItems = [
   {
     to: '/app/availability',
     label: 'Availability',
+    moduleCode: 'ROSTER',
     icon: (
       <svg
         className="w-5 h-5"
@@ -220,6 +227,7 @@ const navItems = [
   {
     to: '/app/patient-flow',
     label: 'Patient Flow',
+    moduleCode: 'PATIENT_FLOW',
     icon: (
       <svg
         className="w-5 h-5"
@@ -239,6 +247,7 @@ const navItems = [
   {
     to: '/app/chc',
     label: 'CHC',
+    moduleCode: 'CHC',
     icon: (
       <svg
         className="w-5 h-5"
@@ -258,6 +267,7 @@ const navItems = [
   {
     to: '/app/virtual-wards',
     label: 'Virtual Wards',
+    moduleCode: 'VIRTUAL_WARDS',
     icon: (
       <svg
         className="w-5 h-5"
@@ -277,6 +287,7 @@ const navItems = [
   {
     to: '/app/iot/devices',
     label: 'IoT Devices',
+    moduleCode: 'IOT',
     adminOnly: true,
     icon: (
       <svg
@@ -297,6 +308,7 @@ const navItems = [
   {
     to: '/app/iot/api-keys',
     label: 'API Keys',
+    moduleCode: 'IOT',
     adminOnly: true,
     icon: (
       <svg
@@ -317,6 +329,7 @@ const navItems = [
   {
     to: '/app/swap-marketplace',
     label: 'Shift Swaps',
+    moduleCode: 'ROSTER',
     icon: (
       <svg
         className="w-5 h-5"
@@ -336,6 +349,7 @@ const navItems = [
   {
     to: '/app/compliance',
     label: 'Compliance',
+    moduleCode: 'COMPLIANCE',
     adminOnly: true,
     icon: (
       <svg
@@ -356,6 +370,7 @@ const navItems = [
   {
     to: '/app/training',
     label: 'Training',
+    moduleCode: 'TRAINING',
     adminOnly: true,
     icon: (
       <svg
@@ -376,6 +391,7 @@ const navItems = [
   {
     to: '/app/my-training',
     label: 'My Training',
+    moduleCode: 'TRAINING',
     icon: (
       <svg
         className="w-5 h-5"
@@ -455,6 +471,7 @@ const navItems = [
   {
     to: '/app/reports',
     label: 'Reports',
+    moduleCode: 'REPORTS',
     adminOnly: true,
     icon: (
       <svg
@@ -475,6 +492,7 @@ const navItems = [
   {
     to: '/app/billing',
     label: 'Billing',
+    moduleCode: 'BILLING',
     adminOnly: true,
     icon: (
       <svg
@@ -540,8 +558,16 @@ const navItems = [
 ];
 
 export function Layout(): React.ReactElement {
-  const { user, logout, isSuperAdmin, isPlatformAdmin, selectedTenant, selectTenant, memberships } =
-    useAuth();
+  const {
+    user,
+    logout,
+    isSuperAdmin,
+    isPlatformAdmin,
+    selectedTenant,
+    selectTenant,
+    memberships,
+    isModuleEnabled,
+  } = useAuth();
   const hasMultipleMemberships = memberships.length > 1;
   const navigate = useNavigate();
   const location = useLocation();
@@ -659,6 +685,7 @@ export function Layout(): React.ReactElement {
               if (item.superAdminOnly && !isSuperAdmin) return null;
               if (item.platformOnly && !isPlatformAdmin) return null;
               if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;
+              if (item.moduleCode && !isModuleEnabled(item.moduleCode)) return null;
               const active = isActive(item.to);
               return (
                 <Link

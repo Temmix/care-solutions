@@ -105,14 +105,21 @@ describe('useAuth', () => {
   });
 
   it('selectTenant calls api.setTenantId', async () => {
+    mockedApi.get.mockResolvedValueOnce(['patients', 'billing']); // modules fetch
+
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    act(() => {
-      result.current.selectTenant({ id: 'tenant-1', name: 'Test Org', type: 'CARE_HOME' });
+    await act(async () => {
+      result.current.selectTenant({
+        id: 'tenant-1',
+        name: 'Test Org',
+        type: 'CARE_HOME',
+        enabledModules: [],
+      });
     });
 
     expect(mockedApi.setTenantId).toHaveBeenCalledWith('tenant-1');
@@ -120,6 +127,7 @@ describe('useAuth', () => {
       id: 'tenant-1',
       name: 'Test Org',
       type: 'CARE_HOME',
+      enabledModules: ['patients', 'billing'],
     });
   });
 

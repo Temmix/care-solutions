@@ -5,6 +5,11 @@ export interface UsageData {
   users: { current: number; limit: number };
   patients: { current: number; limit: number };
   tier: string;
+  trial?: {
+    active: boolean;
+    endsAt: string;
+    daysRemaining: number;
+  };
 }
 
 export function useUsage(): { usage: UsageData | null; refresh: () => void } {
@@ -94,15 +99,59 @@ export function UsageBanner({
   const showUpgrade =
     (show !== 'patients' && isAtUserLimit) || (show !== 'users' && isAtPatientLimit);
 
+  const trialExpired = usage.trial && !usage.trial.active;
+  const trialUrgent = usage.trial?.active && usage.trial.daysRemaining <= 7;
+
   return (
     <div className="mb-6 bg-white rounded-xl border border-slate-100 p-4">
+      {/* Trial countdown banner */}
+      {usage.trial && (
+        <div
+          className={`flex items-center justify-between mb-3 p-3 rounded-lg ${
+            trialExpired ? 'bg-red-50' : trialUrgent ? 'bg-amber-50' : 'bg-blue-50'
+          }`}
+        >
+          <div>
+            <span
+              className={`text-sm font-medium ${
+                trialExpired ? 'text-red-900' : trialUrgent ? 'text-amber-900' : 'text-blue-900'
+              }`}
+            >
+              {trialExpired
+                ? 'Your Professional trial has ended'
+                : `Professional Trial — ${usage.trial.daysRemaining} day${usage.trial.daysRemaining === 1 ? '' : 's'} remaining`}
+            </span>
+            <p
+              className={`text-xs mt-0.5 ${
+                trialExpired ? 'text-red-700' : trialUrgent ? 'text-amber-700' : 'text-blue-700'
+              }`}
+            >
+              {trialExpired
+                ? 'Upgrade to keep Professional features and higher limits.'
+                : 'You have full access to Professional features. Upgrade before your trial ends to keep them.'}
+            </p>
+          </div>
+          <a
+            href="/app/billing"
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg no-underline shrink-0 ml-4 ${
+              trialExpired
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-accent text-white hover:bg-accent/90'
+            }`}
+          >
+            Upgrade Now
+          </a>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-slate-900">
-          {TIER_LABELS[usage.tier] ?? usage.tier} Plan Usage
+          {usage.trial?.active ? 'Professional Trial' : (TIER_LABELS[usage.tier] ?? usage.tier)}{' '}
+          Plan Usage
         </span>
-        {showUpgrade && (
+        {showUpgrade && !usage.trial && (
           <a
-            href="/billing"
+            href="/app/billing"
             className="text-xs text-accent font-medium no-underline hover:underline"
           >
             Upgrade Plan

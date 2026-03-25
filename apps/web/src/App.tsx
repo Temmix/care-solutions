@@ -27,6 +27,7 @@ import { SpecialtyTypesSettingsPage } from './features/settings/SpecialtyTypesSe
 import { SettingsPage } from './features/settings/SettingsPage';
 import { MedicationTypesSettingsPage } from './features/settings/MedicationTypesSettingsPage';
 import { TrainingTypesSettingsPage } from './features/settings/TrainingTypesSettingsPage';
+import { ModuleVisibilitySettingsPage } from './features/settings/ModuleVisibilitySettingsPage';
 import { OrganisationSettingsPage } from './features/settings/OrganisationSettingsPage';
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
@@ -59,6 +60,7 @@ import { TrainingListPage } from './features/training/TrainingListPage';
 import { TrainingDetailPage } from './features/training/TrainingDetailPage';
 import { MyTrainingPage } from './features/training/MyTrainingPage';
 import { DemoPage } from './features/demo/DemoPage';
+import { ModuleGuard } from './components/ModuleGuard';
 import { Toaster } from 'react-hot-toast';
 
 export function App(): React.ReactElement {
@@ -79,59 +81,339 @@ export function App(): React.ReactElement {
             }
           >
             <Route index element={<DashboardPage />} />
-            <Route path="patients" element={<PatientListPage />} />
-            <Route path="patients/new" element={<PatientCreatePage />} />
-            <Route path="patients/:id" element={<PatientDetailPage />} />
+            {/* Patients */}
+            <Route
+              path="patients"
+              element={
+                <ModuleGuard moduleCode="PATIENTS">
+                  <PatientListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="patients/new"
+              element={
+                <ModuleGuard moduleCode="PATIENTS">
+                  <PatientCreatePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="patients/:id"
+              element={
+                <ModuleGuard moduleCode="PATIENTS">
+                  <PatientDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Care Plans */}
+            <Route
+              path="care-plans"
+              element={
+                <ModuleGuard moduleCode="CARE_PLANS">
+                  <CarePlanListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="care-plans/new"
+              element={
+                <ModuleGuard moduleCode="CARE_PLANS">
+                  <CarePlanCreatePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="care-plans/:id"
+              element={
+                <ModuleGuard moduleCode="CARE_PLANS">
+                  <CarePlanDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Medications */}
+            <Route
+              path="medications"
+              element={
+                <ModuleGuard moduleCode="MEDICATIONS">
+                  <MedicationsListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="medications/new"
+              element={
+                <ModuleGuard moduleCode="MEDICATIONS">
+                  <MedicationsCreatePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="medications/:id"
+              element={
+                <ModuleGuard moduleCode="MEDICATIONS">
+                  <MedicationsDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Assessments */}
+            <Route
+              path="assessments"
+              element={
+                <ModuleGuard moduleCode="ASSESSMENTS">
+                  <AssessmentListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="assessments/new"
+              element={
+                <ModuleGuard moduleCode="ASSESSMENTS">
+                  <AssessmentCreatePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="assessments/:id"
+              element={
+                <ModuleGuard moduleCode="ASSESSMENTS">
+                  <AssessmentDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Roster & Scheduling */}
+            <Route
+              path="roster"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <RosterPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="shift-patterns"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <ShiftPatternsPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="availability"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <AvailabilityPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="swap-marketplace"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <SwapMarketplacePage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Compliance */}
+            <Route
+              path="compliance"
+              element={
+                <ModuleGuard moduleCode="COMPLIANCE">
+                  <ComplianceDashboardPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Patient Flow */}
+            <Route
+              path="patient-flow"
+              element={
+                <ModuleGuard moduleCode="PATIENT_FLOW">
+                  <PatientFlowDashboardPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="locations"
+              element={
+                <ModuleGuard moduleCode="PATIENT_FLOW">
+                  <LocationsPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="admit"
+              element={
+                <ModuleGuard moduleCode="PATIENT_FLOW">
+                  <AdmitPatientPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="encounters/:id"
+              element={
+                <ModuleGuard moduleCode="PATIENT_FLOW">
+                  <EncounterDetailPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="encounters/:id/discharge-plan"
+              element={
+                <ModuleGuard moduleCode="PATIENT_FLOW">
+                  <DischargePlanPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* CHC */}
+            <Route
+              path="chc"
+              element={
+                <ModuleGuard moduleCode="CHC">
+                  <ChcListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="chc/new"
+              element={
+                <ModuleGuard moduleCode="CHC">
+                  <ChcCreatePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="chc/:id"
+              element={
+                <ModuleGuard moduleCode="CHC">
+                  <ChcDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Virtual Wards */}
+            <Route
+              path="virtual-wards"
+              element={
+                <ModuleGuard moduleCode="VIRTUAL_WARDS">
+                  <VirtualWardsDashboardPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="virtual-wards/enrol"
+              element={
+                <ModuleGuard moduleCode="VIRTUAL_WARDS">
+                  <VirtualWardsEnrolPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="virtual-wards/:id"
+              element={
+                <ModuleGuard moduleCode="VIRTUAL_WARDS">
+                  <VirtualWardsDetailPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* IoT */}
+            <Route
+              path="iot/devices"
+              element={
+                <ModuleGuard moduleCode="IOT">
+                  <DevicesListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="iot/devices/:id"
+              element={
+                <ModuleGuard moduleCode="IOT">
+                  <DeviceDetailPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="iot/api-keys"
+              element={
+                <ModuleGuard moduleCode="IOT">
+                  <ApiKeysPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Training */}
+            <Route
+              path="training"
+              element={
+                <ModuleGuard moduleCode="TRAINING">
+                  <TrainingListPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="training/:id"
+              element={
+                <ModuleGuard moduleCode="TRAINING">
+                  <TrainingDetailPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="my-training"
+              element={
+                <ModuleGuard moduleCode="TRAINING">
+                  <MyTrainingPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Reports & Billing */}
+            <Route
+              path="reports"
+              element={
+                <ModuleGuard moduleCode="REPORTS">
+                  <ReportsPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="billing"
+              element={
+                <ModuleGuard moduleCode="BILLING">
+                  <BillingPage />
+                </ModuleGuard>
+              }
+            />
+
+            {/* Always visible */}
             <Route path="practitioners" element={<PractitionersPage />} />
             <Route path="tenants" element={<TenantsPage />} />
             <Route path="select-tenant" element={<SelectTenantPage />} />
             <Route path="super-admins" element={<SuperAdminsPage />} />
             <Route path="tenant-admins" element={<TenantAdminsPage />} />
-            <Route path="care-plans" element={<CarePlanListPage />} />
-            <Route path="care-plans/new" element={<CarePlanCreatePage />} />
-            <Route path="care-plans/:id" element={<CarePlanDetailPage />} />
-            <Route path="medications" element={<MedicationsListPage />} />
-            <Route path="medications/new" element={<MedicationsCreatePage />} />
-            <Route path="medications/:id" element={<MedicationsDetailPage />} />
-            <Route path="assessments" element={<AssessmentListPage />} />
-            <Route path="assessments/new" element={<AssessmentCreatePage />} />
-            <Route path="assessments/:id" element={<AssessmentDetailPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
+            <Route path="audit/compliance" element={<AuditCompliancePage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="team" element={<TeamPage />} />
+            <Route path="change-password" element={<ChangePasswordPage />} />
+
+            {/* Settings */}
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="settings/organisation" element={<OrganisationSettingsPage />} />
             <Route path="settings/assessment-types" element={<AssessmentTypesSettingsPage />} />
             <Route path="settings/specialty-types" element={<SpecialtyTypesSettingsPage />} />
             <Route path="settings/medication-types" element={<MedicationTypesSettingsPage />} />
             <Route path="settings/training-types" element={<TrainingTypesSettingsPage />} />
-            <Route path="settings/organisation" element={<OrganisationSettingsPage />} />
-            <Route path="roster" element={<RosterPage />} />
-            <Route path="shift-patterns" element={<ShiftPatternsPage />} />
-            <Route path="availability" element={<AvailabilityPage />} />
-            <Route path="patient-flow" element={<PatientFlowDashboardPage />} />
-            <Route path="locations" element={<LocationsPage />} />
-            <Route path="admit" element={<AdmitPatientPage />} />
-            <Route path="encounters/:id" element={<EncounterDetailPage />} />
-            <Route path="encounters/:id/discharge-plan" element={<DischargePlanPage />} />
-            <Route path="swap-marketplace" element={<SwapMarketplacePage />} />
-            <Route path="compliance" element={<ComplianceDashboardPage />} />
-            <Route path="chc" element={<ChcListPage />} />
-            <Route path="chc/new" element={<ChcCreatePage />} />
-            <Route path="chc/:id" element={<ChcDetailPage />} />
-            <Route path="virtual-wards" element={<VirtualWardsDashboardPage />} />
-            <Route path="virtual-wards/enrol" element={<VirtualWardsEnrolPage />} />
-            <Route path="virtual-wards/:id" element={<VirtualWardsDetailPage />} />
-            <Route path="audit" element={<AuditLogPage />} />
-            <Route path="audit/compliance" element={<AuditCompliancePage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="settings/modules" element={<ModuleVisibilitySettingsPage />} />
             <Route path="settings/notifications" element={<NotificationPreferencesPage />} />
-            <Route path="iot/devices" element={<DevicesListPage />} />
-            <Route path="iot/devices/:id" element={<DeviceDetailPage />} />
-            <Route path="iot/api-keys" element={<ApiKeysPage />} />
-            <Route path="training" element={<TrainingListPage />} />
-            <Route path="training/:id" element={<TrainingDetailPage />} />
-            <Route path="my-training" element={<MyTrainingPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="team" element={<TeamPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="change-password" element={<ChangePasswordPage />} />
           </Route>
           <Route
             path="/change-password"

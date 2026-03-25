@@ -160,7 +160,31 @@ export function BillingPage(): React.ReactElement {
             </div>
           </div>
 
-          {subscription.currentPeriodEnd && (
+          {subscription.status === 'TRIALING' && subscription.trialEndsAt && (
+            <div className="mt-4 pt-4 border-t border-blue-100 bg-blue-50 -mx-6 -mb-6 px-6 py-4 rounded-b-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Professional Trial —{' '}
+                    {Math.max(
+                      0,
+                      Math.ceil(
+                        (new Date(subscription.trialEndsAt).getTime() - Date.now()) /
+                          (1000 * 60 * 60 * 24),
+                      ),
+                    )}{' '}
+                    days left
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Your trial ends on {formatDate(subscription.trialEndsAt)}. Subscribe to keep
+                    Professional features.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {subscription.currentPeriodEnd && subscription.status !== 'TRIALING' && (
             <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
               {subscription.cancelAtPeriodEnd ? (
                 <span className="text-amber-600">
@@ -183,11 +207,13 @@ export function BillingPage(): React.ReactElement {
 
       {/* Plans Grid */}
       <h2 className="text-lg font-semibold text-slate-900 mb-4">Available Plans</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {plans
+          .filter((plan) => plan.tier !== 'FREE')
           .sort((a, b) => tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier))
           .map((plan) => {
             const isCurrent = subscription?.tier === plan.tier;
+            const isTrialing = subscription?.status === 'TRIALING' && isCurrent;
             const isUpgrade =
               subscription && tierOrder.indexOf(plan.tier) > tierOrder.indexOf(subscription.tier);
             const isDowngrade =
@@ -253,9 +279,22 @@ export function BillingPage(): React.ReactElement {
                   </li>
                 </ul>
 
-                {isCurrent ? (
+                {isCurrent && !isTrialing ? (
                   <div className="text-center text-sm font-medium text-accent py-2">
                     Current Plan
+                  </div>
+                ) : isTrialing && plan.priceId ? (
+                  <div>
+                    <div className="text-center text-xs font-medium text-blue-600 mb-2">
+                      Current (Trial)
+                    </div>
+                    <button
+                      onClick={() => handleSelectPlan(plan)}
+                      disabled={actionLoading === plan.tier}
+                      className="w-full py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-50 bg-accent text-white hover:bg-accent/90"
+                    >
+                      {actionLoading === plan.tier ? 'Redirecting...' : 'Subscribe'}
+                    </button>
                   </div>
                 ) : plan.priceId ? (
                   <button

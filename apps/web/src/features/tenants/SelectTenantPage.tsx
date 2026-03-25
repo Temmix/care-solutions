@@ -26,11 +26,12 @@ export function SelectTenantPage(): React.ReactElement {
   const { user, memberships, selectedTenant, selectTenant } = useAuth();
   const navigate = useNavigate();
 
-  const handleSelect = (membership: TenantMembership) => {
-    selectTenant({
+  const handleSelect = async (membership: TenantMembership) => {
+    await selectTenant({
       id: membership.organizationId,
       name: membership.organization.name,
       type: membership.organization.type,
+      enabledModules: [],
     });
     navigate('/app');
   };
