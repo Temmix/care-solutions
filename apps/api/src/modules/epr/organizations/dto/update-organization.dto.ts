@@ -1,5 +1,6 @@
-import { IsString, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsBoolean, IsArray, IsIn } from 'class-validator';
 import { OrganizationType } from '@prisma/client';
+import { MODULE_CODES } from '@care/shared';
 
 export class UpdateOrganizationDto {
   @IsOptional()
@@ -37,4 +38,10 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @IsIn([...MODULE_CODES], { each: true })
+  enabledModules?: string[];
 }

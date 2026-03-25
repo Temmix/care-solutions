@@ -516,6 +516,9 @@ model Organization {
   tenantTrainingCertificates TrainingCertificate[]  @relation("TenantTrainingCertificates")
   tenantTrainingTypes        TrainingTypeConfig[]   @relation("TenantTrainingTypes")
 
+  // Module visibility
+  enabledModules String[] @default([])
+
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
 

@@ -29,6 +29,7 @@ interface SelectedTenant {
   id: string;
   name: string;
   type: string;
+  enabledModules: string[];
 }
 
 interface AuthContextType extends AuthState {
@@ -43,6 +44,7 @@ interface AuthContextType extends AuthState {
   isPlatformAdmin: boolean;
   currentRole: string | null;
   memberships: TenantMembership[];
+  isModuleEnabled: (moduleCode: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -113,22 +115,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchProfile]);
 
-  const selectTenant = useCallback((tenant: SelectedTenant | null) => {
+  const selectTenant = useCallback(async (tenant: SelectedTenant | null) => {
+    if (tenant) {
+      api.setTenantId(tenant.id);
+      try {
+        const modules = await api.get<string[]>(`/organizations/${tenant.id}/modules`);
+        tenant = { ...tenant, enabledModules: modules };
+      } catch {
+        tenant = { ...tenant, enabledModules: [] };
+      }
+    }
     setSelectedTenant(tenant);
     persistTenant(tenant);
-    api.setTenantId(tenant?.id ?? null);
+    if (!tenant) api.setTenantId(null);
   }, []);
 
   const autoSelectTenant = useCallback(
-    (loginMemberships: TenantMembership[]) => {
+    async (loginMemberships: TenantMembership[]) => {
       if (loginMemberships.length === 1) {
         const m = loginMemberships[0];
-        const tenant = {
+        const tenant: SelectedTenant = {
           id: m.organizationId,
           name: m.organization.name,
           type: m.organization.type,
+          enabledModules: [],
         };
-        selectTenant(tenant);
+        await selectTenant(tenant);
       }
     },
     [selectTenant],
@@ -146,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Auto-select if single membership
     if (result.memberships && result.memberships.length > 0) {
-      autoSelectTenant(result.memberships);
+      await autoSelectTenant(result.memberships);
     }
   };
 
@@ -159,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchProfile();
 
     if (result.memberships && result.memberships.length > 0) {
-      autoSelectTenant(result.memberships);
+      await autoSelectTenant(result.memberships);
     }
   };
 
@@ -169,6 +181,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     selectTenant(null);
     setState({ user: null, isAuthenticated: false, isLoading: false });
   }, [selectTenant]);
+
+  const isModuleEnabled = useCallback(
+    (moduleCode: string): boolean => {
+      if (isPlatformAdmin) return true;
+      if (!selectedTenant || selectedTenant.enabledModules.length === 0) return true;
+      return selectedTenant.enabledModules.includes(moduleCode);
+    },
+    [isPlatformAdmin, selectedTenant],
+  );
 
   // Register the logout handler so the API client can force logout on refresh failure
   useEffect(() => {
@@ -190,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isPlatformAdmin,
         currentRole,
         memberships,
+        isModuleEnabled,
       }}
     >
       {children}

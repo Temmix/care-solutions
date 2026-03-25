@@ -349,6 +349,188 @@ export function DemoPage(): React.ReactElement {
         </div>
       </section>
 
+      {/* Platform Roadmap */}
+      <section className="py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-3">
+              Platform Roadmap
+            </h2>
+            <p className="text-slate-500 text-base max-w-xl mx-auto">
+              Our development journey — from core clinical systems to a fully integrated healthcare
+              platform.
+            </p>
+          </div>
+
+          <div className="relative">
+            {/* Vertical timeline line */}
+            <div className="absolute left-6 lg:left-1/2 top-0 bottom-0 w-px bg-slate-200 -translate-x-1/2 hidden sm:block" />
+
+            <div className="space-y-8 sm:space-y-12">
+              {[
+                {
+                  phase: 'Phase 1',
+                  title: 'Core Clinical Platform',
+                  status: 'complete' as const,
+                  items: [
+                    'Electronic Patient Records (FHIR R4)',
+                    'Care Plan management with goals & activities',
+                    'Clinical assessments & observations',
+                    'Medication prescribing & administration',
+                    'Multi-tenant architecture with data isolation',
+                    'Role-based access control (Admin, Clinician, Nurse, Carer)',
+                  ],
+                },
+                {
+                  phase: 'Phase 2',
+                  title: 'Workforce & Operations',
+                  status: 'complete' as const,
+                  items: [
+                    'Shift pattern builder & roster scheduling',
+                    'Staff availability & leave management',
+                    'Shift swap marketplace',
+                    'Working time compliance monitoring',
+                    'Staff training records & certification tracking',
+                    'Notification system with preferences',
+                  ],
+                },
+                {
+                  phase: 'Phase 3',
+                  title: 'Specialist Modules',
+                  status: 'complete' as const,
+                  items: [
+                    'Patient flow & real-time bed management',
+                    'Admission, transfer & discharge workflows',
+                    'Discharge planning checklists',
+                    'Continuing Healthcare (CHC) assessments',
+                    'Virtual ward enrolment & monitoring',
+                    'IoT device integration & API key management',
+                  ],
+                },
+                {
+                  phase: 'Phase 4',
+                  title: 'Intelligence & Configuration',
+                  status: 'in-progress' as const,
+                  items: [
+                    'Module visibility — org-type-aware feature toggling',
+                    'Audit log & compliance dashboard',
+                    'Reporting & analytics engine',
+                    'Billing & subscription management',
+                    'Organisation settings & customisation',
+                    'Field-level AES-256 encryption with KMS',
+                  ],
+                },
+                {
+                  phase: 'Phase 5',
+                  title: 'Interoperability & Scale',
+                  status: 'planned' as const,
+                  items: [
+                    'FHIR R4 API for third-party integrations',
+                    'NHS Spine / PDS patient demographic lookup',
+                    'E-referral service (e-RS) integration',
+                    'GP Connect appointment booking',
+                    'Webhooks & event-driven notifications',
+                    'White-label & multi-region deployment',
+                  ],
+                },
+                {
+                  phase: 'Phase 6',
+                  title: 'AI & Advanced Analytics',
+                  status: 'planned' as const,
+                  items: [
+                    'AI-assisted care plan recommendations',
+                    'Predictive deterioration scoring (NEWS2)',
+                    'Automated roster optimisation',
+                    'Natural language clinical note summarisation',
+                    'Population health dashboards',
+                    'Outcome benchmarking across organisations',
+                  ],
+                },
+              ].map((milestone, index) => (
+                <div
+                  key={milestone.phase}
+                  className={`relative sm:grid sm:grid-cols-2 sm:gap-8 ${index % 2 === 0 ? '' : 'sm:direction-rtl'}`}
+                >
+                  {/* Timeline dot */}
+                  <div className="absolute left-6 lg:left-1/2 -translate-x-1/2 hidden sm:flex items-center justify-center">
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 ${
+                        milestone.status === 'complete'
+                          ? 'bg-accent border-accent'
+                          : milestone.status === 'in-progress'
+                            ? 'bg-amber-400 border-amber-400'
+                            : 'bg-white border-slate-300'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Content card — alternating sides on lg */}
+                  <div
+                    className={`sm:col-span-1 ${index % 2 === 0 ? 'lg:col-start-1' : 'lg:col-start-2'} sm:pl-12 lg:pl-0`}
+                  >
+                    <div className="bg-white rounded-xl border border-slate-100 p-6 hover:border-slate-200 transition-colors">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          {milestone.phase}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            milestone.status === 'complete'
+                              ? 'bg-accent/10 text-accent'
+                              : milestone.status === 'in-progress'
+                                ? 'bg-amber-50 text-amber-600'
+                                : 'bg-slate-50 text-slate-400'
+                          }`}
+                        >
+                          {milestone.status === 'complete'
+                            ? 'Complete'
+                            : milestone.status === 'in-progress'
+                              ? 'In Progress'
+                              : 'Planned'}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-semibold text-slate-900 mb-3">
+                        {milestone.title}
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {milestone.items.map((item) => (
+                          <li key={item} className="flex items-start gap-2 text-sm text-slate-500">
+                            <svg
+                              className={`w-4 h-4 mt-0.5 shrink-0 ${
+                                milestone.status === 'complete'
+                                  ? 'text-accent'
+                                  : milestone.status === 'in-progress'
+                                    ? 'text-amber-400'
+                                    : 'text-slate-300'
+                              }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              {milestone.status === 'complete' ? (
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m4.5 12.75 6 6 9-13.5"
+                                />
+                              ) : (
+                                <circle cx="12" cy="12" r="8" />
+                              )}
+                            </svg>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-20 lg:py-24">
         <div className="max-w-6xl mx-auto px-6 text-center">

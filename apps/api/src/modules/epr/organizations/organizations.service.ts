@@ -2,6 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
 import { toFhirOrganization, toFhirOrgBundle } from './mappers/organization-fhir.mapper';
+import { resolveEnabledModules } from '@care/shared';
 
 @Injectable()
 export class OrganizationsService {
@@ -55,6 +56,24 @@ export class OrganizationsService {
     await this.findOne(id, tenantId);
     const org = await this.prisma.organization.update({ where: { id }, data: dto });
     return toFhirOrganization(org);
+  }
+
+  async getEnabledModules(id: string, tenantId: string | null): Promise<string[]> {
+    if (tenantId && id !== tenantId) {
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
+    }
+    const org = await this.prisma.organization.findUnique({
+      where: { id },
+      select: { type: true, enabledModules: true },
+    });
+    if (!org) {
+      throw new NotFoundException(
+        'Organisation not found. It may have been deactivated or removed.',
+      );
+    }
+    return resolveEnabledModules(org.enabledModules, org.type);
   }
 
   async deactivate(id: string, tenantId: string | null) {

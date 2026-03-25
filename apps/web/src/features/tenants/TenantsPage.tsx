@@ -71,9 +71,9 @@ export function TenantsPage(): React.ReactElement {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelectTenant = (org: FhirOrganization) => {
+  const handleSelectTenant = async (org: FhirOrganization) => {
     const typeCode = org.type?.[0]?.coding?.[0]?.code ?? 'OTHER';
-    selectTenant({ id: org.id, name: org.name, type: typeCode });
+    await selectTenant({ id: org.id, name: org.name, type: typeCode, enabledModules: [] });
     navigate('/app');
   };
 
