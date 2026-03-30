@@ -89,7 +89,7 @@ export function ModuleVisibilitySettingsPage(): React.ReactElement {
     {
       label: 'Specialist',
       modules: MODULE_DEFINITIONS.filter((m) =>
-        ['PATIENT_FLOW', 'CHC', 'VIRTUAL_WARDS', 'IOT'].includes(m.code),
+        ['PATIENT_FLOW', 'CHC', 'VIRTUAL_WARDS'].includes(m.code),
       ),
     },
     {
