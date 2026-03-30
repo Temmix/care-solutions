@@ -92,8 +92,8 @@ export function ForgotPasswordPage(): React.ReactElement {
               </div>
               <h2 className="text-2xl font-bold text-slate-900 mb-1">Check your email</h2>
               <p className="text-slate-500 text-sm mb-6">
-                If an account with <strong>{email}</strong> exists, we've sent a password reset link.
-                Check your inbox and spam folder.
+                If an account with <strong>{email}</strong> exists, we've sent a password reset
+                link. Check your inbox and spam folder.
               </p>
               <Link
                 to="/login"

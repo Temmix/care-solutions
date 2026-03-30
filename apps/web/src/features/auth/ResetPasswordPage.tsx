@@ -102,11 +102,7 @@ export function ResetPasswordPage(): React.ReactElement {
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m4.5 12.75 6 6 9-13.5"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-slate-900 mb-1">Password reset</h2>
