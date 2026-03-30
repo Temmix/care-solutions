@@ -1,4 +1,10 @@
-import { Injectable, Inject, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import bcrypt from 'bcryptjs';
@@ -20,6 +26,8 @@ const MEMBERSHIP_SELECT = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(JwtService) private jwtService: JwtService,
@@ -107,7 +115,7 @@ export class AuthService {
           htmlBody: html,
           textBody: text,
         })
-        .catch(() => {});
+        .catch((err) => this.logger.warn(`Failed to send welcome email to ${dto.email}`, err));
 
       const tokens = this.generateTokens(result.user.id, result.user.email);
       const memberships = [

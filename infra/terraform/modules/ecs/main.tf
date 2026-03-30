@@ -206,6 +206,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ENCRYPTION_PROVIDER", value = "kms" },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "SES_FROM_EMAIL", value = var.ses_from_email },
+        { name = "NOTIFICATION_FROM_EMAIL", value = var.ses_from_email },
         { name = "EMAIL_ENABLED", value = "true" },
       ]
 
