@@ -122,7 +122,10 @@ describe('WorkforceService', () => {
     mockTx.shiftAssignment.update.mockReset();
     mockTx.shiftSwapRequest.update.mockReset();
     const audit = { log: jest.fn().mockResolvedValue(undefined) };
-    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    const notifications = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      notifyMany: jest.fn().mockResolvedValue(undefined),
+    };
     service = new WorkforceService(
       prisma as any,
       eventsService as any,

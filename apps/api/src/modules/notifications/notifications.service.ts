@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
 import { EmailService } from './email.service';
 import { SearchNotificationsDto, UpdatePreferencesDto } from './dto';
+import { renderEmailTemplate } from './email-templates';
 
 @Injectable()
 export class NotificationsService {
@@ -56,17 +57,18 @@ export class NotificationsService {
           select: { email: true, firstName: true },
         });
         if (user?.email) {
+          const { html, text } = renderEmailTemplate({
+            recipientName: user.firstName ?? 'there',
+            title: params.title,
+            body: params.message,
+            ctaLabel: params.link ? 'View in Clinvara' : undefined,
+            ctaUrl: params.link ? `https://app.clinvara.com${params.link}` : undefined,
+          });
           await this.emailService.sendEmail({
             to: user.email,
             subject: `Clinvara: ${params.title}`,
-            htmlBody: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #1e293b;">${params.title}</h2>
-                <p style="color: #475569;">${params.message}</p>
-                ${params.link ? `<p><a href="https://app.clinvara.com${params.link}" style="color: #6366f1;">View in Clinvara</a></p>` : ''}
-              </div>
-            `,
-            textBody: `${params.title}\n\n${params.message}`,
+            htmlBody: html,
+            textBody: text,
           });
         }
       }

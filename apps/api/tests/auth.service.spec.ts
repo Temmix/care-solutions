@@ -67,6 +67,7 @@ describe('AuthService', () => {
       configService as any,
       encryption as any,
       blindIndex as any,
+      { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
     );
   });
 
@@ -289,6 +290,7 @@ describe('AuthService', () => {
         configService as any,
         encryptionEnabled as any,
         blindIdx as any,
+        { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
       );
 
       prisma.user.findUnique.mockResolvedValue(null); // findUnique should NOT be called for email
@@ -308,6 +310,131 @@ describe('AuthService', () => {
       expect((prisma as any).user.findFirst).toHaveBeenCalledWith({
         where: { emailIndex: 'email-hash-123' },
       });
+    });
+  });
+
+  describe('welcome email', () => {
+    const dtoWithTenant = {
+      email: 'test@example.com',
+      password: 'password123',
+      firstName: 'John',
+      lastName: 'Doe',
+      tenantName: 'My Org',
+    };
+
+    it('should send welcome email after org registration', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockHash.mockResolvedValue('hashed-password');
+
+      const mockOrg = { id: 'org-1', name: 'My Org' };
+      const mockUser = { id: 'user-1', email: dtoWithTenant.email, role: 'ADMIN' };
+      const emailService = { sendEmail: jest.fn().mockResolvedValue(undefined) };
+
+      prisma.$transaction.mockImplementation(async (cb: (tx: any) => Promise<unknown>) => {
+        const tx = {
+          organization: { create: jest.fn().mockResolvedValue(mockOrg) },
+          user: { create: jest.fn().mockResolvedValue(mockUser) },
+          userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
+          subscription: { create: jest.fn().mockResolvedValue({}) },
+        };
+        return cb(tx);
+      });
+
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new AuthService(
+        prisma as any,
+        jwtService as any,
+        configService as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      await svc.register(dtoWithTenant as any);
+
+      expect(emailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: dtoWithTenant.email,
+          subject: 'Welcome to Clinvara!',
+          htmlBody: expect.stringContaining('Welcome to Clinvara'),
+          textBody: expect.stringContaining('Welcome to Clinvara'),
+        }),
+      );
+    });
+
+    it('should not send welcome email for registration without tenant', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockHash.mockResolvedValue('hashed-password');
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        role: 'PATIENT',
+        tenantId: null,
+      });
+
+      const emailService = { sendEmail: jest.fn().mockResolvedValue(undefined) };
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new AuthService(
+        prisma as any,
+        jwtService as any,
+        configService as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      await svc.register({
+        email: 'test@example.com',
+        password: 'pass123',
+        firstName: 'Jane',
+        lastName: 'Doe',
+      } as any);
+
+      expect(emailService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not fail registration if welcome email fails', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockHash.mockResolvedValue('hashed-password');
+
+      const mockOrg = { id: 'org-1', name: 'My Org' };
+      const mockUser = { id: 'user-1', email: dtoWithTenant.email, role: 'ADMIN' };
+      const emailService = { sendEmail: jest.fn().mockRejectedValue(new Error('SES down')) };
+
+      prisma.$transaction.mockImplementation(async (cb: (tx: any) => Promise<unknown>) => {
+        const tx = {
+          organization: { create: jest.fn().mockResolvedValue(mockOrg) },
+          user: { create: jest.fn().mockResolvedValue(mockUser) },
+          userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
+          subscription: { create: jest.fn().mockResolvedValue({}) },
+        };
+        return cb(tx);
+      });
+
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new AuthService(
+        prisma as any,
+        jwtService as any,
+        configService as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      const result = await svc.register(dtoWithTenant as any);
+
+      expect(result.accessToken).toBe('mock-token');
+      expect(emailService.sendEmail).toHaveBeenCalled();
     });
   });
 

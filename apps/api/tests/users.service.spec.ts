@@ -52,7 +52,13 @@ describe('UsersService', () => {
     const blindIndex = {
       computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
     };
-    service = new UsersService(prisma as any, limits as any, encryption as any, blindIndex as any);
+    service = new UsersService(
+      prisma as any,
+      limits as any,
+      encryption as any,
+      blindIndex as any,
+      { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
+    );
   });
 
   // ── Tenant-scoped methods ───────────────────────────────
@@ -237,6 +243,7 @@ describe('UsersService', () => {
         { enforceUserLimit: jest.fn() } as any,
         encEnabled as any,
         blindIdx as any,
+        { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
       );
 
       (prisma.user as any).findFirst = jest.fn().mockResolvedValue(null);
@@ -257,6 +264,184 @@ describe('UsersService', () => {
       expect((prisma.user as any).findFirst).toHaveBeenCalledWith({
         where: { emailIndex: 'email-hash' },
       });
+    });
+  });
+
+  // ── Email notifications ─────────────────────────────────
+
+  describe('invitation email', () => {
+    it('should send invitation email after creating a tenant user', async () => {
+      const emailService = { sendEmail: jest.fn().mockResolvedValue(undefined) };
+      const mockCreatedUser = {
+        id: 'new-user',
+        email: 'invited@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'NURSE',
+        isActive: true,
+        mustChangePassword: true,
+        tenantId: 'tenant-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const txPrisma = {
+        ...prisma,
+        organization: { findUnique: jest.fn().mockResolvedValue({ name: 'Test Org' }) },
+        $transaction: jest.fn(async (cb: (tx: any) => Promise<unknown>) => {
+          const tx = {
+            user: { create: jest.fn().mockResolvedValue(mockCreatedUser) },
+            userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
+          };
+          return cb(tx);
+        }),
+      };
+
+      const limits = { enforceUserLimit: jest.fn() };
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new UsersService(
+        txPrisma as any,
+        limits as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      await svc.createTenantUser(
+        {
+          email: 'invited@test.com',
+          password: 'TempPass123!',
+          firstName: 'New',
+          lastName: 'User',
+          role: 'NURSE',
+        } as any,
+        'tenant-1',
+      );
+
+      expect(emailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'invited@test.com',
+          subject: expect.stringContaining('invited to Clinvara'),
+          htmlBody: expect.stringContaining('TempPass123!'),
+          textBody: expect.stringContaining('TempPass123!'),
+        }),
+      );
+    });
+
+    it('should not fail user creation if invitation email fails', async () => {
+      const emailService = { sendEmail: jest.fn().mockRejectedValue(new Error('SES down')) };
+      const mockCreatedUser = {
+        id: 'new-user',
+        email: 'invited@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'NURSE',
+        isActive: true,
+        mustChangePassword: true,
+        tenantId: 'tenant-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const txPrisma = {
+        ...prisma,
+        organization: { findUnique: jest.fn().mockResolvedValue({ name: 'Test Org' }) },
+        $transaction: jest.fn(async (cb: (tx: any) => Promise<unknown>) => {
+          const tx = {
+            user: { create: jest.fn().mockResolvedValue(mockCreatedUser) },
+            userTenantMembership: { create: jest.fn().mockResolvedValue({}) },
+          };
+          return cb(tx);
+        }),
+      };
+
+      const limits = { enforceUserLimit: jest.fn() };
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new UsersService(
+        txPrisma as any,
+        limits as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      const result = await svc.createTenantUser(
+        {
+          email: 'invited@test.com',
+          password: 'TempPass123!',
+          firstName: 'New',
+          lastName: 'User',
+          role: 'NURSE',
+        } as any,
+        'tenant-1',
+      );
+
+      expect(result).toEqual(mockCreatedUser);
+    });
+  });
+
+  describe('deactivation email', () => {
+    it('should send deactivation email after removing a tenant user', async () => {
+      const emailService = { sendEmail: jest.fn().mockResolvedValue(undefined) };
+      const mockUser = {
+        id: 'u1',
+        email: 'user@test.com',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        role: 'NURSE',
+        isActive: true,
+        mustChangePassword: false,
+        tenantId: 'tenant-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const deactivatedUser = { ...mockUser, isActive: false };
+
+      const removePrisma = {
+        ...prisma,
+        userTenantMembership: {
+          ...prisma.userTenantMembership,
+          findFirst: jest.fn().mockResolvedValue({ role: 'NURSE', user: mockUser }),
+          updateMany: jest.fn().mockResolvedValue({}),
+        },
+        user: {
+          ...prisma.user,
+          update: jest.fn().mockResolvedValue(deactivatedUser),
+        },
+        organization: { findUnique: jest.fn().mockResolvedValue({ name: 'Test Org' }) },
+      };
+
+      const limits = { enforceUserLimit: jest.fn() };
+      const encryption = { isEnabled: jest.fn().mockReturnValue(false) };
+      const blindIndex = {
+        computeGlobalBlindIndex: jest.fn((_v: string, _f: string) => 'global-hash'),
+      };
+      const svc = new UsersService(
+        removePrisma as any,
+        limits as any,
+        encryption as any,
+        blindIndex as any,
+        emailService as any,
+      );
+
+      await svc.remove('u1', 'tenant-1');
+
+      expect(emailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@test.com',
+          subject: 'Account Deactivated',
+          htmlBody: expect.stringContaining('deactivated'),
+          textBody: expect.stringContaining('deactivated'),
+        }),
+      );
     });
   });
 

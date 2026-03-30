@@ -51,7 +51,14 @@ describe('BillingService', () => {
       getOrThrow: jest.fn().mockReturnValue('whsec_test'),
     };
 
-    service = new BillingService(prisma as any, configService as any);
+    service = new BillingService(
+      prisma as any,
+      configService as any,
+      {
+        notify: jest.fn().mockResolvedValue(undefined),
+        notifyMany: jest.fn().mockResolvedValue(undefined),
+      } as any,
+    );
   });
 
   describe('getSubscription', () => {
@@ -133,6 +140,56 @@ describe('BillingService', () => {
       expect(plans[1].priceMonthlyGBP).toBe(59);
       expect(plans[2].priceMonthlyGBP).toBe(99);
       expect(plans[3].priceMonthlyGBP).toBe(299);
+    });
+  });
+
+  // ── Notification tests ──────────────────────────────────
+
+  describe('trial expiry notification', () => {
+    it('should notify org admins when trial expires via lazy check', async () => {
+      const notif = {
+        notify: jest.fn().mockResolvedValue(undefined),
+        notifyMany: jest.fn().mockResolvedValue(undefined),
+      };
+      const trialSub = {
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt: new Date(Date.now() - 1000), // expired
+        organization: { name: 'Test Org', stripeCustomerId: null },
+      };
+
+      const billingPrisma = {
+        ...prisma,
+        subscription: {
+          ...prisma.subscription,
+          findUnique: jest.fn().mockResolvedValue(trialSub),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        userTenantMembership: {
+          findMany: jest.fn().mockResolvedValue([{ userId: 'admin-1' }, { userId: 'admin-2' }]),
+        },
+      };
+
+      const svc = new BillingService(billingPrisma as any, configService as any, notif as any);
+
+      await svc.getSubscription('org-1');
+
+      // Trial expired → expireTrial called → notifyOrgAdmins called
+      expect(billingPrisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tier: 'FREE', status: 'ACTIVE' }),
+        }),
+      );
+      expect(notif.notifyMany).toHaveBeenCalledWith(
+        ['admin-1', 'admin-2'],
+        expect.objectContaining({
+          tenantId: 'org-1',
+          type: 'SUBSCRIPTION_CHANGED',
+          title: 'Trial Ended',
+        }),
+      );
     });
   });
 });

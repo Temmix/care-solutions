@@ -2,6 +2,7 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { Prisma, TrainingStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTrainingRecordDto } from './dto/create-training-record.dto';
 import { UpdateTrainingRecordDto } from './dto/update-training-record.dto';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
@@ -22,6 +23,7 @@ export class TrainingService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   // ── Training Records ────────────────────────────────
@@ -68,6 +70,20 @@ export class TrainingService {
         metadata: { title: dto.title, staffUserId: dto.userId },
       })
       .catch(() => {});
+
+    // Notify the assigned user about the training
+    if (dto.userId !== createdById) {
+      this.notifications
+        .notify({
+          userId: dto.userId,
+          tenantId,
+          type: 'TRAINING_ASSIGNED',
+          title: 'Training Assigned',
+          message: `You have been assigned training: ${dto.title}.`,
+          link: '/app/training',
+        })
+        .catch(() => {});
+    }
 
     return record;
   }
