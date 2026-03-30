@@ -10,6 +10,9 @@ export class EmailService {
   constructor(@Inject(ConfigService) private config: ConfigService) {
     this.fromEmail = this.config.get<string>('NOTIFICATION_FROM_EMAIL', 'noreply@clinvara.com');
     this.enabled = this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
+    this.logger.log(
+      `EmailService initialised: enabled=${this.enabled}, from=${this.fromEmail}, EMAIL_ENABLED raw="${this.config.get<string>('EMAIL_ENABLED', '(not set)')}"`,
+    );
   }
 
   async sendEmail(params: {

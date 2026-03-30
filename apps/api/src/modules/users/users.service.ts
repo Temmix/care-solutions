@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   ConflictException,
   ForbiddenException,
@@ -35,6 +36,8 @@ const USER_SELECT = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(SubscriptionLimitService) private limits: SubscriptionLimitService,
@@ -170,7 +173,9 @@ export class UsersService {
         htmlBody: html,
         textBody: text,
       })
-      .catch(() => {});
+      .catch((err) =>
+        this.logger.warn(`Failed to send deactivation email to ${result.email}`, err),
+      );
 
     return result;
   }
@@ -267,7 +272,7 @@ export class UsersService {
         htmlBody: html,
         textBody: text,
       })
-      .catch(() => {});
+      .catch((err) => this.logger.warn(`Failed to send invitation email to ${dto.email}`, err));
 
     return user;
   }
