@@ -397,41 +397,6 @@ export function DashboardPage(): React.ReactElement {
               ))}
             </div>
           </div>
-
-          {/* Phase roadmap */}
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900 mb-4">Platform Roadmap</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-              {[
-                { title: 'EPR', status: 'Live', done: true },
-                { title: 'Care Plans', status: 'Live', done: true },
-                { title: 'EPMA', status: 'Live', done: true },
-                { title: 'Workforce', status: 'Live', done: true },
-                { title: 'Patient Flow', status: 'Live', done: true },
-                { title: 'Analytics', status: 'Phase 6', done: false },
-              ].map((item) => (
-                <div
-                  key={item.title}
-                  className={`p-4 rounded-xl border ${
-                    item.done ? 'border-emerald-200 bg-emerald-50' : 'border-slate-100 bg-white'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-slate-900">{item.title}</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        item.done
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </>
       )}
     </div>
