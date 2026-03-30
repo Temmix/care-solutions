@@ -64,5 +64,9 @@ export function useTeam() {
     return api.patch<TeamMember>(`/users/${id}`, { isActive: true });
   }, []);
 
-  return { list, create, update, deactivate, reactivate, loading, error };
+  const remove = useCallback(async (id: string): Promise<void> => {
+    await api.delete(`/users/${id}`);
+  }, []);
+
+  return { list, create, update, deactivate, reactivate, remove, loading, error };
 }

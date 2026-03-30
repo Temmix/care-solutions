@@ -202,11 +202,83 @@ function CreateMemberModal({
   );
 }
 
+// ── Confirm remove modal ─────────────────────────────────────
+
+interface ConfirmRemoveModalProps {
+  member: TeamMember | null;
+  removing: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmRemoveModal({
+  member,
+  removing,
+  onConfirm,
+  onCancel,
+}: ConfirmRemoveModalProps): React.ReactElement | null {
+  if (!member) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <svg
+              className="w-5 h-5 text-red-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900">Remove Member</h2>
+        </div>
+        <p className="text-sm text-slate-600 mb-1">
+          Are you sure you want to remove{' '}
+          <span className="font-medium text-slate-900">
+            {member.firstName} {member.lastName}
+          </span>
+          ?
+        </p>
+        <p className="text-xs text-slate-400 mb-6">
+          This will deactivate their account and revoke access to the organisation. A notification
+          email will be sent to {member.email}.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={removing}
+            className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={removing}
+            className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 cursor-pointer disabled:opacity-50"
+          >
+            {removing ? 'Removing...' : 'Remove'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ───────────────────────────────────────────────
 
 export function TeamPage(): React.ReactElement {
   const { user } = useAuth();
-  const { list, create, deactivate, reactivate, loading, error } = useTeam();
+  const { list, create, deactivate, reactivate, remove, loading, error } = useTeam();
   const { usage, refresh: refreshUsage } = useUsage();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [total, setTotal] = useState(0);
@@ -214,6 +286,8 @@ export function TeamPage(): React.ReactElement {
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [removingMember, setRemovingMember] = useState<TeamMember | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const loadMembers = useCallback(
     async (p = 1) => {
@@ -259,6 +333,23 @@ export function TeamPage(): React.ReactElement {
       await loadMembers(page);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Action failed');
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!removingMember) return;
+    setRemoving(true);
+    setActionError('');
+    try {
+      await remove(removingMember.id);
+      setRemovingMember(null);
+      await loadMembers(page);
+      refreshUsage();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to remove member');
+      setRemovingMember(null);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -371,16 +462,24 @@ export function TeamPage(): React.ReactElement {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {member.id !== user?.id ? (
-                      <button
-                        onClick={() => handleToggleActive(member)}
-                        className={`text-xs font-medium px-3 py-1 rounded-lg border cursor-pointer ${
-                          member.isActive
-                            ? 'text-red-600 border-red-200 hover:bg-red-50'
-                            : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
-                        }`}
-                      >
-                        {member.isActive ? 'Deactivate' : 'Reactivate'}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleActive(member)}
+                          className={`text-xs font-medium px-3 py-1 rounded-lg border cursor-pointer ${
+                            member.isActive
+                              ? 'text-red-600 border-red-200 hover:bg-red-50'
+                              : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {member.isActive ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                        <button
+                          onClick={() => setRemovingMember(member)}
+                          className="text-xs font-medium px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-xs text-slate-400">You</span>
                     )}
@@ -421,6 +520,13 @@ export function TeamPage(): React.ReactElement {
         saving={saving}
         onClose={() => setShowCreate(false)}
         onSave={handleCreate}
+      />
+
+      <ConfirmRemoveModal
+        member={removingMember}
+        removing={removing}
+        onConfirm={handleRemove}
+        onCancel={() => setRemovingMember(null)}
       />
     </div>
   );
