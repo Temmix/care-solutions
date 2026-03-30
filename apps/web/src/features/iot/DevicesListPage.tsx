@@ -70,7 +70,7 @@ export function DevicesListPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">IoT Devices</h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -114,7 +114,7 @@ export function DevicesListPage(): React.ReactElement {
       </div>
 
       {/* Device table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">
@@ -222,7 +222,7 @@ export function DevicesListPage(): React.ReactElement {
 
       {/* Register Modal */}
       {showRegister && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">Register Device</h2>
             <div className="space-y-3 mb-4">

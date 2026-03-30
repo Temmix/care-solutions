@@ -101,7 +101,7 @@ export function ReportsPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Reports</h1>
         <button
           onClick={handleExport}
@@ -115,7 +115,7 @@ export function ReportsPage(): React.ReactElement {
       <div className="flex gap-6">
         {/* Sidebar */}
         <div className="w-56 flex-shrink-0">
-          <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
             {REPORTS.map((r) => (
               <button
                 key={r.key}

@@ -335,7 +335,7 @@ export function PractitionersPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Practitioners</h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -361,7 +361,7 @@ export function PractitionersPage(): React.ReactElement {
 
       <ErrorAlert message={error} className="mb-6" />
 
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100">

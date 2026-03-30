@@ -149,7 +149,7 @@ export function NotificationPreferencesPage(): React.ReactElement {
 
       <ErrorAlert message={error} className="mb-4" />
 
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left">

@@ -51,7 +51,7 @@ export function AssessmentListPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Assessments</h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -76,7 +76,7 @@ export function AssessmentListPage(): React.ReactElement {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select
           value={typeFilter}
           onChange={(e) => {
@@ -108,7 +108,7 @@ export function AssessmentListPage(): React.ReactElement {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         {loading && assessments.length === 0 ? (
           <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
         ) : assessments.length === 0 ? (

@@ -101,7 +101,7 @@ function CreateMemberModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
         <h2 className="text-lg font-semibold text-slate-900 mb-1">Add Team Member</h2>
         <p className="text-xs text-slate-500 mb-4">
@@ -220,7 +220,7 @@ function ConfirmRemoveModal({
   if (!member) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -359,7 +359,7 @@ export function TeamPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Team</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -409,7 +409,7 @@ export function TeamPage(): React.ReactElement {
       )}
 
       {members.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">

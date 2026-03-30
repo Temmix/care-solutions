@@ -437,7 +437,7 @@ export function RosterPage(): React.ReactElement {
   return (
     <div>
       {/* ── Header ───────────────────────────────────────── */}
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Roster</h1>
           <p className="text-slate-500 text-sm">
@@ -639,9 +639,9 @@ export function RosterPage(): React.ReactElement {
       )}
 
       {/* ── Roster matrix ────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         {/* Day header row */}
-        <div className="grid grid-cols-[200px_repeat(7,1fr)] border-b border-slate-100">
+        <div className="grid grid-cols-[200px_repeat(7,1fr)] border-b border-slate-100 min-w-225">
           <div className="px-4 py-3 bg-slate-50 border-r border-slate-100">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Location
@@ -691,7 +691,7 @@ export function RosterPage(): React.ReactElement {
           return (
             <div key={locRow.key} className="border-b border-slate-50 last:border-b-0">
               {/* Location row */}
-              <div className="grid grid-cols-[200px_repeat(7,1fr)]">
+              <div className="grid grid-cols-[200px_repeat(7,1fr)] min-w-225">
                 {/* Location label */}
                 <div
                   className={`px-4 py-3 border-r border-slate-100 flex items-start gap-2 cursor-pointer hover:bg-slate-50/50 transition-colors ${isUnassigned ? 'bg-slate-50/30' : ''}`}
@@ -790,7 +790,7 @@ export function RosterPage(): React.ReactElement {
 
         {/* Summary footer */}
         {shifts.length > 0 && (
-          <div className="grid grid-cols-[200px_repeat(7,1fr)] border-t border-slate-200 bg-slate-50/50">
+          <div className="grid grid-cols-[200px_repeat(7,1fr)] border-t border-slate-200 bg-slate-50/50 min-w-225">
             <div className="px-4 py-2.5 border-r border-slate-100">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Total
@@ -818,7 +818,7 @@ export function RosterPage(): React.ReactElement {
 
       {/* ── Assign modal ─────────────────────────────────── */}
       {assignShiftId && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg max-h-[80vh] flex flex-col">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Assign Staff</h3>
             <ErrorAlert
@@ -1009,7 +1009,7 @@ export function RosterPage(): React.ReactElement {
 
       {/* ── Swap request modal ─────────────────────────── */}
       {swapAssignmentId && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Request Shift Swap</h3>
             <p className="text-sm text-slate-500 mb-4">
