@@ -52,7 +52,7 @@ export function CreateApiKeyModal({ open, onClose, onCreate }: Props): React.Rea
   // Show key after creation
   if (rawKey) {
     return (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-2">API Key Created</h2>
           <p className="text-sm text-amber-600 mb-4">
@@ -81,7 +81,7 @@ export function CreateApiKeyModal({ open, onClose, onCreate }: Props): React.Rea
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Create API Key</h2>
 

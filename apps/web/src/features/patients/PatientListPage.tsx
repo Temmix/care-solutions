@@ -133,7 +133,7 @@ export function PatientListPage(): React.ReactElement {
       <UsageBanner show="patients" usage={usage} />
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-3 mb-6">
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1 relative">
           <svg
             className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -161,7 +161,7 @@ export function PatientListPage(): React.ReactElement {
           placeholder="NHS Number"
           value={searchNhs}
           onChange={(e) => setSearchNhs(e.target.value)}
-          className="w-48 px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
+          className="w-full sm:w-48 px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white placeholder:text-slate-400 transition-colors"
         />
         <button
           type="submit"
@@ -174,7 +174,7 @@ export function PatientListPage(): React.ReactElement {
       <ErrorAlert message={error} className="mb-4" />
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-slate-100">

@@ -177,11 +177,11 @@ export function TrainingDetailPage(): React.ReactElement {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {error && <ErrorAlert message={error} />}
 
       {/* Header */}
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-6">
         <div>
           <button
             onClick={() => navigate('/app/training')}
@@ -426,7 +426,7 @@ export function TrainingDetailPage(): React.ReactElement {
 
       {/* Certificate Form Modal */}
       {showCertForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
               {editingCert ? 'Edit Certificate' : 'Add Certificate'}

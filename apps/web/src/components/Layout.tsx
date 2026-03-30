@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
 import { NotificationBell } from '../features/notifications/NotificationBell';
@@ -542,6 +542,24 @@ export function Layout(): React.ReactElement {
   const hasMultipleMemberships = memberships.length > 1;
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   // Redirect multi-membership users to tenant selection if no tenant is selected
   useEffect(() => {
@@ -582,139 +600,168 @@ export function Layout(): React.ReactElement {
             ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
             : '';
 
-  return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-sidebar text-white flex flex-col">
-        {/* Logo */}
-        <div className="px-5 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              C
-            </div>
-            <span className="text-lg font-semibold tracking-tight">Clinvara</span>
+  /* ── Sidebar content (shared between desktop & mobile drawer) ── */
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            C
           </div>
+          <span className="text-lg font-semibold tracking-tight">Clinvara</span>
         </div>
+      </div>
 
-        {/* Tenant indicator */}
-        <div className="px-5 mb-4">
-          {isPlatformAdmin && selectedTenant && (
-            <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
-              <div className="text-xs text-slate-400">Managing</div>
-              <div className="text-sm font-medium text-accent-light truncate">
-                {selectedTenant.name}
-              </div>
+      {/* Tenant indicator */}
+      <div className="px-5 mb-4">
+        {isPlatformAdmin && selectedTenant && (
+          <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
+            <div className="text-xs text-slate-400">Managing</div>
+            <div className="text-sm font-medium text-accent-light truncate">
+              {selectedTenant.name}
+            </div>
+            <button
+              onClick={handleClearTenant}
+              className="text-xs text-slate-400 bg-transparent border-none cursor-pointer p-0 mt-1 hover:text-white transition-colors"
+            >
+              Switch tenant
+            </button>
+          </div>
+        )}
+        {isPlatformAdmin && !selectedTenant && (
+          <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
+            <div className="text-xs text-slate-400">No tenant selected</div>
+            <Link
+              to="/app/tenants"
+              className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
+            >
+              Select a tenant
+            </Link>
+          </div>
+        )}
+        {!isPlatformAdmin && selectedTenant && (
+          <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
+            <div className="text-xs text-slate-400">Organisation</div>
+            <div className="text-sm font-medium text-white truncate">{selectedTenant.name}</div>
+            {hasMultipleMemberships && (
               <button
                 onClick={handleClearTenant}
                 className="text-xs text-slate-400 bg-transparent border-none cursor-pointer p-0 mt-1 hover:text-white transition-colors"
               >
-                Switch tenant
+                Switch organisation
               </button>
-            </div>
-          )}
-          {isPlatformAdmin && !selectedTenant && (
-            <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
-              <div className="text-xs text-slate-400">No tenant selected</div>
-              <Link
-                to="/app/tenants"
-                className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
-              >
-                Select a tenant
-              </Link>
-            </div>
-          )}
-          {!isPlatformAdmin && selectedTenant && (
-            <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
-              <div className="text-xs text-slate-400">Organisation</div>
-              <div className="text-sm font-medium text-white truncate">{selectedTenant.name}</div>
-              {hasMultipleMemberships && (
-                <button
-                  onClick={handleClearTenant}
-                  className="text-xs text-slate-400 bg-transparent border-none cursor-pointer p-0 mt-1 hover:text-white transition-colors"
-                >
-                  Switch organisation
-                </button>
-              )}
-            </div>
-          )}
-          {!isPlatformAdmin && !selectedTenant && memberships.length > 0 && (
-            <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
-              <div className="text-xs text-slate-400">No organisation selected</div>
-              <Link
-                to="/app/select-tenant"
-                className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
-              >
-                Select organisation
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3">
-          <div className="space-y-1">
-            {navItems.map((item) => {
-              if (item.superAdminOnly && !isSuperAdmin) return null;
-              if (item.platformOnly && !isPlatformAdmin) return null;
-              if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;
-              if (item.moduleCode && !isModuleEnabled(item.moduleCode)) return null;
-              const active = isActive(item.to);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm no-underline transition-colors ${
-                    active
-                      ? 'bg-sidebar-active text-white font-medium'
-                      : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              );
-            })}
+            )}
           </div>
-        </nav>
-
-        {/* User section */}
-        <div className="px-5 py-4 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-sidebar-hover flex items-center justify-center text-sm font-medium text-accent-light">
-              {user?.firstName?.charAt(0)}
-              {user?.lastName?.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
-                {user?.firstName} {user?.lastName}
-              </div>
-              <div className="text-xs text-slate-400">{roleLabel}</div>
-            </div>
-          </div>
-          <Link
-            to="/app/change-password"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 bg-transparent border border-white/15 text-slate-300 no-underline rounded-lg text-xs cursor-pointer hover:bg-sidebar-hover hover:text-white transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
+        )}
+        {!isPlatformAdmin && !selectedTenant && memberships.length > 0 && (
+          <div className="px-3 py-2 bg-sidebar-hover rounded-lg">
+            <div className="text-xs text-slate-400">No organisation selected</div>
+            <Link
+              to="/app/select-tenant"
+              className="text-xs text-accent-light no-underline hover:text-accent transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
-              />
-            </svg>
-            Change Password
-          </Link>
+              Select organisation
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 overflow-y-auto">
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            if (item.superAdminOnly && !isSuperAdmin) return null;
+            if (item.platformOnly && !isPlatformAdmin) return null;
+            if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;
+            if (item.moduleCode && !isModuleEnabled(item.moduleCode)) return null;
+            const active = isActive(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm no-underline transition-colors ${
+                  active
+                    ? 'bg-sidebar-active text-white font-medium'
+                    : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
+                }`}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* User section */}
+      <div className="px-5 py-4 border-t border-white/10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-sidebar-hover flex items-center justify-center text-sm font-medium text-accent-light shrink-0">
+            {user?.firstName?.charAt(0)}
+            {user?.lastName?.charAt(0)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">
+              {user?.firstName} {user?.lastName}
+            </div>
+            <div className="text-xs text-slate-400">{roleLabel}</div>
+          </div>
+        </div>
+        <Link
+          to="/app/change-password"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 bg-transparent border border-white/15 text-slate-300 no-underline rounded-lg text-xs cursor-pointer hover:bg-sidebar-hover hover:text-white transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+            />
+          </svg>
+          Change Password
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-transparent border border-white/15 text-slate-300 rounded-lg text-xs cursor-pointer hover:bg-sidebar-hover hover:text-white transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
+            />
+          </svg>
+          Sign out
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen">
+      {/* ── Mobile top bar ── */}
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-sidebar px-4 h-14 lg:hidden">
+        <div className="flex items-center gap-3">
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-transparent border border-white/15 text-slate-300 rounded-lg text-xs cursor-pointer hover:bg-sidebar-hover hover:text-white transition-colors"
+            onClick={() => setMobileMenuOpen(true)}
+            className="w-10 h-10 flex items-center justify-center text-white bg-transparent border-none cursor-pointer rounded-lg hover:bg-sidebar-hover transition-colors -ml-1"
+            aria-label="Open menu"
           >
             <svg
-              className="w-4 h-4"
+              className="w-6 h-6"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -723,19 +770,65 @@ export function Layout(): React.ReactElement {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
               />
             </svg>
-            Sign out
           </button>
+          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-xs">
+            C
+          </div>
+          <span className="text-base font-semibold text-white tracking-tight">Clinvara</span>
         </div>
+        <NotificationBell />
+      </div>
+
+      {/* ── Mobile drawer backdrop ── */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile drawer ── */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-sidebar text-white flex flex-col transition-transform duration-300 ease-in-out lg:hidden ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setMobileMenuOpen(false)}
+          className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-slate-400 bg-transparent border-none cursor-pointer rounded-lg hover:bg-sidebar-hover hover:text-white transition-colors"
+          aria-label="Close menu"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+        {sidebarContent}
       </aside>
 
-      <main className="flex-1 bg-surface overflow-auto">
-        <div className="flex justify-end px-8 pt-4">
+      {/* ── Desktop sidebar ── */}
+      <aside className="hidden lg:flex w-64 bg-sidebar text-white flex-col shrink-0">
+        {sidebarContent}
+      </aside>
+
+      {/* ── Main content ── */}
+      <main className="flex-1 bg-surface overflow-auto min-w-0">
+        {/* Desktop notification bell */}
+        <div className="hidden lg:flex justify-end px-8 pt-4">
           <NotificationBell />
         </div>
-        <div className="px-8 pb-8">
+        {/* Content area with responsive padding + mobile top bar offset */}
+        <div className="px-4 sm:px-6 lg:px-8 pb-6 lg:pb-8 pt-16 lg:pt-2">
           <Outlet />
         </div>
       </main>

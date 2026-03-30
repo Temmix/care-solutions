@@ -36,7 +36,7 @@ export function MyTrainingPage(): React.ReactElement {
   const overdueRecords = records.filter((r) => r.status === 'OVERDUE' || r.status === 'EXPIRED');
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">My Training</h1>
 
       {error && <ErrorAlert message={error} />}
@@ -60,7 +60,7 @@ export function MyTrainingPage(): React.ReactElement {
       )}
 
       {/* Records Table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100">

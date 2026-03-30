@@ -150,8 +150,8 @@ export function TrainingListPage(): React.ReactElement {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Staff Training</h1>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -194,7 +194,7 @@ export function TrainingListPage(): React.ReactElement {
 
       {/* Create Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-lg shadow-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">Add Training Record</h2>
             <form onSubmit={handleCreate} className="space-y-3">
@@ -381,7 +381,7 @@ export function TrainingListPage(): React.ReactElement {
       </div>
 
       {/* Records Table */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100">

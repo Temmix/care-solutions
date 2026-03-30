@@ -89,7 +89,7 @@ export function NotificationsPage(): React.ReactElement {
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
           <p className="text-sm text-slate-500 mt-1">{unreadCount} unread</p>
@@ -145,7 +145,7 @@ export function NotificationsPage(): React.ReactElement {
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         {loading && !notifications.length ? (
           <p className="px-4 py-8 text-center text-slate-400">Loading...</p>
         ) : notifications.length === 0 ? (

@@ -284,7 +284,7 @@ export function SwapMarketplacePage(): React.ReactElement {
 
       {/* ── Respond modal ───────────────────────────────── */}
       {respondingTo && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg max-h-[80vh] flex flex-col">
             <h3 className="text-sm font-semibold text-slate-900 mb-2">Offer Your Shift</h3>
             <p className="text-sm text-slate-500 mb-1">

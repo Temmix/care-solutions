@@ -35,7 +35,7 @@ export function MedicationsListPage(): React.ReactElement {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Medications</h1>
           <p className="text-sm text-slate-500 m-0">
@@ -60,7 +60,7 @@ export function MedicationsListPage(): React.ReactElement {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select
           value={status}
           onChange={(e) => {
@@ -99,7 +99,7 @@ export function MedicationsListPage(): React.ReactElement {
       )}
 
       {prescriptions.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">

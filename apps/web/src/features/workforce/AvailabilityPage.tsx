@@ -253,7 +253,7 @@ export function AvailabilityPage(): React.ReactElement {
         <div className="text-center py-12 text-slate-400 text-sm">Loading availability...</div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-slate-100">
