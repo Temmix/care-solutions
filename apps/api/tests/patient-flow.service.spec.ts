@@ -72,6 +72,7 @@ describe('PatientFlowService — Discharge Planning', () => {
   let service: PatientFlowService;
   let prisma: MockPrisma;
   let eventsService: ReturnType<typeof createMockEventsService>;
+  let notifications: { notify: jest.Mock; notifyMany: jest.Mock };
 
   beforeEach(() => {
     prisma = createMockPrisma();
@@ -82,7 +83,16 @@ describe('PatientFlowService — Discharge Planning', () => {
     mockTx.bed.update.mockReset();
     mockTx.patientEvent.create.mockReset();
     const audit = { log: jest.fn().mockResolvedValue(undefined) };
-    service = new PatientFlowService(prisma as any, eventsService as any, audit as any);
+    notifications = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      notifyMany: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new PatientFlowService(
+      prisma as any,
+      eventsService as any,
+      audit as any,
+      notifications as any,
+    );
   });
 
   // ── createDischargePlan ───────────────────────────────
@@ -430,7 +440,7 @@ describe('PatientFlowService — Discharge Planning', () => {
       );
     });
 
-    it('should skip bed update when encounter has no bed', async () => {
+    it('should work when encounter has no bed assigned', async () => {
       prisma.dischargePlan.findFirst.mockResolvedValue({ id: 'plan-1', status: 'READY' });
       prisma.encounter.findFirst.mockResolvedValue({
         id: 'enc-1',
@@ -449,6 +459,151 @@ describe('PatientFlowService — Discharge Planning', () => {
       await service.completeDischargePlan('enc-1', 'user-1', tenantId);
 
       expect(mockTx.bed.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Notification tests ──────────────────────────────────
+
+  describe('admit — notifications', () => {
+    const admitTx = {
+      encounter: {
+        create: jest.fn(),
+      },
+      bed: { update: jest.fn() },
+      patientEvent: { create: jest.fn() },
+    };
+
+    beforeEach(() => {
+      admitTx.encounter.create.mockReset();
+      admitTx.bed.update.mockReset();
+      admitTx.patientEvent.create.mockReset();
+      prisma.$transaction.mockImplementation((fn: (tx: any) => Promise<any>) => fn(admitTx));
+    });
+
+    it('should notify primary practitioner on admission', async () => {
+      prisma.patient.findFirst.mockResolvedValue({ id: 'p1', tenantId });
+      prisma.encounter.findFirst.mockResolvedValue(null);
+
+      const encounter = {
+        id: 'enc-1',
+        patient: { id: 'p1', givenName: 'John', familyName: 'Doe' },
+        location: { name: 'Ward A' },
+        bed: null,
+        primaryPractitioner: { id: 'doc-1', firstName: 'Dr', lastName: 'Smith' },
+      };
+      admitTx.encounter.create.mockResolvedValue(encounter);
+
+      await service.admit(
+        {
+          patientId: 'p1',
+          primaryPractitionerId: 'doc-1',
+        } as any,
+        'admin-1',
+        tenantId,
+      );
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'doc-1',
+          tenantId,
+          type: 'PATIENT_ADMITTED',
+          title: 'Patient Admitted',
+          message: expect.stringContaining('John Doe'),
+        }),
+      );
+    });
+
+    it('should not notify when no primary practitioner', async () => {
+      prisma.patient.findFirst.mockResolvedValue({ id: 'p1', tenantId });
+      prisma.encounter.findFirst.mockResolvedValue(null);
+
+      const encounter = {
+        id: 'enc-1',
+        patient: { id: 'p1', givenName: 'John', familyName: 'Doe' },
+        location: null,
+        bed: null,
+        primaryPractitioner: null,
+      };
+      admitTx.encounter.create.mockResolvedValue(encounter);
+
+      await service.admit({ patientId: 'p1' } as any, 'admin-1', tenantId);
+
+      expect(notifications.notify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('discharge — notifications', () => {
+    it('should notify primary practitioner on discharge', async () => {
+      prisma.encounter.findFirst.mockResolvedValue({
+        id: 'enc-1',
+        patientId: 'p1',
+        bedId: null,
+        tenantId,
+        primaryPractitionerId: 'doc-1',
+        notes: null,
+        patient: { givenName: 'Jane', familyName: 'Smith' },
+      });
+
+      const dischargeTx = {
+        encounter: {
+          update: jest.fn().mockResolvedValue({
+            id: 'enc-1',
+            patient: { id: 'p1', givenName: 'Jane', familyName: 'Smith' },
+            location: null,
+            bed: null,
+          }),
+        },
+        bed: { update: jest.fn() },
+        patientEvent: { create: jest.fn() },
+      };
+      prisma.$transaction.mockImplementation((fn: (tx: any) => Promise<any>) => fn(dischargeTx));
+
+      await service.discharge('enc-1', { destination: 'HOME' } as any, 'admin-1', tenantId);
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'doc-1',
+          tenantId,
+          type: 'PATIENT_DISCHARGED',
+          title: 'Patient Discharged',
+          message: expect.stringContaining('Jane Smith'),
+        }),
+      );
+    });
+  });
+
+  describe('transfer — notifications', () => {
+    it('should notify primary practitioner on transfer', async () => {
+      prisma.encounter.findFirst.mockResolvedValue({
+        id: 'enc-1',
+        patientId: 'p1',
+        locationId: 'loc-1',
+        bedId: null,
+        tenantId,
+        primaryPractitionerId: 'doc-1',
+        patient: { givenName: 'Bob', familyName: 'Jones' },
+      });
+      prisma.location.findFirst.mockResolvedValue({ id: 'loc-2', name: 'Ward B' });
+
+      const transferTx = {
+        transfer: { create: jest.fn().mockResolvedValue({ id: 'tr-1' }) },
+        bed: { update: jest.fn() },
+        encounter: { update: jest.fn() },
+        patientEvent: { create: jest.fn() },
+      };
+      prisma.$transaction.mockImplementation((fn: (tx: any) => Promise<any>) => fn(transferTx));
+
+      await service.transfer('enc-1', { toLocationId: 'loc-2' } as any, 'admin-1', tenantId);
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'doc-1',
+          tenantId,
+          type: 'PATIENT_TRANSFERRED',
+          title: 'Patient Transferred',
+          message: expect.stringContaining('Ward B'),
+        }),
+      );
     });
   });
 });

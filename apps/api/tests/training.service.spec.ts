@@ -86,7 +86,14 @@ describe('TrainingService', () => {
 
     audit = { log: jest.fn().mockResolvedValue(undefined) };
 
-    service = new TrainingService(prisma as any, audit as any);
+    service = new TrainingService(
+      prisma as any,
+      audit as any,
+      {
+        notify: jest.fn().mockResolvedValue(undefined),
+        notifyMany: jest.fn().mockResolvedValue(undefined),
+      } as any,
+    );
   });
 
   // ── createTrainingRecord ──────────────────────────────
@@ -478,6 +485,59 @@ describe('TrainingService', () => {
         NotFoundException,
       );
       expect(prisma.trainingCertificate.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Notification tests ──────────────────────────────────
+
+  describe('training assignment notification', () => {
+    const dto = {
+      title: 'Fire Safety Training',
+      category: 'FIRE_SAFETY' as const,
+      priority: 'MANDATORY' as const,
+      userId,
+      provider: 'Safety Corp',
+      renewalPeriodMonths: 12,
+      scheduledDate: '2026-04-01',
+    };
+
+    it('should notify assigned user when created by a different user', async () => {
+      const notif = {
+        notify: jest.fn().mockResolvedValue(undefined),
+        notifyMany: jest.fn().mockResolvedValue(undefined),
+      };
+      const svc = new TrainingService(prisma as any, audit as any, notif as any);
+
+      prisma.userTenantMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.trainingRecord.create.mockResolvedValue(mockRecord);
+
+      await svc.createTrainingRecord(dto as any, createdById, tenantId);
+
+      expect(notif.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          tenantId,
+          type: 'TRAINING_ASSIGNED',
+          title: 'Training Assigned',
+          message: expect.stringContaining('Fire Safety Training'),
+        }),
+      );
+    });
+
+    it('should not notify when user creates their own training record', async () => {
+      const notif = {
+        notify: jest.fn().mockResolvedValue(undefined),
+        notifyMany: jest.fn().mockResolvedValue(undefined),
+      };
+      const svc = new TrainingService(prisma as any, audit as any, notif as any);
+
+      prisma.userTenantMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.trainingRecord.create.mockResolvedValue(mockRecord);
+
+      // createdById === userId (self-assignment)
+      await svc.createTrainingRecord(dto as any, userId, tenantId);
+
+      expect(notif.notify).not.toHaveBeenCalled();
     });
   });
 

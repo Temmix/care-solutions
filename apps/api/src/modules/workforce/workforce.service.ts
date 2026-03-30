@@ -880,6 +880,20 @@ export class WorkforceService {
     await this.prisma.staffAvailability.delete({ where: { id } });
   }
 
+  // ── Helpers ──────────────────────────────────────────
+
+  private async getAdminUserIds(tenantId: string): Promise<string[]> {
+    const admins = await this.prisma.userTenantMembership.findMany({
+      where: {
+        organizationId: tenantId,
+        status: 'ACTIVE',
+        role: { in: ['ADMIN', 'TENANT_ADMIN'] },
+      },
+      select: { userId: true },
+    });
+    return admins.map((a) => a.userId);
+  }
+
   // ── Shift Swap Marketplace ────────────────────────────
 
   async createSwapRequest(dto: CreateSwapRequestDto, userId: string, tenantId: string) {
@@ -1063,6 +1077,19 @@ export class WorkforceService {
       })
       .catch(() => {});
 
+    // Notify admins that swap needs approval
+    this.getAdminUserIds(tenantId)
+      .then((adminIds) =>
+        this.notifications.notifyMany(adminIds, {
+          tenantId,
+          type: NotificationType.SHIFT_SWAP_NEEDS_APPROVAL,
+          title: 'Shift Swap Needs Approval',
+          message: `${updatedSwap.responder?.firstName} ${updatedSwap.responder?.lastName} has accepted a shift swap and it needs your approval.`,
+          link: '/app/swap-marketplace',
+        }),
+      )
+      .catch(() => {});
+
     return updatedSwap;
   }
 
@@ -1124,6 +1151,18 @@ export class WorkforceService {
         })
         .catch(() => {});
 
+      // Notify requester and responder
+      const approvedNotification = {
+        tenantId,
+        type: NotificationType.SHIFT_SWAP_APPROVED,
+        title: 'Shift Swap Approved',
+        message: 'Your shift swap has been approved by a manager.',
+        link: '/app/swap-marketplace',
+      };
+      this.notifications
+        .notifyMany([swap.requesterId, swap.responderId!].filter(Boolean), approvedNotification)
+        .catch(() => {});
+
       return result;
     } catch (error) {
       this.logger.error(`approveSwap failed: ${error}`);
@@ -1159,6 +1198,21 @@ export class WorkforceService {
       })
       .catch(() => {});
 
+    // Notify requester (and responder if exists)
+    const rejectMessage = managerNote
+      ? `Your shift swap has been rejected. Note: ${managerNote}`
+      : 'Your shift swap has been rejected by a manager.';
+    const userIds = [swap.requesterId, swap.responderId].filter(Boolean) as string[];
+    this.notifications
+      .notifyMany(userIds, {
+        tenantId,
+        type: NotificationType.SHIFT_SWAP_REJECTED,
+        title: 'Shift Swap Rejected',
+        message: rejectMessage,
+        link: '/app/swap-marketplace',
+      })
+      .catch(() => {});
+
     return rejected;
   }
 
@@ -1170,10 +1224,26 @@ export class WorkforceService {
     if (swap.requesterId !== userId)
       throw new ForbiddenException('Only the requester can cancel this swap request.');
 
-    return this.prisma.shiftSwapRequest.update({
+    const cancelled = await this.prisma.shiftSwapRequest.update({
       where: { id: swapId },
       data: { status: 'CANCELLED' },
     });
+
+    // Notify responder if swap was already accepted
+    if (swap.responderId) {
+      this.notifications
+        .notify({
+          userId: swap.responderId,
+          tenantId,
+          type: NotificationType.SHIFT_SWAP_CANCELLED,
+          title: 'Shift Swap Cancelled',
+          message: 'A shift swap you accepted has been cancelled by the requester.',
+          link: '/app/swap-marketplace',
+        })
+        .catch(() => {});
+    }
+
+    return cancelled;
   }
 
   // ── Compliance Dashboard ──────────────────────────────

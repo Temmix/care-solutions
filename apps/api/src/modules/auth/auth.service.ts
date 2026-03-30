@@ -7,6 +7,8 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { BlindIndexService } from '../encryption/blind-index.service';
 import { RegisterDto, LoginDto } from './dto';
 import { PLAN_LIMITS, TRIAL_DURATION_DAYS, TRIAL_TIER } from '../billing/plan-limits';
+import { EmailService } from '../notifications/email.service';
+import { renderWelcomeEmail } from '../notifications/email-templates';
 
 const MEMBERSHIP_SELECT = {
   organizationId: true,
@@ -24,6 +26,7 @@ export class AuthService {
     @Inject(ConfigService) private configService: ConfigService,
     @Inject(EncryptionService) private encryption: EncryptionService,
     @Inject(BlindIndexService) private blindIndex: BlindIndexService,
+    @Inject(EmailService) private emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -89,6 +92,22 @@ export class AuthService {
 
         return { user, org };
       });
+
+      // Send welcome email (mandatory, bypasses preferences)
+      const { html, text } = renderWelcomeEmail({
+        firstName: dto.firstName,
+        orgName: dto.tenantName!,
+        trialDays: TRIAL_DURATION_DAYS,
+        loginUrl: 'https://app.clinvara.com/login',
+      });
+      this.emailService
+        .sendEmail({
+          to: dto.email,
+          subject: 'Welcome to Clinvara!',
+          htmlBody: html,
+          textBody: text,
+        })
+        .catch(() => {});
 
       const tokens = this.generateTokens(result.user.id, result.user.email);
       const memberships = [

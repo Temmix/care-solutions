@@ -12,6 +12,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SubscriptionLimitService } from '../billing/subscription-limit.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { BlindIndexService } from '../encryption/blind-index.service';
+import { EmailService } from '../notifications/email.service';
+import { renderInvitationEmail, renderDeactivationEmail } from '../notifications/email-templates';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateSuperAdminDto } from './dto/create-super-admin.dto';
 import { CreateTenantUserDto } from './dto/create-tenant-user.dto';
@@ -38,6 +40,7 @@ export class UsersService {
     @Inject(SubscriptionLimitService) private limits: SubscriptionLimitService,
     @Inject(EncryptionService) private encryption: EncryptionService,
     @Inject(BlindIndexService) private blindIndex: BlindIndexService,
+    @Inject(EmailService) private emailService: EmailService,
   ) {}
 
   async findAll(tenantId: string | null, page = 1, limit = 20) {
@@ -131,7 +134,7 @@ export class UsersService {
   }
 
   async remove(id: string, tenantId: string | null) {
-    await this.findOne(id, tenantId);
+    const userToRemove = await this.findOne(id, tenantId);
 
     // If tenant-scoped, deactivate the membership rather than the entire user
     if (tenantId) {
@@ -141,11 +144,35 @@ export class UsersService {
       });
     }
 
-    return this.prisma.user.update({
+    const result = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
       select: USER_SELECT,
     });
+
+    // Send deactivation email (mandatory, bypasses preferences)
+    const orgName = tenantId
+      ? ((
+          await this.prisma.organization.findUnique({
+            where: { id: tenantId },
+            select: { name: true },
+          })
+        )?.name ?? 'your organisation')
+      : 'Clinvara';
+    const { html, text } = renderDeactivationEmail({
+      firstName: userToRemove.firstName ?? 'there',
+      orgName,
+    });
+    this.emailService
+      .sendEmail({
+        to: result.email,
+        subject: 'Account Deactivated',
+        htmlBody: html,
+        textBody: text,
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   // ── Tenant user creation ───────────────────────────────
@@ -196,8 +223,8 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
         data: {
           email: dto.email,
           passwordHash,
@@ -212,15 +239,37 @@ export class UsersService {
 
       await tx.userTenantMembership.create({
         data: {
-          userId: user.id,
+          userId: created.id,
           organizationId: tenantId,
           role: dto.role,
           status: 'ACTIVE',
         },
       });
 
-      return user;
+      return created;
     });
+
+    // Send invitation email with temp password (mandatory, bypasses preferences)
+    const org = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+    const { html, text } = renderInvitationEmail({
+      firstName: dto.firstName,
+      orgName: org?.name ?? 'your organisation',
+      tempPassword: dto.password,
+      loginUrl: 'https://app.clinvara.com/login',
+    });
+    this.emailService
+      .sendEmail({
+        to: dto.email,
+        subject: "You've been invited to Clinvara",
+        htmlBody: html,
+        textBody: text,
+      })
+      .catch(() => {});
+
+    return user;
   }
 
   // ── Password management ───────────────────────────────

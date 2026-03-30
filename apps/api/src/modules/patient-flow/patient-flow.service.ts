@@ -12,6 +12,7 @@ import { CreateDischargeTaskDto } from './dto/create-discharge-task.dto';
 import { UpdateDischargeTaskDto } from './dto/update-discharge-task.dto';
 import { EventsService } from '../events/events.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PatientFlowService {
@@ -19,6 +20,7 @@ export class PatientFlowService {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private eventsService: EventsService,
     @Inject(AuditService) private audit: AuditService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   // ── Locations ───────────────────────────────────────
@@ -225,6 +227,20 @@ export class PatientFlowService {
         })
         .catch(() => {});
 
+      if (dto.primaryPractitionerId) {
+        const patientName = `${encounter.patient.givenName} ${encounter.patient.familyName}`;
+        this.notifications
+          .notify({
+            userId: dto.primaryPractitionerId,
+            tenantId,
+            type: 'PATIENT_ADMITTED',
+            title: 'Patient Admitted',
+            message: `${patientName} has been admitted${encounter.location ? ` to ${encounter.location.name}` : ''} and assigned to you.`,
+            link: `/app/patient-flow/encounters/${encounter.id}`,
+          })
+          .catch(() => {});
+      }
+
       return encounter;
     });
   }
@@ -358,7 +374,7 @@ export class PatientFlowService {
         },
       });
 
-      if (tenantId)
+      if (tenantId) {
         this.audit
           .log({
             userId,
@@ -369,6 +385,21 @@ export class PatientFlowService {
             metadata: { toBedId: dto.toBedId },
           })
           .catch(() => {});
+
+        if (encounter.primaryPractitionerId) {
+          const patientName = `${encounter.patient.givenName} ${encounter.patient.familyName}`;
+          this.notifications
+            .notify({
+              userId: encounter.primaryPractitionerId,
+              tenantId,
+              type: 'PATIENT_TRANSFERRED',
+              title: 'Patient Transferred',
+              message: `${patientName} has been transferred to ${toLocation.name}.`,
+              link: `/app/patient-flow/encounters/${encounterId}`,
+            })
+            .catch(() => {});
+        }
+      }
 
       return transfer;
     });
@@ -431,7 +462,7 @@ export class PatientFlowService {
         });
       }
 
-      if (tenantId)
+      if (tenantId) {
         this.audit
           .log({
             userId,
@@ -441,6 +472,21 @@ export class PatientFlowService {
             tenantId,
           })
           .catch(() => {});
+
+        if (encounter.primaryPractitionerId) {
+          const patientName = `${encounter.patient.givenName} ${encounter.patient.familyName}`;
+          this.notifications
+            .notify({
+              userId: encounter.primaryPractitionerId,
+              tenantId,
+              type: 'PATIENT_DISCHARGED',
+              title: 'Patient Discharged',
+              message: `${patientName} has been discharged.`,
+              link: `/app/patient-flow/encounters/${encounterId}`,
+            })
+            .catch(() => {});
+        }
+      }
 
       return updated;
     });

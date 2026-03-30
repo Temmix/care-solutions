@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PLAN_LIMITS } from './plan-limits';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class BillingService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(ConfigService) private config: ConfigService,
+    @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
 
   private get stripe(): Stripe {
@@ -114,6 +116,14 @@ export class BillingService {
         userLimit: freeLimits.userLimit,
       },
     });
+
+    this.notifyOrgAdmins(
+      organizationId,
+      'SUBSCRIPTION_CHANGED',
+      'Trial Ended',
+      'Your Professional trial has ended and your organisation has been downgraded to the Free plan. Subscribe to restore full access.',
+      '/app/billing',
+    ).catch(() => {});
   }
 
   // ── Stripe Customer ─────────────────────────────────────
@@ -221,6 +231,15 @@ export class BillingService {
     const organizationId = stripeSub.metadata?.organizationId;
     if (!organizationId) return;
     await this.upsertSubscription(organizationId, stripeSub);
+
+    const tier = this.tierFromPriceId(stripeSub.items.data[0]?.price?.id ?? null);
+    this.notifyOrgAdmins(
+      organizationId,
+      'SUBSCRIPTION_CHANGED',
+      'Subscription Updated',
+      `Your subscription has been updated to the ${tier.charAt(0) + tier.slice(1).toLowerCase()} plan.`,
+      '/app/billing',
+    ).catch(() => {});
   }
 
   private async handleSubscriptionDeleted(stripeSub: Stripe.Subscription) {
@@ -234,6 +253,14 @@ export class BillingService {
         cancelAtPeriodEnd: false,
       },
     });
+
+    this.notifyOrgAdmins(
+      organizationId,
+      'SUBSCRIPTION_CHANGED',
+      'Subscription Cancelled',
+      'Your subscription has been cancelled. Your organisation will be downgraded to the Free plan.',
+      '/app/billing',
+    ).catch(() => {});
   }
 
   private async upsertSubscription(organizationId: string, stripeSub: Stripe.Subscription) {
@@ -299,6 +326,29 @@ export class BillingService {
       paused: 'CANCELED',
     };
     return map[status] ?? 'ACTIVE';
+  }
+
+  private async notifyOrgAdmins(
+    organizationId: string,
+    type: 'SUBSCRIPTION_CHANGED' | 'TRIAL_EXPIRING',
+    title: string,
+    message: string,
+    link: string,
+  ): Promise<void> {
+    const admins = await this.prisma.userTenantMembership.findMany({
+      where: { organizationId, status: 'ACTIVE', role: { in: ['ADMIN', 'TENANT_ADMIN'] } },
+      select: { userId: true },
+    });
+    const userIds = admins.map((a) => a.userId);
+    if (userIds.length === 0) return;
+
+    await this.notifications.notifyMany(userIds, {
+      tenantId: organizationId,
+      type,
+      title,
+      message,
+      link,
+    });
   }
 
   // ── All subscriptions (SUPER_ADMIN) ────────────────────
