@@ -350,6 +350,8 @@ model User {
   role               Role     @default(PATIENT)
   isActive           Boolean  @default(true)
   mustChangePassword Boolean  @default(false)
+  passwordResetToken     String?   @unique
+  passwordResetExpiresAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

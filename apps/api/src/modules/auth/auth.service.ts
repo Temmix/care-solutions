@@ -2,19 +2,21 @@ import {
   Injectable,
   Inject,
   Logger,
+  BadRequestException,
   ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { BlindIndexService } from '../encryption/blind-index.service';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import { PLAN_LIMITS, TRIAL_DURATION_DAYS, TRIAL_TIER } from '../billing/plan-limits';
 import { EmailService } from '../notifications/email.service';
-import { renderWelcomeEmail } from '../notifications/email-templates';
+import { renderWelcomeEmail, renderPasswordResetEmail } from '../notifications/email-templates';
 
 const MEMBERSHIP_SELECT = {
   organizationId: true,
@@ -227,6 +229,72 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.findUserByEmail(dto.email);
+
+    // Always return success to prevent email enumeration
+    if (!user || !user.isActive) {
+      return {
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetToken: token, passwordResetExpiresAt: expiresAt },
+    });
+
+    const baseUrl = this.configService.get<string>('APP_URL', 'https://app.clinvara.com');
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+    const { html, text } = renderPasswordResetEmail({
+      firstName: user.firstName,
+      resetUrl,
+    });
+
+    this.emailService
+      .sendEmail({
+        to: user.email,
+        subject: 'Reset Your Password — Clinvara',
+        htmlBody: html,
+        textBody: text,
+      })
+      .catch((err) => this.logger.warn(`Failed to send password reset email to ${dto.email}`, err));
+
+    return {
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { passwordResetToken: dto.token },
+    });
+
+    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+      throw new BadRequestException(
+        'This password reset link is invalid or has expired. Please request a new one.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+        mustChangePassword: false,
+      },
+    });
+
+    return { message: 'Your password has been reset successfully. You can now log in.' };
   }
 
   private async findUserByEmail(email: string) {
