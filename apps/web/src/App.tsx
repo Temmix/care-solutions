@@ -3,6 +3,8 @@ import { AuthProvider } from './hooks/use-auth';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { LoginPage } from './features/auth/LoginPage';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { DashboardPage } from './features/auth/DashboardPage';
 import { PatientListPage } from './features/patients/PatientListPage';
@@ -71,6 +73,8 @@ export function App(): React.ReactElement {
         <Routes>
           <Route path="/" element={<DemoPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
             path="/app"

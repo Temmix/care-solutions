@@ -160,6 +160,43 @@ export function renderInvitationEmail(params: {
   return { html, text };
 }
 
+// ── Password reset email (mandatory) ────────────────────
+
+export function renderPasswordResetEmail(params: { firstName: string; resetUrl: string }): {
+  html: string;
+  text: string;
+} {
+  const html = layout(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:${SLATE_900};">Reset Your Password</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:${SLATE_600};line-height:1.6;">
+      Hi ${params.firstName},
+    </p>
+    <p style="margin:0 0 12px;font-size:14px;color:${SLATE_600};line-height:1.6;">
+      We received a request to reset your password. Click the button below to choose a new one.
+      This link will expire in 1 hour.
+    </p>
+    <p style="margin:0 0 4px;font-size:13px;color:${SLATE_400};line-height:1.6;">
+      If you didn't request this, you can safely ignore this email.
+    </p>
+    ${ctaButton('Reset Password', params.resetUrl)}
+  `);
+
+  const text = [
+    'Reset Your Password',
+    '',
+    `Hi ${params.firstName},`,
+    '',
+    'We received a request to reset your password.',
+    'Click the link below to choose a new one. This link will expire in 1 hour.',
+    '',
+    'Reset password: ' + params.resetUrl,
+    '',
+    "If you didn't request this, you can safely ignore this email.",
+  ].join('\n');
+
+  return { html, text };
+}
+
 // ── Deactivation email (mandatory) ─────────────────────
 
 export function renderDeactivationEmail(params: { firstName: string; orgName: string }): {

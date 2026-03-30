@@ -103,7 +103,15 @@ export function LoginPage(): React.ReactElement {
             </div>
 
             <div className="mb-6">
-              <label className="block mb-1.5 text-sm font-medium text-slate-700">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-slate-700">Password</label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-accent hover:text-accent-dark no-underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 value={password}
