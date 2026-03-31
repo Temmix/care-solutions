@@ -224,6 +224,11 @@ const NESTED_RELATIONS: Record<string, Record<string, string>> = {
     escalatedTo: 'User',
     resolver: 'User',
   },
+
+  // ── Audit ─────────────────────────────────────────────
+  AuditLog: {
+    user: 'User',
+  },
 };
 
 const WRITE_ACTIONS = new Set(['create', 'update', 'upsert', 'createMany', 'updateMany']);
