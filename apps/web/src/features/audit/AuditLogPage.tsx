@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuditLogs, type AuditLogEntry } from './hooks/use-audit-logs';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
-const ACTIONS = ['', 'CREATE', 'UPDATE', 'DELETE', 'VIEW'] as const;
-
 const RESOURCES = [
   '',
   'Patient',
@@ -21,11 +19,25 @@ const RESOURCES = [
   'Bed',
 ] as const;
 
-const actionColors: Record<string, string> = {
-  CREATE: 'bg-emerald-50 text-emerald-700',
-  UPDATE: 'bg-blue-50 text-blue-700',
-  DELETE: 'bg-red-50 text-red-600',
-  VIEW: 'bg-slate-50 text-slate-600',
+const resourceLabels: Record<string, string> = {
+  Patient: 'Patient',
+  CarePlan: 'Care Plan',
+  Assessment: 'Assessment',
+  MedicationRequest: 'Medication Request',
+  Encounter: 'Encounter',
+  ChcCase: 'CHC Case',
+  VirtualWardEnrolment: 'Virtual Ward Enrolment',
+  Shift: 'Shift',
+  ShiftAssignment: 'Shift Assignment',
+  ShiftSwapRequest: 'Shift Swap',
+  DischargePlan: 'Discharge Plan',
+  Location: 'Location',
+  Bed: 'Bed',
+  User: 'User',
+  Organization: 'Organisation',
+  TrainingRecord: 'Training Record',
+  Subscription: 'Subscription',
+  Notification: 'Notification',
 };
 
 function formatDateTime(d: string): string {
@@ -47,7 +59,6 @@ export function AuditLogPage(): React.ReactElement {
   const [error, setError] = useState('');
   const limit = 25;
 
-  const [action, setAction] = useState('');
   const [resource, setResource] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -58,7 +69,6 @@ export function AuditLogPage(): React.ReactElement {
     searchLogs({
       page,
       limit,
-      action: action || undefined,
       resource: resource || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
@@ -69,7 +79,7 @@ export function AuditLogPage(): React.ReactElement {
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load audit logs'))
       .finally(() => setLoading(false));
-  }, [searchLogs, page, action, resource, startDate, endDate]);
+  }, [searchLogs, page, resource, startDate, endDate]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -93,25 +103,7 @@ export function AuditLogPage(): React.ReactElement {
       <ErrorAlert message={error} className="mb-4" />
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4 mb-4 grid grid-cols-4 gap-3">
-        <div>
-          <label className="text-xs font-medium text-slate-400 mb-1 block">Action</label>
-          <select
-            value={action}
-            onChange={(e) => {
-              setAction(e.target.value);
-              setPage(1);
-            }}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white outline-none"
-          >
-            <option value="">All Actions</option>
-            {ACTIONS.filter(Boolean).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="bg-white rounded-xl border border-slate-100 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">Resource</label>
           <select
@@ -125,7 +117,7 @@ export function AuditLogPage(): React.ReactElement {
             <option value="">All Resources</option>
             {RESOURCES.filter(Boolean).map((r) => (
               <option key={r} value={r}>
-                {r}
+                {resourceLabels[r] ?? r}
               </option>
             ))}
           </select>
@@ -163,21 +155,19 @@ export function AuditLogPage(): React.ReactElement {
             <tr className="border-b border-slate-100 text-left">
               <th className="px-4 py-3 font-medium text-slate-400">Timestamp</th>
               <th className="px-4 py-3 font-medium text-slate-400">User</th>
-              <th className="px-4 py-3 font-medium text-slate-400">Action</th>
               <th className="px-4 py-3 font-medium text-slate-400">Resource</th>
-              <th className="px-4 py-3 font-medium text-slate-400">Resource ID</th>
             </tr>
           </thead>
           <tbody>
             {loading && !logs.length ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
                   No audit logs found
                 </td>
               </tr>
@@ -188,16 +178,8 @@ export function AuditLogPage(): React.ReactElement {
                   <td className="px-4 py-3 text-slate-900">
                     {log.user.firstName} {log.user.lastName}
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${actionColors[log.action] ?? 'bg-slate-50 text-slate-600'}`}
-                    >
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{log.resource}</td>
-                  <td className="px-4 py-3 text-slate-500 font-mono text-xs">
-                    {log.resourceId ? log.resourceId.slice(0, 8) + '...' : '—'}
+                  <td className="px-4 py-3 text-slate-700">
+                    {resourceLabels[log.resource] ?? log.resource}
                   </td>
                 </tr>
               ))
