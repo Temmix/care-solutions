@@ -21,7 +21,7 @@ COPY packages/shared/ packages/shared/
 COPY apps/web/ apps/web/
 
 # Set API URL at build time (baked into the SPA bundle)
-ARG VITE_API_BASE=https://clinvara-api-production.up.railway.app/api
+ARG VITE_API_BASE=https://api.clinvara.com/api
 ENV VITE_API_BASE=$VITE_API_BASE
 
 # Build shared → web (turbo handles order)
