@@ -1,0 +1,95 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main]
+
+env:
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+jobs:
+  ci:
+    name: CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run format:check
+
+      - run: npm run lint
+
+      - run: npm run build -w packages/shared
+      - run: npm run build -w apps/logger
+
+      - run: npx prisma generate
+        working-directory: apps/api
+
+      - run: npm test -w apps/api -- --ci
+        env:
+          JWT_SECRET: test-secret
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - run: npm test -w apps/web -- --reporter=verbose
+
+      - run: npx tsc --noEmit -p apps/web/tsconfig.json
+
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Set railway.json for API
+        run: |
+          cat > railway.json << 'RJSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": { "dockerfilePath": "Dockerfile.api" },
+            "deploy": {
+              "healthcheckPath": "/api/health",
+              "restartPolicyType": "ON_FAILURE",
+              "restartPolicyMaxRetries": 10
+            }
+          }
+          RJSON
+
+      - name: Deploy API to Railway
+        run: railway up --service clinvara-api
+
+  deploy-web:
+    name: Deploy Web
+    runs-on: ubuntu-latest
+    needs: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Set railway.json for Web
+        run: |
+          cat > railway.json << 'RJSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": { "dockerfilePath": "Dockerfile.web" },
+            "deploy": {
+              "healthcheckPath": "/healthz",
+              "restartPolicyType": "ON_FAILURE",
+              "restartPolicyMaxRetries": 10
+            }
+          }
+          RJSON
+
+      - name: Deploy Web to Railway
+        run: railway up --service clinvara-web
