@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.1009.0",
-    "@aws-sdk/client-ses": "^3.1014.0",
     "@care/logger": "*",
     "@care/shared": "*",
     "@nestjs/common": "^10.3.0",
@@ -34,6 +33,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
+    "resend": "^6.10.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
     "stripe": "^20.4.1",

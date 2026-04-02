@@ -4,6 +4,7 @@ import { api } from '../../../lib/api-client';
 export interface PlanLimits {
   patientLimit: number;
   userLimit: number;
+  adminLimit: number;
   label: string;
   priceMonthlyGBP: number;
 }
@@ -12,6 +13,7 @@ export interface Plan {
   tier: string;
   patientLimit: number;
   userLimit: number;
+  adminLimit: number;
   label: string;
   priceMonthlyGBP: number;
   priceId: string | null;

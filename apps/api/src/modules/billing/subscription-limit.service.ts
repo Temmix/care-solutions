@@ -11,6 +11,7 @@ export interface TrialInfo {
 export interface UsageInfo {
   users: { current: number; limit: number };
   patients: { current: number; limit: number };
+  admins: { current: number; limit: number };
   tier: string;
   trial?: TrialInfo;
 }
@@ -26,14 +27,19 @@ export class SubscriptionLimitService {
    */
   private async getLimits(
     tenantId: string,
-  ): Promise<{ userLimit: number; patientLimit: number; tier: string }> {
+  ): Promise<{ userLimit: number; patientLimit: number; adminLimit: number; tier: string }> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { organizationId: tenantId },
     });
 
     if (!subscription) {
       const free = PLAN_LIMITS.FREE;
-      return { userLimit: free.userLimit, patientLimit: free.patientLimit, tier: 'FREE' };
+      return {
+        userLimit: free.userLimit,
+        patientLimit: free.patientLimit,
+        adminLimit: free.adminLimit,
+        tier: 'FREE',
+      };
     }
 
     // Lazy trial expiry: enforce FREE limits immediately if trial has ended
@@ -43,12 +49,19 @@ export class SubscriptionLimitService {
       new Date() > subscription.trialEndsAt
     ) {
       const free = PLAN_LIMITS.FREE;
-      return { userLimit: free.userLimit, patientLimit: free.patientLimit, tier: 'FREE' };
+      return {
+        userLimit: free.userLimit,
+        patientLimit: free.patientLimit,
+        adminLimit: free.adminLimit,
+        tier: 'FREE',
+      };
     }
 
+    const planLimits = PLAN_LIMITS[subscription.tier];
     return {
       userLimit: subscription.userLimit,
       patientLimit: subscription.patientLimit,
+      adminLimit: planLimits?.adminLimit ?? 1,
       tier: subscription.tier,
     };
   }
@@ -64,6 +77,13 @@ export class SubscriptionLimitService {
   private async countPatients(tenantId: string): Promise<number> {
     return this.prisma.patient.count({
       where: { tenantId, active: true },
+    });
+  }
+
+  /** Count active admin members belonging to a tenant */
+  private async countAdmins(tenantId: string): Promise<number> {
+    return this.prisma.userTenantMembership.count({
+      where: { organizationId: tenantId, status: 'ACTIVE', role: 'ADMIN' },
     });
   }
 
@@ -100,14 +120,31 @@ export class SubscriptionLimitService {
   }
 
   /**
+   * Check if the tenant can add another admin.
+   * Throws ForbiddenException if at or over limit.
+   */
+  async enforceAdminLimit(tenantId: string): Promise<void> {
+    const { adminLimit, tier } = await this.getLimits(tenantId);
+    const currentCount = await this.countAdmins(tenantId);
+
+    if (!isWithinLimit(currentCount, adminLimit)) {
+      const planLabel = PLAN_LIMITS[tier]?.label ?? tier;
+      throw new ForbiddenException(
+        `Admin limit reached (${currentCount}/${adminLimit}). Your ${planLabel} plan allows up to ${adminLimit} admin(s). Please upgrade your subscription.`,
+      );
+    }
+  }
+
+  /**
    * Returns current usage counts and limits for a tenant.
    * Used by the billing/usage endpoint so the frontend can display progress bars.
    */
   async getUsage(tenantId: string): Promise<UsageInfo> {
-    const [limits, userCount, patientCount, subscription] = await Promise.all([
+    const [limits, userCount, patientCount, adminCount, subscription] = await Promise.all([
       this.getLimits(tenantId),
       this.countUsers(tenantId),
       this.countPatients(tenantId),
+      this.countAdmins(tenantId),
       this.prisma.subscription.findUnique({
         where: { organizationId: tenantId },
         select: { status: true, trialEndsAt: true },
@@ -131,6 +168,7 @@ export class SubscriptionLimitService {
     return {
       users: { current: userCount, limit: limits.userLimit },
       patients: { current: patientCount, limit: limits.patientLimit },
+      admins: { current: adminCount, limit: limits.adminLimit },
       tier: limits.tier,
       trial,
     };

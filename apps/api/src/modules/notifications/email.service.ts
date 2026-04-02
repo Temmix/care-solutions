@@ -1,17 +1,23 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly fromEmail: string;
   private readonly enabled: boolean;
+  private readonly resend: Resend | null;
 
   constructor(@Inject(ConfigService) private config: ConfigService) {
     this.fromEmail = this.config.get<string>('NOTIFICATION_FROM_EMAIL', 'noreply@clinvara.com');
     this.enabled = this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
+
+    const apiKey = this.config.get<string>('RESEND_API_KEY', '');
+    this.resend = apiKey ? new Resend(apiKey) : null;
+
     this.logger.log(
-      `EmailService initialised: enabled=${this.enabled}, from=${this.fromEmail}, EMAIL_ENABLED raw="${this.config.get<string>('EMAIL_ENABLED', '(not set)')}"`,
+      `EmailService initialised: enabled=${this.enabled}, from=${this.fromEmail}, provider=resend, hasApiKey=${!!apiKey}`,
     );
   }
 
@@ -26,27 +32,19 @@ export class EmailService {
       return;
     }
 
+    if (!this.resend) {
+      this.logger.warn(`No RESEND_API_KEY configured, skipping: ${params.subject} → ${params.to}`);
+      return;
+    }
+
     try {
-      // Dynamic import to avoid requiring @aws-sdk/client-ses when not in use
-      const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
-
-      const ses = new SESClient({
-        region: this.config.get<string>('AWS_REGION', 'eu-west-2'),
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: params.to,
+        subject: params.subject,
+        html: params.htmlBody,
+        ...(params.textBody ? { text: params.textBody } : {}),
       });
-
-      await ses.send(
-        new SendEmailCommand({
-          Source: this.fromEmail,
-          Destination: { ToAddresses: [params.to] },
-          Message: {
-            Subject: { Data: params.subject },
-            Body: {
-              Html: { Data: params.htmlBody },
-              ...(params.textBody ? { Text: { Data: params.textBody } } : {}),
-            },
-          },
-        }),
-      );
 
       this.logger.log(`Email sent: ${params.subject} → ${params.to}`);
     } catch (err) {

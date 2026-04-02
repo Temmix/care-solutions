@@ -1,0 +1,45 @@
+# ── Stage 1: Install dependencies ───────────────────────
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+COPY package.json package-lock.json turbo.json ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+
+RUN npm ci
+
+# ── Stage 2: Build ──────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+
+COPY package.json turbo.json tsconfig.base.json ./
+COPY packages/shared/ packages/shared/
+COPY apps/web/ apps/web/
+
+# Set API URL at build time (baked into the SPA bundle)
+ARG VITE_API_BASE=https://api.clinvara.com/api
+ENV VITE_API_BASE=$VITE_API_BASE
+
+# Build shared → web (turbo handles order)
+RUN npx turbo run build --filter=@care/web
+
+# ── Stage 3: Runner (nginx) ────────────────────────────
+FROM nginx:1.25-alpine AS runner
+
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy nginx template
+COPY infra/docker/nginx.conf.template /etc/nginx/nginx.conf.template
+
+# Copy built SPA assets
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+
+ENV PORT=80
+
+# Substitute PORT at runtime, then start nginx
+CMD ["/bin/sh", "-c", "envsubst '$PORT' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
