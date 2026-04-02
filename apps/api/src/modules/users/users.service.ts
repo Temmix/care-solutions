@@ -189,7 +189,17 @@ export class UsersService {
       );
     }
 
+    if (dto.role === 'PATIENT' || dto.role === 'SYSTEM') {
+      throw new ForbiddenException(
+        'Patients must be created through the patient management module.',
+      );
+    }
+
     await this.limits.enforceUserLimit(tenantId);
+
+    if (dto.role === 'ADMIN') {
+      await this.limits.enforceAdminLimit(tenantId);
+    }
 
     const existing = await this.findUserByEmail(dto.email);
 

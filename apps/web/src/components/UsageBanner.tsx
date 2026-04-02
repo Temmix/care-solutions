@@ -4,6 +4,7 @@ import { api } from '../lib/api-client';
 export interface UsageData {
   users: { current: number; limit: number };
   patients: { current: number; limit: number };
+  admins: { current: number; limit: number };
   tier: string;
   trial?: {
     active: boolean;

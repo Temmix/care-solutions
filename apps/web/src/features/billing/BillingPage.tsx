@@ -131,7 +131,7 @@ export function BillingPage(): React.ReactElement {
             )}
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
               <div className="text-xs text-slate-500 mb-1">Plan</div>
               <div className="text-sm font-semibold text-slate-900">
@@ -156,6 +156,12 @@ export function BillingPage(): React.ReactElement {
               <div className="text-xs text-slate-500 mb-1">User Limit</div>
               <div className="text-sm font-medium text-slate-900">
                 {formatLimit(subscription.userLimit)}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 mb-1">Admin Limit</div>
+              <div className="text-sm font-medium text-slate-900">
+                {formatLimit(subscription.limits.adminLimit)}
               </div>
             </div>
           </div>
@@ -276,6 +282,22 @@ export function BillingPage(): React.ReactElement {
                       />
                     </svg>
                     {formatLimit(plan.userLimit)} users
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg
+                      className="w-4 h-4 text-emerald-500 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                    {formatLimit(plan.adminLimit)} admin{plan.adminLimit !== 1 ? 's' : ''}
                   </li>
                 </ul>
 

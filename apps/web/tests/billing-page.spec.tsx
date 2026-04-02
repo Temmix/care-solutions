@@ -45,6 +45,7 @@ const mockPlans = [
     priceMonthlyGBP: 0,
     patientLimit: 5,
     userLimit: 1,
+    adminLimit: 1,
     priceId: null,
   },
   {
@@ -53,6 +54,7 @@ const mockPlans = [
     priceMonthlyGBP: 59,
     patientLimit: 200,
     userLimit: 20,
+    adminLimit: 1,
     priceId: 'price_starter',
   },
   {
@@ -61,6 +63,7 @@ const mockPlans = [
     priceMonthlyGBP: 99,
     patientLimit: 500,
     userLimit: 50,
+    adminLimit: 3,
     priceId: 'price_pro',
   },
   {
@@ -69,6 +72,7 @@ const mockPlans = [
     priceMonthlyGBP: 299,
     patientLimit: -1,
     userLimit: -1,
+    adminLimit: -1,
     priceId: 'price_enterprise',
   },
 ];
@@ -83,7 +87,13 @@ const mockSubscription = {
   cancelAtPeriodEnd: false,
   patientLimit: 200,
   userLimit: 20,
-  limits: { patientLimit: 200, userLimit: 20, label: 'Starter', priceMonthlyGBP: 59 },
+  limits: {
+    patientLimit: 200,
+    userLimit: 20,
+    adminLimit: 1,
+    label: 'Starter',
+    priceMonthlyGBP: 59,
+  },
   organization: { name: 'Sunrise Care', stripeCustomerId: 'cus_test' },
 };
 

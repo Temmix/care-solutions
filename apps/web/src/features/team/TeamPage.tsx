@@ -4,14 +4,13 @@ import { useTeam, type TeamMember, type CreateMemberForm } from './hooks/use-tea
 import { UsageBanner, useUsage } from '../../components/UsageBanner';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
-const ROLES = ['ADMIN', 'CLINICIAN', 'NURSE', 'CARER', 'PATIENT'] as const;
+const ROLES = ['ADMIN', 'CLINICIAN', 'NURSE', 'CARER'] as const;
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrator',
   CLINICIAN: 'Clinician',
   NURSE: 'Nurse',
   CARER: 'Carer',
-  PATIENT: 'Patient',
 };
 
 // ── Validation ──────────────────────────────────────────────
