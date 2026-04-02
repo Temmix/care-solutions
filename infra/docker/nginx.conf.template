@@ -5,7 +5,7 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    resolver 127.0.0.11 valid=10s;
+    resolver ${DNS_RESOLVER} valid=30s ipv6=off;
 
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -31,7 +31,8 @@ server {
 
     # Proxy API requests to the API service
     location /api/ {
-        proxy_pass http://${API_HOST};
+        set $api_upstream http://${API_HOST};
+        proxy_pass $api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -43,7 +44,8 @@ server {
 
     # Proxy WebSocket connections
     location /socket.io/ {
-        proxy_pass http://${API_HOST};
+        set $ws_upstream http://${API_HOST};
+        proxy_pass $ws_upstream;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
