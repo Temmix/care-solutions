@@ -83,6 +83,9 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 # Copy Prisma schema + migrations (for migrate deploy)
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 
+# Copy startup script
+COPY infra/docker/api-start.sh ./api-start.sh
+
 # Create logs directory
 RUN mkdir -p /app/logs && chown -R care:care /app
 
@@ -91,4 +94,4 @@ USER care
 ENV NODE_ENV=production
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["sh", "./api-start.sh"]
