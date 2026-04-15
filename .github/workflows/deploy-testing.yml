@@ -64,6 +64,9 @@ jobs:
           }
           RJSON
 
+      - name: Link Railway project
+        run: railway link 2c1aeca7-b49f-46ec-a355-31c90276cf92
+
       - name: Deploy API to Railway (Testing)
         run: railway up --service clinvara-staging-api --environment testing
 
@@ -90,6 +93,9 @@ jobs:
             }
           }
           RJSON
+
+      - name: Link Railway project
+        run: railway link 2c1aeca7-b49f-46ec-a355-31c90276cf92
 
       - name: Deploy Web to Railway (Testing)
         run: railway up --service clinvara-staging-web --environment testing
