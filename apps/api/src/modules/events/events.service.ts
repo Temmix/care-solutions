@@ -72,6 +72,22 @@ export class EventsService {
     this.emit(tenantId, 'virtual-ward:vitals', data);
   }
 
+  // Clock In/Out
+
+  emitClockIn(
+    tenantId: string,
+    data: { userId: string; shiftAssignmentId: string; clockInAt: Date },
+  ): void {
+    this.emit(tenantId, 'clock:in', data);
+  }
+
+  emitClockOut(
+    tenantId: string,
+    data: { userId: string; shiftAssignmentId: string; clockOutAt: Date | null },
+  ): void {
+    this.emit(tenantId, 'clock:out', data);
+  }
+
   // Phase 5: Notifications
 
   emitNotification(

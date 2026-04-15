@@ -6,3 +6,6 @@ export { CreateAvailabilityDto } from './create-availability.dto';
 export { CreateSwapRequestDto } from './create-swap-request.dto';
 export { RespondSwapDto } from './respond-swap.dto';
 export { ComplianceQueryDto } from './compliance-query.dto';
+export { ClockInDto } from './clock-in.dto';
+export { ClockOutDto } from './clock-out.dto';
+export { TimesheetQueryDto } from './timesheet-query.dto';

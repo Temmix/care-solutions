@@ -22,6 +22,9 @@ import {
   CreateAvailabilityDto,
   CreateSwapRequestDto,
   RespondSwapDto,
+  ClockInDto,
+  ClockOutDto,
+  TimesheetQueryDto,
 } from './dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
@@ -75,6 +78,14 @@ export class WorkforceController {
   createShift(@Body() dto: CreateShiftDto, @CurrentTenant() tenantId: string | null) {
     if (!tenantId) throw new BadRequestException('Tenant selection required');
     return this.workforceService.createShift(dto, tenantId);
+  }
+
+  // Must be declared BEFORE shifts/:id to avoid param capture
+  @Get('shifts/my-today')
+  @Roles(Role.CLINICIAN, Role.NURSE, Role.CARER)
+  getMyShiftsToday(@CurrentUser() user: RequestUser, @CurrentTenant() tenantId: string | null) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getMyShiftsToday(user.id, tenantId);
   }
 
   @Get('shifts')
@@ -284,5 +295,36 @@ export class WorkforceController {
     if (!from || !to)
       throw new BadRequestException('Both "from" and "to" query params are required');
     return this.workforceService.getComplianceReport(tenantId, from, to);
+  }
+
+  // ── Clock In / Out ──────────────────────────────────
+
+  @Post('clock-in')
+  @Roles(Role.CLINICIAN, Role.NURSE, Role.CARER)
+  clockIn(
+    @Body() dto: ClockInDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.clockIn(dto, user.id, tenantId);
+  }
+
+  @Post('clock-out')
+  @Roles(Role.CLINICIAN, Role.NURSE, Role.CARER)
+  clockOut(
+    @Body() dto: ClockOutDto,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.clockOut(dto, user.id, tenantId);
+  }
+
+  @Get('timesheets')
+  @Roles(Role.ADMIN)
+  getTimesheets(@CurrentTenant() tenantId: string | null, @Query() query: TimesheetQueryDto) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.workforceService.getTimesheets(tenantId, query);
   }
 }

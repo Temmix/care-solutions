@@ -3,8 +3,9 @@ import { usePatientFlow, type Location } from './hooks/use-patient-flow';
 import { useAuth } from '../../hooks/use-auth';
 import { Link } from 'react-router-dom';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { usePostcodeLookup } from './hooks/use-postcode-lookup';
 
-const locationTypes = ['WARD', 'ROOM', 'BED', 'DEPARTMENT', 'WING'];
+const locationTypes = ['WARD', 'ROOM', 'BED', 'DEPARTMENT', 'WING', 'PATIENT_HOME'];
 
 const bedStatusColors: Record<string, string> = {
   AVAILABLE: 'bg-emerald-100 text-emerald-700',
@@ -24,7 +25,12 @@ export function LocationsPage(): React.ReactElement {
   const [locWard, setLocWard] = useState('');
   const [locFloor, setLocFloor] = useState('');
   const [locCapacity, setLocCapacity] = useState(0);
+  const [locLatitude, setLocLatitude] = useState('');
+  const [locLongitude, setLocLongitude] = useState('');
+  const [locGeofenceRadius, setLocGeofenceRadius] = useState(150);
   const [bedIdentifier, setBedIdentifier] = useState('');
+  const [locPostcode, setLocPostcode] = useState('');
+  const postcodeLookup = usePostcodeLookup();
 
   const load = async () => {
     try {
@@ -49,9 +55,16 @@ export function LocationsPage(): React.ReactElement {
         ward: locWard || undefined,
         floor: locFloor || undefined,
         capacity: locCapacity || undefined,
+        latitude: locLatitude ? parseFloat(locLatitude) : undefined,
+        longitude: locLongitude ? parseFloat(locLongitude) : undefined,
+        geofenceRadius: locGeofenceRadius || undefined,
       });
       setShowLocationForm(false);
       setLocName('');
+      setLocLatitude('');
+      setLocLongitude('');
+      setLocPostcode('');
+      setLocGeofenceRadius(150);
       load();
     } catch {
       // error
@@ -171,6 +184,72 @@ export function LocationsPage(): React.ReactElement {
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
               />
             </div>
+            <div className="sm:col-span-2 lg:col-span-3 border-t border-slate-100 pt-4 mt-1">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                GPS Coordinates (for geofenced clock-in)
+              </label>
+              <div className="flex gap-3 items-end mb-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Postcode Lookup</label>
+                  <input
+                    type="text"
+                    value={locPostcode}
+                    onChange={(e) => setLocPostcode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    placeholder="e.g. SW1A 1AA"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={!locPostcode.trim() || postcodeLookup.loading}
+                  onClick={async () => {
+                    const result = await postcodeLookup.lookup(locPostcode.trim());
+                    if (result) {
+                      setLocLatitude(String(result.latitude));
+                      setLocLongitude(String(result.longitude));
+                    }
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {postcodeLookup.loading ? 'Looking up...' : 'Lookup'}
+                </button>
+              </div>
+              {postcodeLookup.error && (
+                <p className="text-xs text-red-600 mb-2">{postcodeLookup.error}</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Latitude</label>
+                  <input
+                    type="text"
+                    value={locLatitude}
+                    onChange={(e) => setLocLatitude(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    placeholder="e.g. 51.5074"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Longitude</label>
+                  <input
+                    type="text"
+                    value={locLongitude}
+                    onChange={(e) => setLocLongitude(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    placeholder="e.g. -0.1278"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Geofence Radius (m)</label>
+                  <input
+                    type="number"
+                    value={locGeofenceRadius}
+                    onChange={(e) => setLocGeofenceRadius(Number(e.target.value))}
+                    min={1}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button
@@ -209,6 +288,12 @@ export function LocationsPage(): React.ReactElement {
                     {loc.ward && <span className="text-xs text-slate-400">Ward: {loc.ward}</span>}
                     {loc.floor && (
                       <span className="text-xs text-slate-400">Floor: {loc.floor}</span>
+                    )}
+                    {loc.latitude != null && loc.longitude != null && (
+                      <span className="text-xs text-emerald-600">
+                        GPS: {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                        {loc.geofenceRadius && ` (${loc.geofenceRadius}m)`}
+                      </span>
                     )}
                   </div>
                 </div>

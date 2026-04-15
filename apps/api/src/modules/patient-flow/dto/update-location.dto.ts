@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsInt, Min, MinLength } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsInt, IsNumber, Min, MinLength } from 'class-validator';
 import { LocationType } from '@prisma/client';
 
 export class UpdateLocationDto {
@@ -27,4 +27,17 @@ export class UpdateLocationDto {
   @IsInt()
   @Min(0)
   capacity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  geofenceRadius?: number;
 }
