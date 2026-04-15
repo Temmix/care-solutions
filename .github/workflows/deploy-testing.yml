@@ -5,7 +5,7 @@ on:
     branches: [development]
 
 env:
-  RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN_TESTING }}
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_TESTING }}
 
 jobs:
   ci:
