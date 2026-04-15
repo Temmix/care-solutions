@@ -5,7 +5,7 @@ on:
     branches: [development]
 
 env:
-  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_TESTING }}
+  RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN_TESTING }}
 
 jobs:
   ci:
@@ -65,7 +65,9 @@ jobs:
           RJSON
 
       - name: Deploy API to Railway (Testing)
-        run: railway up --service clinvara-staging-api --ci
+        run: railway up --service clinvara-staging-api --environment testing --ci
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
 
   deploy-web:
     name: Deploy Web (Testing)
@@ -92,4 +94,6 @@ jobs:
           RJSON
 
       - name: Deploy Web to Railway (Testing)
-        run: railway up --service clinvara-staging-web --ci
+        run: railway up --service clinvara-staging-web --environment testing --ci
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
