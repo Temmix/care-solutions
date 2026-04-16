@@ -50,32 +50,11 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Set railway.json for API
-        run: |
-          cat > railway.json << 'RJSON'
-          {
-            "$schema": "https://railway.com/railway.schema.json",
-            "build": { "dockerfilePath": "Dockerfile.api" },
-            "deploy": {
-              "healthcheckPath": "/api/health",
-              "restartPolicyType": "ON_FAILURE",
-              "restartPolicyMaxRetries": 10
-            }
-          }
-          RJSON
-
-      - name: Enable database seeding
-        run: railway variables set RUN_SEED=true --service clinvara-staging-api --environment testing
-        env:
-          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
+      - name: Remove railway.json to use service settings
+        run: rm -f railway.json
 
       - name: Deploy API to Railway (Testing)
         run: railway up --service clinvara-staging-api --environment testing --ci
-        env:
-          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
-
-      - name: Disable database seeding
-        run: railway variables set RUN_SEED=false --service clinvara-staging-api --environment testing
         env:
           RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
 
@@ -89,19 +68,8 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Set railway.json for Web
-        run: |
-          cat > railway.json << 'RJSON'
-          {
-            "$schema": "https://railway.com/railway.schema.json",
-            "build": { "dockerfilePath": "Dockerfile.web" },
-            "deploy": {
-              "healthcheckPath": "/healthz",
-              "restartPolicyType": "ON_FAILURE",
-              "restartPolicyMaxRetries": 10
-            }
-          }
-          RJSON
+      - name: Remove railway.json to use service settings
+        run: rm -f railway.json
 
       - name: Deploy Web to Railway (Testing)
         run: railway up --service clinvara-staging-web --environment testing --ci
