@@ -50,8 +50,14 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Remove railway.json to use service settings
-        run: rm -f railway.json
+      - name: Set railway.json for API
+        run: |
+          cat > railway.json << 'RJSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": { "dockerfilePath": "Dockerfile.api" }
+          }
+          RJSON
 
       - name: Deploy API to Railway (Testing)
         run: railway up --service clinvara-staging-api --environment testing --ci
@@ -68,8 +74,14 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Remove railway.json to use service settings
-        run: rm -f railway.json
+      - name: Set railway.json for Web
+        run: |
+          cat > railway.json << 'RJSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": { "dockerfilePath": "Dockerfile.web" }
+          }
+          RJSON
 
       - name: Deploy Web to Railway (Testing)
         run: railway up --service clinvara-staging-web --environment testing --ci
