@@ -64,8 +64,18 @@ jobs:
           }
           RJSON
 
+      - name: Enable database seeding
+        run: railway variables set RUN_SEED=true --service clinvara-staging-api --environment testing
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
+
       - name: Deploy API to Railway (Testing)
         run: railway up --service clinvara-staging-api --environment testing --ci
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
+
+      - name: Disable database seeding
+        run: railway variables set RUN_SEED=false --service clinvara-staging-api --environment testing
         env:
           RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
 
