@@ -43,6 +43,8 @@ import { AdmitPatientPage } from './features/patient-flow/AdmitPatientPage';
 import { EncounterDetailPage } from './features/patient-flow/EncounterDetailPage';
 import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
 import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
+import { ClockPage } from './features/workforce/ClockPage';
+import { TimesheetPage } from './features/workforce/TimesheetPage';
 import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
 import { ChcListPage } from './features/chc/ChcListPage';
 import { ChcCreatePage } from './features/chc/ChcCreatePage';
@@ -62,6 +64,10 @@ import { TrainingListPage } from './features/training/TrainingListPage';
 import { TrainingDetailPage } from './features/training/TrainingDetailPage';
 import { MyTrainingPage } from './features/training/MyTrainingPage';
 import { DemoPage } from './features/demo/DemoPage';
+import { TermsOfService } from './features/legal/TermsOfService';
+import { PrivacyPolicy } from './features/legal/PrivacyPolicy';
+import { AcceptableUsePolicy } from './features/legal/AcceptableUsePolicy';
+import { DataProcessingAgreement } from './features/legal/DataProcessingAgreement';
 import { ModuleGuard } from './components/ModuleGuard';
 import { Toaster } from 'react-hot-toast';
 
@@ -76,6 +82,10 @@ export function App(): React.ReactElement {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/legal/terms" element={<TermsOfService />} />
+          <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+          <Route path="/legal/acceptable-use" element={<AcceptableUsePolicy />} />
+          <Route path="/legal/dpa" element={<DataProcessingAgreement />} />
           <Route
             path="/app"
             element={
@@ -219,6 +229,22 @@ export function App(): React.ReactElement {
               element={
                 <ModuleGuard moduleCode="ROSTER">
                   <SwapMarketplacePage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="clock"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <ClockPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="timesheets"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <TimesheetPage />
                 </ModuleGuard>
               }
             />

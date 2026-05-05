@@ -202,4 +202,18 @@ export class PatientFlowController {
   ) {
     return this.patientFlowService.completeDischargePlan(id, user.id, tenantId);
   }
+
+  // ── Patient-Location Linking ──────────────────────────
+
+  @Patch('patients/:id/location')
+  @Roles(Role.ADMIN)
+  linkPatientLocation(
+    @Param('id') id: string,
+    @Body() body: { locationId: string | null },
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string | null,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant selection required');
+    return this.patientFlowService.linkPatientLocation(id, body.locationId, tenantId, user.id);
+  }
 }

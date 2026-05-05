@@ -97,7 +97,7 @@ export function RegisterPage(): React.ReactElement {
         </div>
 
         <div className="text-slate-500 text-sm">
-          &copy; {new Date().getFullYear()} Clinvara Ltd. All rights reserved.
+          &copy; {new Date().getFullYear()} Aethon Labs Ltd. All rights reserved.
         </div>
       </div>
 

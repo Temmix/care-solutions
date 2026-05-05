@@ -6,7 +6,17 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, ShiftStatus, AvailabilityType, NotificationType } from '@prisma/client';
+import {
+  Prisma,
+  ShiftStatus,
+  AvailabilityType,
+  NotificationType,
+  ClockRecordStatus,
+} from '@prisma/client';
+import { ClockInDto } from './dto/clock-in.dto';
+import { ClockOutDto } from './dto/clock-out.dto';
+import { TimesheetQueryDto } from './dto/timesheet-query.dto';
+import { haversineDistance } from './utils/haversine';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -1492,5 +1502,273 @@ export class WorkforceService {
       staffingByLocation,
       overtimeHours,
     };
+  }
+
+  // ── Clock In / Out ──────────────────────────────────
+
+  async getMyShiftsToday(userId: string, tenantId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const assignments = await this.prisma.shiftAssignment.findMany({
+      where: {
+        userId,
+        shift: {
+          tenantId,
+          date: { gte: today, lt: tomorrow },
+          status: { in: [ShiftStatus.PUBLISHED, ShiftStatus.IN_PROGRESS] },
+        },
+      },
+      include: {
+        shift: {
+          include: {
+            shiftPattern: true,
+            location: true,
+          },
+        },
+        clockRecord: true,
+      },
+      orderBy: { shift: { shiftPattern: { startTime: 'asc' } } },
+    });
+
+    // Lazy auto-clock-out
+    for (const assignment of assignments) {
+      if (assignment.clockRecord) {
+        const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift);
+        if (updated) {
+          assignment.clockRecord = updated;
+        }
+      }
+    }
+
+    return assignments;
+  }
+
+  async clockIn(dto: ClockInDto, userId: string, tenantId: string) {
+    const assignment = await this.prisma.shiftAssignment.findUnique({
+      where: { id: dto.shiftAssignmentId },
+      include: {
+        shift: { include: { shiftPattern: true, location: true } },
+        clockRecord: true,
+      },
+    });
+
+    if (!assignment) throw new NotFoundException('Shift assignment not found');
+    if (assignment.userId !== userId) throw new ForbiddenException('Not your shift assignment');
+    if (assignment.shift.tenantId !== tenantId) throw new ForbiddenException('Tenant mismatch');
+
+    if (assignment.clockRecord) {
+      throw new BadRequestException('Already clocked in for this shift');
+    }
+
+    // Time window check: can clock in from 30 min before shift start until shift end
+    const now = new Date();
+    const shiftDate = new Date(assignment.shift.date);
+    const { startMin, endMin, overnight } = shiftTimeRange(
+      assignment.shift.shiftPattern.startTime,
+      assignment.shift.shiftPattern.endTime,
+    );
+
+    const shiftStart = new Date(shiftDate);
+    shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
+
+    const shiftEnd = new Date(shiftDate);
+    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
+
+    const windowStart = new Date(shiftStart);
+    windowStart.setMinutes(windowStart.getMinutes() - 30);
+
+    if (now < windowStart) {
+      throw new BadRequestException(
+        'Too early to clock in. Window opens 30 minutes before shift start.',
+      );
+    }
+    if (now > shiftEnd) {
+      throw new BadRequestException('Shift has already ended.');
+    }
+
+    // Geofence check
+    let distance: number | null = null;
+    const location = assignment.shift.location;
+
+    if (location?.latitude != null && location?.longitude != null) {
+      distance = haversineDistance(
+        dto.latitude,
+        dto.longitude,
+        location.latitude,
+        location.longitude,
+      );
+      const radius = location.geofenceRadius ?? 150;
+
+      if (distance > radius) {
+        throw new BadRequestException(
+          `You are ${Math.round(distance)}m from the shift location. Must be within ${radius}m to clock in.`,
+        );
+      }
+    }
+
+    const clockRecord = await this.prisma.clockRecord.create({
+      data: {
+        clockInAt: now,
+        clockInLatitude: dto.latitude,
+        clockInLongitude: dto.longitude,
+        clockInDistance: distance,
+        userId,
+        tenantId,
+        shiftAssignmentId: dto.shiftAssignmentId,
+      },
+    });
+
+    this.eventsService.emitClockIn(tenantId, {
+      userId,
+      shiftAssignmentId: dto.shiftAssignmentId,
+      clockInAt: clockRecord.clockInAt,
+    });
+
+    return clockRecord;
+  }
+
+  async clockOut(dto: ClockOutDto, userId: string, tenantId: string) {
+    const assignment = await this.prisma.shiftAssignment.findUnique({
+      where: { id: dto.shiftAssignmentId },
+      include: { clockRecord: true, shift: true },
+    });
+
+    if (!assignment) throw new NotFoundException('Shift assignment not found');
+    if (assignment.userId !== userId) throw new ForbiddenException('Not your shift assignment');
+    if (assignment.shift.tenantId !== tenantId) throw new ForbiddenException('Tenant mismatch');
+
+    if (!assignment.clockRecord) {
+      throw new BadRequestException('Not clocked in for this shift');
+    }
+    if (assignment.clockRecord.status !== ClockRecordStatus.CLOCKED_IN) {
+      throw new BadRequestException('Already clocked out');
+    }
+
+    const clockRecord = await this.prisma.clockRecord.update({
+      where: { id: assignment.clockRecord.id },
+      data: {
+        status: ClockRecordStatus.CLOCKED_OUT,
+        clockOutAt: new Date(),
+        clockOutLatitude: dto.latitude,
+        clockOutLongitude: dto.longitude,
+        notes: dto.notes,
+      },
+    });
+
+    this.eventsService.emitClockOut(tenantId, {
+      userId,
+      shiftAssignmentId: dto.shiftAssignmentId,
+      clockOutAt: clockRecord.clockOutAt,
+    });
+
+    return clockRecord;
+  }
+
+  private async lazyAutoClockOut(
+    record: { id: string; status: ClockRecordStatus; clockInAt: Date },
+    shift: {
+      date: Date;
+      shiftPattern: { startTime: string; endTime: string; breakMinutes: number };
+    },
+  ) {
+    if (record.status !== ClockRecordStatus.CLOCKED_IN) return null;
+
+    const shiftDate = new Date(shift.date);
+    const { endMin } = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
+
+    const shiftEnd = new Date(shiftDate);
+    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
+
+    const autoClockOutThreshold = new Date(shiftEnd);
+    autoClockOutThreshold.setHours(autoClockOutThreshold.getHours() + 1);
+
+    if (new Date() > autoClockOutThreshold) {
+      return this.prisma.clockRecord.update({
+        where: { id: record.id },
+        data: {
+          status: ClockRecordStatus.AUTO_CLOCKED_OUT,
+          clockOutAt: shiftEnd,
+          autoClockOut: true,
+        },
+      });
+    }
+
+    return null;
+  }
+
+  async getTimesheets(tenantId: string, query: TimesheetQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ClockRecordWhereInput = {
+      tenantId,
+      clockInAt: {
+        gte: new Date(query.from),
+        lte: new Date(query.to),
+      },
+      ...(query.userId && { userId: query.userId }),
+      ...(query.status && { status: query.status }),
+    };
+
+    const [records, total] = await Promise.all([
+      this.prisma.clockRecord.findMany({
+        where,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          shiftAssignment: {
+            include: {
+              shift: {
+                include: {
+                  shiftPattern: true,
+                  location: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { clockInAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.clockRecord.count({ where }),
+    ]);
+
+    // Compute flags
+    const items = records.map((record) => {
+      const pattern = record.shiftAssignment.shift.shiftPattern;
+      const shiftDate = new Date(record.shiftAssignment.shift.date);
+      const { startMin } = shiftTimeRange(pattern.startTime, pattern.endTime);
+
+      const shiftStart = new Date(shiftDate);
+      shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
+
+      const lateMinutes = Math.max(
+        0,
+        Math.round((record.clockInAt.getTime() - shiftStart.getTime()) / 60000),
+      );
+
+      let durationMinutes: number | null = null;
+      if (record.clockOutAt) {
+        durationMinutes = Math.round(
+          (record.clockOutAt.getTime() - record.clockInAt.getTime()) / 60000,
+        );
+      }
+
+      return {
+        ...record,
+        flags: {
+          late: lateMinutes > 5,
+          lateMinutes,
+          autoClockOut: record.autoClockOut,
+        },
+        durationMinutes,
+      };
+    });
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 }

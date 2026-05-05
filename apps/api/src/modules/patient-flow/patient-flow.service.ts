@@ -708,4 +708,44 @@ export class PatientFlowService {
       return completedPlan;
     });
   }
+
+  // ── Patient-Location Linking ──────────────────────────
+
+  async linkPatientLocation(
+    patientId: string,
+    locationId: string | null,
+    tenantId: string,
+    userId: string,
+  ) {
+    const patient = await this.prisma.patient.findFirst({
+      where: { id: patientId, tenantId },
+    });
+    if (!patient) throw new NotFoundException('Patient not found');
+
+    if (locationId) {
+      const location = await this.prisma.location.findFirst({
+        where: { id: locationId, tenantId },
+      });
+      if (!location) throw new NotFoundException('Location not found');
+    }
+
+    const updated = await this.prisma.patient.update({
+      where: { id: patientId },
+      data: { locationId },
+      include: { location: true },
+    });
+
+    this.audit
+      .log({
+        userId,
+        action: locationId ? 'LINK_PATIENT_LOCATION' : 'UNLINK_PATIENT_LOCATION',
+        resource: 'Patient',
+        resourceId: patientId,
+        tenantId,
+        metadata: { locationId },
+      })
+      .catch(() => {});
+
+    return updated;
+  }
 }

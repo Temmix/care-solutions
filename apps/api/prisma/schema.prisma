@@ -337,6 +337,14 @@ enum LocationType {
   BED
   DEPARTMENT
   WING
+  PATIENT_HOME
+}
+
+enum ClockRecordStatus {
+  CLOCKED_IN
+  CLOCKED_OUT
+  MISSED
+  AUTO_CLOCKED_OUT
 }
 
 // ─── Auth & System ────────────────────────────────────
@@ -416,6 +424,9 @@ model User {
   // Staff Training
   trainingRecords        TrainingRecord[] @relation("UserTrainingRecords")
   trainingRecordsCreated TrainingRecord[] @relation("TrainingRecordCreator")
+
+  // Clock records
+  clockRecords ClockRecord[] @relation("UserClockRecords")
 
   // Encryption: blind index for email lookup
   emailIndex String?
@@ -524,6 +535,9 @@ model Organization {
   // Multi-tenancy memberships
   tenantMemberships UserTenantMembership[] @relation("TenantMemberships")
 
+  // Clock records
+  tenantClockRecords ClockRecord[] @relation("TenantClockRecords")
+
   subscription Subscription?
 
   createdAt DateTime @default(now())
@@ -626,6 +640,9 @@ model Patient {
 
   gpPractitionerId String?
   gpPractitioner   Practitioner? @relation("PatientGP", fields: [gpPractitionerId], references: [id])
+
+  locationId String?
+  location   Location? @relation("PatientHomeLocation", fields: [locationId], references: [id])
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id])
@@ -1072,10 +1089,43 @@ model ShiftAssignment {
   swapRequestsAsOriginal ShiftSwapRequest[] @relation("SwapOriginal")
   swapRequestsAsTarget   ShiftSwapRequest[] @relation("SwapTarget")
 
+  // Clock records
+  clockRecord ClockRecord?
+
   @@unique([shiftId, userId])
   @@index([userId])
   @@index([shiftId])
   @@map("shift_assignments")
+}
+
+model ClockRecord {
+  id                String            @id @default(uuid())
+  status            ClockRecordStatus @default(CLOCKED_IN)
+  clockInAt         DateTime
+  clockInLatitude   Float?
+  clockInLongitude  Float?
+  clockInDistance    Float?            // metres from location
+  clockOutAt        DateTime?
+  clockOutLatitude  Float?
+  clockOutLongitude Float?
+  autoClockOut      Boolean           @default(false)
+  notes             String?
+
+  shiftAssignmentId String          @unique
+  shiftAssignment   ShiftAssignment @relation(fields: [shiftAssignmentId], references: [id])
+
+  userId   String
+  user     User @relation("UserClockRecords", fields: [userId], references: [id])
+
+  tenantId String
+  tenant   Organization @relation("TenantClockRecords", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, clockInAt])
+  @@index([tenantId, clockInAt])
+  @@map("clock_records")
 }
 
 model StaffAvailability {
@@ -1119,11 +1169,16 @@ model Location {
   tenantId String
   tenant   Organization @relation("TenantLocations", fields: [tenantId], references: [id])
 
+  latitude       Float?
+  longitude      Float?
+  geofenceRadius Int?     @default(150)
+
   beds              Bed[]
   shifts            Shift[]      @relation("ShiftLocation")
   encounters        Encounter[]  @relation("EncounterLocation")
   transfersFrom     Transfer[]   @relation("TransferFromLocation")
   transfersTo       Transfer[]   @relation("TransferToLocation")
+  patients          Patient[]    @relation("PatientHomeLocation")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1713,6 +1768,8 @@ enum NotificationType {
   TRAINING_EXPIRING
   TRIAL_EXPIRING
   SUBSCRIPTION_CHANGED
+  SHIFT_CLOCK_REMINDER
+  SHIFT_CLOCK_OUT_REMINDER
   SYSTEM
 }
 
@@ -1946,4 +2003,15 @@ model TrainingTypeConfig {
   @@index([tenantId])
   @@index([isActive])
   @@map("training_type_configs")
+}
+
+// ─── Stripe Webhook Idempotency ─────────────────────
+
+model ProcessedStripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([processedAt])
+  @@map("processed_stripe_events")
 }

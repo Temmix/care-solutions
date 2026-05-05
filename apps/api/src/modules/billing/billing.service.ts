@@ -1,4 +1,11 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,14 +14,33 @@ import { NotificationsService } from '../notifications/notifications.service';
 import type { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
-export class BillingService {
+export class BillingService implements OnModuleInit {
   private _stripe: Stripe | null = null;
+  private readonly logger = new Logger(BillingService.name);
 
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(ConfigService) private config: ConfigService,
     @Inject(NotificationsService) private notifications: NotificationsService,
   ) {}
+
+  onModuleInit(): void {
+    const key = this.config.get<string>('STRIPE_SECRET_KEY');
+    const env = this.config.get<string>('NODE_ENV');
+    if (!key) return;
+
+    const isLive = key.startsWith('sk_live_');
+    const isTest = key.startsWith('sk_test_');
+    if (!isLive && !isTest) {
+      throw new Error('STRIPE_SECRET_KEY has unexpected prefix; expected sk_live_ or sk_test_');
+    }
+    if (env === 'production' && !isLive) {
+      throw new Error(
+        'STRIPE_SECRET_KEY is in test mode but NODE_ENV=production. Refusing to start.',
+      );
+    }
+    this.logger.log(`Stripe initialised in ${isLive ? 'LIVE' : 'TEST'} mode`);
+  }
 
   private get stripe(): Stripe {
     if (!this._stripe) {
@@ -198,7 +224,20 @@ export class BillingService {
     return this.stripe.webhooks.constructEvent(body, signature, secret);
   }
 
-  async handleWebhookEvent(event: Stripe.Event): Promise<void> {
+  async handleWebhookEvent(event: Stripe.Event): Promise<{ deduplicated: boolean }> {
+    try {
+      await this.prisma.processedStripeEvent.create({
+        data: { id: event.id, type: event.type },
+      });
+    } catch (e) {
+      // Prisma P2002 = unique constraint violation: this event has already been processed.
+      // Stripe retries non-2xx responses for up to 3 days; this guard makes retries safe.
+      if ((e as { code?: string }).code === 'P2002') {
+        return { deduplicated: true };
+      }
+      throw e;
+    }
+
     switch (event.type) {
       case 'checkout.session.completed':
         await this.handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
@@ -214,6 +253,7 @@ export class BillingService {
         // Ignore other events
         break;
     }
+    return { deduplicated: false };
   }
 
   private async handleCheckoutComplete(session: Stripe.Checkout.Session) {

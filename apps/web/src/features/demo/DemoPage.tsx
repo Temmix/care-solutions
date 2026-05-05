@@ -637,15 +637,43 @@ export function DemoPage(): React.ReactElement {
 
       {/* Footer */}
       <footer className="bg-primary text-white py-10">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              C
+        <div className="max-w-6xl mx-auto px-6 flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                C
+              </div>
+              <span className="text-sm font-semibold tracking-tight">Clinvara</span>
             </div>
-            <span className="text-sm font-semibold tracking-tight">Clinvara</span>
+            <div className="flex items-center gap-6 text-sm">
+              <Link
+                to="/legal/terms"
+                className="text-slate-400 hover:text-white no-underline transition-colors"
+              >
+                Terms
+              </Link>
+              <Link
+                to="/legal/privacy"
+                className="text-slate-400 hover:text-white no-underline transition-colors"
+              >
+                Privacy
+              </Link>
+              <Link
+                to="/legal/acceptable-use"
+                className="text-slate-400 hover:text-white no-underline transition-colors"
+              >
+                Acceptable Use
+              </Link>
+              <Link
+                to="/legal/dpa"
+                className="text-slate-400 hover:text-white no-underline transition-colors"
+              >
+                DPA
+              </Link>
+            </div>
           </div>
-          <div className="text-slate-400 text-sm">
-            &copy; {new Date().getFullYear()} Clinvara Ltd. All rights reserved.
+          <div className="text-slate-400 text-sm text-center sm:text-left">
+            &copy; {new Date().getFullYear()} Aethon Labs Ltd. All rights reserved.
           </div>
         </div>
       </footer>

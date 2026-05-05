@@ -9,7 +9,9 @@ import {
   Req,
   RawBodyRequest,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
+import type Stripe from 'stripe';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
@@ -100,20 +102,34 @@ export class BillingController {
       throw new BadRequestException('Missing raw body');
     }
 
+    let event: Stripe.Event;
     try {
-      const event = this.billingService.constructWebhookEvent(rawBody, signature);
-      this.logger.info(`Webhook received: ${event.type} (${event.id})`, {
-        service: 'BillingController',
-        method: 'handleWebhook',
-      });
-      await this.billingService.handleWebhookEvent(event);
+      event = this.billingService.constructWebhookEvent(rawBody, signature);
+    } catch (err) {
+      this.logger.logException(
+        err,
+        { service: 'BillingController', method: 'handleWebhook' },
+        { metadata: { stage: 'signature' } },
+      );
+      // 4xx tells Stripe not to retry — correct for an invalid signature.
+      throw new BadRequestException('Webhook signature verification failed');
+    }
+
+    try {
+      const { deduplicated } = await this.billingService.handleWebhookEvent(event);
+      this.logger.info(
+        `Webhook processed: ${event.type} (${event.id})${deduplicated ? ' [dedup]' : ''}`,
+        { service: 'BillingController', method: 'handleWebhook' },
+      );
       return { received: true };
     } catch (err) {
-      this.logger.logException(err, {
-        service: 'BillingController',
-        method: 'handleWebhook',
-      });
-      throw new BadRequestException('Webhook signature verification failed');
+      this.logger.logException(
+        err,
+        { service: 'BillingController', method: 'handleWebhook' },
+        { metadata: { stage: 'processing', eventId: event.id, eventType: event.type } },
+      );
+      // 5xx tells Stripe to retry with exponential backoff (up to 3 days).
+      throw new InternalServerErrorException('Webhook processing failed');
     }
   }
 }

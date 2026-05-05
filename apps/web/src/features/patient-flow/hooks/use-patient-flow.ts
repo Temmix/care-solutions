@@ -9,6 +9,9 @@ export interface Location {
   floor: string | null;
   status: string;
   capacity: number;
+  latitude: number | null;
+  longitude: number | null;
+  geofenceRadius: number | null;
   parentId: string | null;
   children: Location[];
   beds: Bed[];
