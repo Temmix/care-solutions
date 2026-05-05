@@ -26,7 +26,6 @@ export class BillingService implements OnModuleInit {
 
   onModuleInit(): void {
     const key = this.config.get<string>('STRIPE_SECRET_KEY');
-    const env = this.config.get<string>('NODE_ENV');
     if (!key) return;
 
     const isLive = key.startsWith('sk_live_');
@@ -34,10 +33,20 @@ export class BillingService implements OnModuleInit {
     if (!isLive && !isTest) {
       throw new Error('STRIPE_SECRET_KEY has unexpected prefix; expected sk_live_ or sk_test_');
     }
-    if (env === 'production' && !isLive) {
+
+    // Explicit opt-in: STRIPE_MODE=live must be set on real-payment environments.
+    // Decoupled from NODE_ENV so staging (NODE_ENV=production) can still use test keys.
+    const expectedMode = (this.config.get<string>('STRIPE_MODE') ?? 'test').toLowerCase();
+    if (expectedMode !== 'live' && expectedMode !== 'test') {
       throw new Error(
-        'STRIPE_SECRET_KEY is in test mode but NODE_ENV=production. Refusing to start.',
+        `STRIPE_MODE has unexpected value "${expectedMode}"; expected "live" or "test"`,
       );
+    }
+    if (expectedMode === 'live' && !isLive) {
+      throw new Error('STRIPE_MODE=live but STRIPE_SECRET_KEY is sk_test_*. Refusing to start.');
+    }
+    if (expectedMode === 'test' && !isTest) {
+      throw new Error('STRIPE_MODE=test but STRIPE_SECRET_KEY is sk_live_*. Refusing to start.');
     }
     this.logger.log(`Stripe initialised in ${isLive ? 'LIVE' : 'TEST'} mode`);
   }
