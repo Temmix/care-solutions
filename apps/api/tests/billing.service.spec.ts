@@ -218,28 +218,43 @@ describe('BillingService', () => {
       );
     };
 
-    it('passes for sk_live in production', () => {
-      const svc = make({ STRIPE_SECRET_KEY: 'sk_live_abc', NODE_ENV: 'production' });
+    it('passes for sk_live with STRIPE_MODE=live', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_live_abc', STRIPE_MODE: 'live' });
       expect(() => svc.onModuleInit()).not.toThrow();
     });
 
-    it('passes for sk_test in development', () => {
-      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', NODE_ENV: 'development' });
+    it('passes for sk_test with STRIPE_MODE unset (defaults to test)', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc' });
       expect(() => svc.onModuleInit()).not.toThrow();
     });
 
-    it('throws when sk_test is used in production', () => {
+    it('passes for sk_test with NODE_ENV=production but STRIPE_MODE not set (staging case)', () => {
       const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', NODE_ENV: 'production' });
-      expect(() => svc.onModuleInit()).toThrow(/test mode but NODE_ENV=production/);
+      expect(() => svc.onModuleInit()).not.toThrow();
+    });
+
+    it('throws when STRIPE_MODE=live but key is sk_test_*', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', STRIPE_MODE: 'live' });
+      expect(() => svc.onModuleInit()).toThrow(/STRIPE_MODE=live but STRIPE_SECRET_KEY is sk_test/);
+    });
+
+    it('throws when STRIPE_MODE=test but key is sk_live_* (prevents accidental live charges)', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_live_abc', STRIPE_MODE: 'test' });
+      expect(() => svc.onModuleInit()).toThrow(/STRIPE_MODE=test but STRIPE_SECRET_KEY is sk_live/);
     });
 
     it('throws on unexpected key prefix', () => {
-      const svc = make({ STRIPE_SECRET_KEY: 'rk_live_restricted', NODE_ENV: 'production' });
+      const svc = make({ STRIPE_SECRET_KEY: 'rk_live_restricted' });
       expect(() => svc.onModuleInit()).toThrow(/unexpected prefix/);
     });
 
+    it('throws on unexpected STRIPE_MODE value', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', STRIPE_MODE: 'sandbox' });
+      expect(() => svc.onModuleInit()).toThrow(/STRIPE_MODE has unexpected value/);
+    });
+
     it('no-ops if key is unset (e.g. local dev without billing)', () => {
-      const svc = make({ STRIPE_SECRET_KEY: undefined, NODE_ENV: 'development' });
+      const svc = make({ STRIPE_SECRET_KEY: undefined });
       expect(() => svc.onModuleInit()).not.toThrow();
     });
   });
