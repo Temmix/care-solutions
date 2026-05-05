@@ -28,6 +28,9 @@ describe('BillingService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    processedStripeEvent: {
+      create: jest.Mock;
+    };
   };
   let configService: { get: jest.Mock; getOrThrow: jest.Mock };
 
@@ -43,6 +46,9 @@ describe('BillingService', () => {
       organization: {
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      processedStripeEvent: {
+        create: jest.fn().mockResolvedValue({}),
       },
     };
 
@@ -140,6 +146,101 @@ describe('BillingService', () => {
       expect(plans[1].priceMonthlyGBP).toBe(59);
       expect(plans[2].priceMonthlyGBP).toBe(99);
       expect(plans[3].priceMonthlyGBP).toBe(299);
+    });
+  });
+
+  // ── Webhook idempotency (B1) ────────────────────────────
+
+  describe('handleWebhookEvent', () => {
+    const buildEvent = (id = 'evt_123', type = 'customer.subscription.updated') =>
+      ({
+        id,
+        type,
+        data: {
+          object: {
+            id: 'sub_1',
+            metadata: { organizationId: 'org-1' },
+            items: {
+              data: [{ price: { id: 'price_x' }, current_period_start: 0, current_period_end: 0 }],
+            },
+            status: 'active',
+            cancel_at_period_end: false,
+            trial_end: null,
+          },
+        },
+      }) as any;
+
+    it('returns deduplicated:true on duplicate event id', async () => {
+      const dupErr = Object.assign(new Error('unique violation'), { code: 'P2002' });
+      prisma.processedStripeEvent.create.mockRejectedValueOnce(dupErr);
+
+      const result = await service.handleWebhookEvent(buildEvent());
+
+      expect(result.deduplicated).toBe(true);
+      expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+    });
+
+    it('processes event and returns deduplicated:false on first delivery', async () => {
+      prisma.processedStripeEvent.create.mockResolvedValueOnce({});
+      prisma.subscription.upsert.mockResolvedValueOnce({});
+
+      const result = await service.handleWebhookEvent(buildEvent());
+
+      expect(result.deduplicated).toBe(false);
+      expect(prisma.processedStripeEvent.create).toHaveBeenCalledWith({
+        data: { id: 'evt_123', type: 'customer.subscription.updated' },
+      });
+    });
+
+    it('rethrows non-P2002 prisma errors so Stripe retries', async () => {
+      const dbErr = Object.assign(new Error('connection failed'), { code: 'P1001' });
+      prisma.processedStripeEvent.create.mockRejectedValueOnce(dbErr);
+
+      await expect(service.handleWebhookEvent(buildEvent())).rejects.toThrow('connection failed');
+    });
+  });
+
+  // ── Mode validation (B2) ────────────────────────────────
+
+  describe('onModuleInit', () => {
+    const make = (envVars: Record<string, string | undefined>) => {
+      const cfg = {
+        get: jest.fn((k: string) => envVars[k]),
+        getOrThrow: jest.fn(),
+      };
+      return new BillingService(
+        prisma as any,
+        cfg as any,
+        {
+          notify: jest.fn(),
+          notifyMany: jest.fn(),
+        } as any,
+      );
+    };
+
+    it('passes for sk_live in production', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_live_abc', NODE_ENV: 'production' });
+      expect(() => svc.onModuleInit()).not.toThrow();
+    });
+
+    it('passes for sk_test in development', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', NODE_ENV: 'development' });
+      expect(() => svc.onModuleInit()).not.toThrow();
+    });
+
+    it('throws when sk_test is used in production', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'sk_test_abc', NODE_ENV: 'production' });
+      expect(() => svc.onModuleInit()).toThrow(/test mode but NODE_ENV=production/);
+    });
+
+    it('throws on unexpected key prefix', () => {
+      const svc = make({ STRIPE_SECRET_KEY: 'rk_live_restricted', NODE_ENV: 'production' });
+      expect(() => svc.onModuleInit()).toThrow(/unexpected prefix/);
+    });
+
+    it('no-ops if key is unset (e.g. local dev without billing)', () => {
+      const svc = make({ STRIPE_SECRET_KEY: undefined, NODE_ENV: 'development' });
+      expect(() => svc.onModuleInit()).not.toThrow();
     });
   });
 
