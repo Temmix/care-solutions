@@ -65,7 +65,9 @@ jobs:
           RJSON
 
       - name: Deploy API to Railway
-        run: railway up --service clinvara-api
+        run: railway up --service clinvara-api --environment production --ci
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
 
   deploy-web:
     name: Deploy Web
@@ -92,4 +94,6 @@ jobs:
           RJSON
 
       - name: Deploy Web to Railway
-        run: railway up --service clinvara-web
+        run: railway up --service clinvara-web --environment production --ci
+        env:
+          RAILWAY_PROJECT_ID: 2c1aeca7-b49f-46ec-a355-31c90276cf92
