@@ -16,6 +16,9 @@ import { PractitionersPage } from './features/practitioners/PractitionersPage';
 import { SuperAdminsPage } from './features/super-admins/SuperAdminsPage';
 import { TenantAdminsPage } from './features/tenant-admins/TenantAdminsPage';
 import { BillingPage } from './features/billing/BillingPage';
+import { TrialsPage } from './features/admin-trials/TrialsPage';
+import { PendingVerificationPage } from './features/admin-tenants/PendingVerificationPage';
+import { TenantDetailPage } from './features/admin-tenants/TenantDetailPage';
 import { CarePlanListPage } from './features/care-plans/CarePlanListPage';
 import { CarePlanCreatePage } from './features/care-plans/CarePlanCreatePage';
 import { CarePlanDetailPage } from './features/care-plans/CarePlanDetailPage';
@@ -429,6 +432,9 @@ export function App(): React.ReactElement {
             <Route path="select-tenant" element={<SelectTenantPage />} />
             <Route path="super-admins" element={<SuperAdminsPage />} />
             <Route path="tenant-admins" element={<TenantAdminsPage />} />
+            <Route path="admin/trials" element={<TrialsPage />} />
+            <Route path="admin/tenants" element={<PendingVerificationPage />} />
+            <Route path="admin/tenants/:id" element={<TenantDetailPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="audit/compliance" element={<AuditCompliancePage />} />
             <Route path="notifications" element={<NotificationsPage />} />

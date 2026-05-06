@@ -9,8 +9,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PLAN_LIMITS } from './plan-limits';
+import { PLAN_LIMITS, TRIAL_DURATION_DAYS, TRIAL_TIER } from './plan-limits';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 import type { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
@@ -22,6 +23,7 @@ export class BillingService implements OnModuleInit {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(ConfigService) private config: ConfigService,
     @Inject(NotificationsService) private notifications: NotificationsService,
+    @Inject(AuditService) private audit: AuditService,
   ) {}
 
   onModuleInit(): void {
@@ -139,7 +141,7 @@ export class BillingService implements OnModuleInit {
     return sub;
   }
 
-  private async expireTrial(organizationId: string): Promise<void> {
+  async expireTrial(organizationId: string): Promise<void> {
     const freeLimits = PLAN_LIMITS.FREE;
     await this.prisma.subscription.update({
       where: { organizationId },
@@ -147,6 +149,7 @@ export class BillingService implements OnModuleInit {
         tier: 'FREE',
         status: 'ACTIVE',
         trialEndsAt: null,
+        lastTrialReminderDay: null,
         patientLimit: freeLimits.patientLimit,
         userLimit: freeLimits.userLimit,
       },
@@ -159,6 +162,176 @@ export class BillingService implements OnModuleInit {
       'Your Professional trial has ended and your organisation has been downgraded to the Free plan. Subscribe to restore full access.',
       '/app/billing',
     ).catch(() => {});
+  }
+
+  // ── Trial admin (SUPER_ADMIN) ────────────────────────────
+
+  async listTrials() {
+    const subs = await this.prisma.subscription.findMany({
+      where: { status: 'TRIALING' },
+      orderBy: { trialEndsAt: 'asc' },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            email: true,
+            verificationStatus: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    const now = Date.now();
+    return subs.map((s) => ({
+      organizationId: s.organizationId,
+      organization: s.organization,
+      tier: s.tier,
+      status: s.status,
+      trialEndsAt: s.trialEndsAt,
+      daysRemaining: s.trialEndsAt
+        ? Math.max(0, Math.ceil((s.trialEndsAt.getTime() - now) / (1000 * 60 * 60 * 24)))
+        : null,
+      createdAt: s.createdAt,
+    }));
+  }
+
+  async extendTrial(
+    organizationId: string,
+    additionalDays: number,
+    adminUserId: string,
+    reason?: string,
+  ) {
+    const sub = await this.prisma.subscription.findUnique({ where: { organizationId } });
+    if (!sub) {
+      throw new NotFoundException('Subscription not found for organisation.');
+    }
+
+    const before = {
+      tier: sub.tier,
+      status: sub.status,
+      trialEndsAt: sub.trialEndsAt,
+    };
+
+    // If trial already lazy-expired (tier=FREE), re-open it from now.
+    // Otherwise, add days to the existing trialEndsAt.
+    const baseDate =
+      sub.status === 'TRIALING' && sub.trialEndsAt && sub.trialEndsAt > new Date()
+        ? sub.trialEndsAt
+        : new Date();
+    const newEndsAt = new Date(baseDate.getTime() + additionalDays * 24 * 60 * 60 * 1000);
+    const proLimits = PLAN_LIMITS[TRIAL_TIER];
+
+    const updated = await this.prisma.subscription.update({
+      where: { organizationId },
+      data: {
+        tier: TRIAL_TIER,
+        status: 'TRIALING',
+        trialEndsAt: newEndsAt,
+        lastTrialReminderDay: null,
+        patientLimit: proLimits.patientLimit,
+        userLimit: proLimits.userLimit,
+      },
+    });
+
+    await this.audit.log({
+      userId: adminUserId,
+      action: 'TRIAL_EXTENDED',
+      resource: 'Subscription',
+      resourceId: sub.id,
+      tenantId: organizationId,
+      metadata: {
+        additionalDays,
+        reason,
+        before,
+        after: { tier: updated.tier, status: updated.status, trialEndsAt: updated.trialEndsAt },
+      },
+    });
+
+    return { subscription: updated };
+  }
+
+  async cancelTrialAdmin(organizationId: string, adminUserId: string, reason?: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { organizationId } });
+    if (!sub) {
+      throw new NotFoundException('Subscription not found for organisation.');
+    }
+    if (sub.status !== 'TRIALING') {
+      throw new BadRequestException('Subscription is not in TRIALING status.');
+    }
+
+    const before = { tier: sub.tier, status: sub.status, trialEndsAt: sub.trialEndsAt };
+    await this.expireTrial(organizationId);
+
+    await this.audit.log({
+      userId: adminUserId,
+      action: 'TRIAL_CANCELED',
+      resource: 'Subscription',
+      resourceId: sub.id,
+      tenantId: organizationId,
+      metadata: {
+        reason,
+        before,
+        after: { tier: 'FREE', status: 'ACTIVE', trialEndsAt: null },
+      },
+    });
+
+    return { ok: true };
+  }
+
+  async grantTrial(
+    organizationId: string,
+    durationDays: number | undefined,
+    adminUserId: string,
+    reason?: string,
+  ) {
+    const sub = await this.prisma.subscription.findUnique({ where: { organizationId } });
+    if (!sub) {
+      throw new NotFoundException('Subscription not found for organisation.');
+    }
+    if (sub.stripeSubscriptionId) {
+      throw new BadRequestException(
+        'Cannot grant trial: tenant has an active Stripe subscription. Cancel via the customer portal first.',
+      );
+    }
+    if (sub.status === 'TRIALING') {
+      throw new BadRequestException('Tenant is already on a trial. Use extend instead.');
+    }
+
+    const before = { tier: sub.tier, status: sub.status, trialEndsAt: sub.trialEndsAt };
+    const days = durationDays ?? TRIAL_DURATION_DAYS;
+    const newEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    const proLimits = PLAN_LIMITS[TRIAL_TIER];
+
+    const updated = await this.prisma.subscription.update({
+      where: { organizationId },
+      data: {
+        tier: TRIAL_TIER,
+        status: 'TRIALING',
+        trialEndsAt: newEndsAt,
+        lastTrialReminderDay: null,
+        patientLimit: proLimits.patientLimit,
+        userLimit: proLimits.userLimit,
+      },
+    });
+
+    await this.audit.log({
+      userId: adminUserId,
+      action: 'TRIAL_GRANTED',
+      resource: 'Subscription',
+      resourceId: sub.id,
+      tenantId: organizationId,
+      metadata: {
+        durationDays: days,
+        reason,
+        before,
+        after: { tier: updated.tier, status: updated.status, trialEndsAt: updated.trialEndsAt },
+      },
+    });
+
+    return { subscription: updated };
   }
 
   // ── Stripe Customer ─────────────────────────────────────
