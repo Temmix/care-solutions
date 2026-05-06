@@ -61,13 +61,13 @@ export function useBilling() {
   const createCheckout = useCallback(async (priceId: string): Promise<{ url: string }> => {
     return api.post<{ url: string }>('/billing/checkout', {
       priceId,
-      returnUrl: `${window.location.origin}/billing`,
+      returnUrl: `${window.location.origin}/app/billing`,
     });
   }, []);
 
   const openPortal = useCallback(async (): Promise<{ url: string }> => {
     return api.post<{ url: string }>('/billing/portal', {
-      returnUrl: `${window.location.origin}/billing`,
+      returnUrl: `${window.location.origin}/app/billing`,
     });
   }, []);
 
