@@ -95,6 +95,13 @@ enum SubscriptionStatus {
   INCOMPLETE
 }
 
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
 enum CarePlanStatus {
   DRAFT
   ACTIVE
@@ -371,6 +378,9 @@ model User {
   practitioner   Practitioner?
   recordedEvents PatientEvent[] @relation("PatientEventRecorder")
 
+  // KYB: orgs this admin has verified
+  verifiedOrganizations Organization[] @relation("OrgVerifier")
+
   authoredCarePlans CarePlan[]     @relation("CarePlanAuthor")
   carePlanNotes     CarePlanNote[] @relation("CarePlanNoteAuthor")
 
@@ -471,6 +481,15 @@ model Organization {
   postalCode   String?
   country      String?          @default("GB")
 
+  // Identity verification (KYB)
+  companiesHouseNumber String?
+  cqcProviderId        String?
+  verificationStatus   VerificationStatus @default(UNVERIFIED)
+  verifiedAt           DateTime?
+  verifiedById         String?
+  verifiedBy           User?              @relation("OrgVerifier", fields: [verifiedById], references: [id])
+  verificationNotes    String?
+
   // Stripe billing
   stripeCustomerId String? @unique
 
@@ -559,6 +578,7 @@ model Subscription {
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
   trialEndsAt          DateTime?
+  lastTrialReminderDay Int?
   patientLimit         Int                @default(10)
   userLimit            Int                @default(3)
 
@@ -567,6 +587,7 @@ model Subscription {
 
   @@index([organizationId])
   @@index([stripeSubscriptionId])
+  @@index([status, trialEndsAt])
   @@map("subscriptions")
 }
 

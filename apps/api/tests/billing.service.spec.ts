@@ -22,7 +22,9 @@ describe('BillingService', () => {
     subscription: {
       findUnique: jest.Mock;
       upsert: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
+      findMany: jest.Mock;
     };
     organization: {
       findUnique: jest.Mock;
@@ -33,6 +35,7 @@ describe('BillingService', () => {
     };
   };
   let configService: { get: jest.Mock; getOrThrow: jest.Mock };
+  let audit: { log: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -41,7 +44,9 @@ describe('BillingService', () => {
       subscription: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn(),
+        findMany: jest.fn(),
       },
       organization: {
         findUnique: jest.fn(),
@@ -57,6 +62,8 @@ describe('BillingService', () => {
       getOrThrow: jest.fn().mockReturnValue('whsec_test'),
     };
 
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
+
     service = new BillingService(
       prisma as any,
       configService as any,
@@ -64,6 +71,7 @@ describe('BillingService', () => {
         notify: jest.fn().mockResolvedValue(undefined),
         notifyMany: jest.fn().mockResolvedValue(undefined),
       } as any,
+      audit as any,
     );
   });
 
@@ -215,6 +223,7 @@ describe('BillingService', () => {
           notify: jest.fn(),
           notifyMany: jest.fn(),
         } as any,
+        { log: jest.fn() } as any,
       );
     };
 
@@ -259,6 +268,207 @@ describe('BillingService', () => {
     });
   });
 
+  // ── Trial admin (SUPER_ADMIN) ───────────────────────────
+
+  describe('listTrials', () => {
+    it('returns trials with daysRemaining computed', async () => {
+      const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          organizationId: 'org-1',
+          tier: 'PROFESSIONAL',
+          status: 'TRIALING',
+          trialEndsAt: inSevenDays,
+          createdAt: new Date(),
+          organization: { id: 'org-1', name: 'Test', type: 'CARE_HOME' },
+        },
+      ]);
+      const result = await service.listTrials();
+      expect(result).toHaveLength(1);
+      expect(result[0].daysRemaining).toBe(7);
+    });
+  });
+
+  describe('extendTrial', () => {
+    it('extends an active trial and writes audit log', async () => {
+      const trialEndsAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt,
+      });
+      prisma.subscription.update.mockResolvedValue({
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt: new Date(trialEndsAt.getTime() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      await service.extendTrial('org-1', 7, 'admin-1', 'sales request');
+
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1' },
+          data: expect.objectContaining({ status: 'TRIALING' }),
+        }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'admin-1',
+          action: 'TRIAL_EXTENDED',
+          resource: 'Subscription',
+          tenantId: 'org-1',
+          metadata: expect.objectContaining({ additionalDays: 7, reason: 'sales request' }),
+        }),
+      );
+    });
+
+    it('re-opens an already-expired trial from now', async () => {
+      const past = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'FREE',
+        status: 'ACTIVE',
+        trialEndsAt: past,
+      });
+      prisma.subscription.update.mockResolvedValue({
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt: new Date(),
+      });
+
+      await service.extendTrial('org-1', 14, 'admin-1');
+
+      const updateCall = prisma.subscription.update.mock.calls[0][0];
+      const newEndsAt = updateCall.data.trialEndsAt as Date;
+      // Should be ~14 days from now, not 14 days from past
+      const fourteenDaysFromNow = Date.now() + 14 * 24 * 60 * 60 * 1000;
+      expect(Math.abs(newEndsAt.getTime() - fourteenDaysFromNow)).toBeLessThan(60_000);
+    });
+
+    it('throws NotFoundException for unknown organization', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(null);
+      await expect(service.extendTrial('nope', 7, 'admin-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('cancelTrialAdmin', () => {
+    it('cancels a TRIALING subscription and writes audit log', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt: new Date(),
+      });
+      prisma.subscription.update.mockResolvedValue({});
+      // expireTrial calls userTenantMembership.findMany internally
+      (prisma as any).userTenantMembership = {
+        findMany: jest.fn().mockResolvedValue([]),
+      };
+
+      await service.cancelTrialAdmin('org-1', 'admin-1', 'abuse');
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'TRIAL_CANCELED',
+          metadata: expect.objectContaining({ reason: 'abuse' }),
+        }),
+      );
+    });
+
+    it('rejects when subscription is not TRIALING', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        trialEndsAt: null,
+      });
+      await expect(service.cancelTrialAdmin('org-1', 'admin-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('grantTrial', () => {
+    it('grants a new trial to a FREE tenant', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'FREE',
+        status: 'ACTIVE',
+        trialEndsAt: null,
+        stripeSubscriptionId: null,
+      });
+      prisma.subscription.update.mockResolvedValue({
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        trialEndsAt: new Date(),
+      });
+
+      await service.grantTrial('org-1', 30, 'admin-1', 'win-back');
+
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tier: 'PROFESSIONAL', status: 'TRIALING' }),
+        }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'TRIAL_GRANTED',
+          metadata: expect.objectContaining({ durationDays: 30, reason: 'win-back' }),
+        }),
+      );
+    });
+
+    it('rejects when tenant has active Stripe subscription', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        stripeSubscriptionId: 'sub_stripe_123',
+      });
+      await expect(service.grantTrial('org-1', undefined, 'admin-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects when tenant is already TRIALING', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'PROFESSIONAL',
+        status: 'TRIALING',
+        stripeSubscriptionId: null,
+      });
+      await expect(service.grantTrial('org-1', undefined, 'admin-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('uses default TRIAL_DURATION_DAYS when durationDays is undefined', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        id: 'sub-1',
+        organizationId: 'org-1',
+        tier: 'FREE',
+        status: 'ACTIVE',
+        stripeSubscriptionId: null,
+      });
+      prisma.subscription.update.mockResolvedValue({});
+
+      await service.grantTrial('org-1', undefined, 'admin-1');
+
+      const updateCall = prisma.subscription.update.mock.calls[0][0];
+      const newEndsAt = updateCall.data.trialEndsAt as Date;
+      const sixtyDaysFromNow = Date.now() + 60 * 24 * 60 * 60 * 1000;
+      expect(Math.abs(newEndsAt.getTime() - sixtyDaysFromNow)).toBeLessThan(60_000);
+    });
+  });
+
   // ── Notification tests ──────────────────────────────────
 
   describe('trial expiry notification', () => {
@@ -288,7 +498,12 @@ describe('BillingService', () => {
         },
       };
 
-      const svc = new BillingService(billingPrisma as any, configService as any, notif as any);
+      const svc = new BillingService(
+        billingPrisma as any,
+        configService as any,
+        notif as any,
+        { log: jest.fn() } as any,
+      );
 
       await svc.getSubscription('org-1');
 

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsEnum, Matches } from 'class-validator';
 import { Role, OrganizationType } from '@prisma/client';
 
 export class RegisterDto {
@@ -54,4 +54,19 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   country?: string;
+
+  // Identity verification fields (KYB) — optional at signup, can be filled later
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9]{6,8}$/, {
+    message: 'companiesHouseNumber must be 6–8 alphanumeric characters',
+  })
+  companiesHouseNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^1-\d{6,12}$/, {
+    message: 'cqcProviderId must be in the form "1-XXXXXXXX"',
+  })
+  cqcProviderId?: string;
 }

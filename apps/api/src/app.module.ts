@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -36,6 +37,7 @@ import { HealthController } from './health.controller';
       transports: [{ type: 'console' }, { type: 'file' }],
       fileOptions: { directory: './logs', prefix: 'care-api' },
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     EncryptionModule,
     EventsModule,
