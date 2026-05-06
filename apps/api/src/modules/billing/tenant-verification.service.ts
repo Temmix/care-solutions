@@ -138,6 +138,44 @@ export class TenantVerificationService {
     return updated;
   }
 
+  async resetVerification(organizationId: string, adminUserId: string, reason?: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organisation not found.');
+    if (org.verificationStatus === 'UNVERIFIED') {
+      throw new BadRequestException('Organisation is already unverified.');
+    }
+
+    const before = {
+      status: org.verificationStatus,
+      verifiedAt: org.verifiedAt,
+      verifiedById: org.verifiedById,
+    };
+    const updated = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        verificationStatus: 'UNVERIFIED',
+        verifiedAt: null,
+        verifiedById: null,
+        // verificationNotes preserved — useful audit trail of why this was reset
+      },
+    });
+
+    await this.audit.log({
+      userId: adminUserId,
+      action: 'TENANT_VERIFICATION_RESET',
+      resource: 'Organization',
+      resourceId: organizationId,
+      tenantId: organizationId,
+      metadata: {
+        reason,
+        before,
+        after: { status: updated.verificationStatus },
+      },
+    });
+
+    return updated;
+  }
+
   async reject(organizationId: string, adminUserId: string, reason: string) {
     const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
     if (!org) throw new NotFoundException('Organisation not found.');

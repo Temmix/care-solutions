@@ -2,7 +2,12 @@ import { Controller, Get, Post, Patch, Param, Body, UseGuards, Inject } from '@n
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { TenantVerificationService } from './tenant-verification.service';
-import { VerifyTenantDto, RejectTenantDto, UpdateTenantIdentityDto } from './dto';
+import {
+  VerifyTenantDto,
+  RejectTenantDto,
+  ResetVerificationDto,
+  UpdateTenantIdentityDto,
+} from './dto';
 import { Roles, CurrentUser } from '../../common/decorators';
 import { RolesGuard } from '../../common/guards';
 
@@ -47,5 +52,14 @@ export class TenantVerificationController {
     @CurrentUser() user: { id: string },
   ) {
     return this.service.reject(id, user.id, body.reason);
+  }
+
+  @Post(':id/reset-verification')
+  resetVerification(
+    @Param('id') id: string,
+    @Body() body: ResetVerificationDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.resetVerification(id, user.id, body.reason);
   }
 }

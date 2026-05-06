@@ -127,6 +127,67 @@ describe('TenantVerificationService', () => {
     });
   });
 
+  describe('resetVerification', () => {
+    it('flips VERIFIED tenant back to UNVERIFIED, clears verifiedAt + verifiedById, audits', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        verificationStatus: 'VERIFIED',
+        verifiedAt: new Date('2026-05-01'),
+        verifiedById: 'admin-old',
+      });
+      prisma.organization.update.mockResolvedValue({ verificationStatus: 'UNVERIFIED' });
+
+      await service.resetVerification('org-1', 'admin-1', 'mis-clicked verify');
+
+      expect(prisma.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-1' },
+        data: {
+          verificationStatus: 'UNVERIFIED',
+          verifiedAt: null,
+          verifiedById: null,
+        },
+      });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'admin-1',
+          action: 'TENANT_VERIFICATION_RESET',
+          resource: 'Organization',
+          resourceId: 'org-1',
+          metadata: expect.objectContaining({ reason: 'mis-clicked verify' }),
+        }),
+      );
+    });
+
+    it('also resets a REJECTED tenant', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        verificationStatus: 'REJECTED',
+        verifiedAt: null,
+        verifiedById: null,
+      });
+      prisma.organization.update.mockResolvedValue({ verificationStatus: 'UNVERIFIED' });
+
+      await service.resetVerification('org-1', 'admin-1');
+
+      expect(prisma.organization.update).toHaveBeenCalled();
+    });
+
+    it('rejects when already UNVERIFIED (no-op guard)', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        verificationStatus: 'UNVERIFIED',
+      });
+      await expect(service.resetVerification('org-1', 'admin-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('throws NotFoundException for unknown organization', async () => {
+      prisma.organization.findUnique.mockResolvedValue(null);
+      await expect(service.resetVerification('nope', 'admin-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('updateIdentity', () => {
     it('only updates fields provided in DTO; preserves others', async () => {
       prisma.organization.findUnique.mockResolvedValue({

@@ -80,5 +80,20 @@ export function useAdminTenants() {
     [],
   );
 
-  return { listPending, getDetail, updateIdentity, verify, reject, loading, error };
+  const resetVerification = useCallback(
+    (id: string, reason?: string) =>
+      api.post<unknown>(`/admin/tenants/${id}/reset-verification`, { reason }),
+    [],
+  );
+
+  return {
+    listPending,
+    getDetail,
+    updateIdentity,
+    verify,
+    reject,
+    resetVerification,
+    loading,
+    error,
+  };
 }
