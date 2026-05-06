@@ -5,11 +5,11 @@ import { useAdminTenants, type TenantDetail } from './hooks/use-admin-tenants';
 import { useAdminTrials } from '../admin-trials/hooks/use-admin-trials';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
-type ActionMode = 'verify' | 'reject' | 'extend' | 'cancel' | 'grant' | null;
+type ActionMode = 'verify' | 'reject' | 'reset' | 'extend' | 'cancel' | 'grant' | null;
 
 export function TenantDetailPage(): React.ReactElement {
   const { id = '' } = useParams<{ id: string }>();
-  const { getDetail, verify, reject } = useAdminTenants();
+  const { getDetail, verify, reject, resetVerification } = useAdminTenants();
   const { extend, cancel, grant } = useAdminTrials();
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +109,14 @@ export function TenantDetailPage(): React.ReactElement {
               className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Reject
+            </button>
+          )}
+          {tenant.verificationStatus !== 'UNVERIFIED' && (
+            <button
+              onClick={() => setAction('reset')}
+              className="px-4 py-2 text-sm bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
+            >
+              Reset to unverified
             </button>
           )}
         </div>
@@ -214,6 +222,21 @@ export function TenantDetailPage(): React.ReactElement {
           reasonRequired
           onClose={() => setAction(null)}
           onConfirm={(reason) => runAction(() => reject(id, reason), 'Tenant rejected')}
+        />
+      )}
+      {action === 'reset' && (
+        <SimpleReasonModal
+          title={`Reset verification — ${tenant.name}`}
+          desc="Tenant returns to UNVERIFIED status and reappears in the verification queue. Existing notes are preserved as audit history. Use this to undo a mistaken verify or reject."
+          confirmLabel="Reset to unverified"
+          confirmClass="bg-slate-700 hover:bg-slate-800"
+          onClose={() => setAction(null)}
+          onConfirm={(reason) =>
+            runAction(
+              () => resetVerification(id, reason || undefined),
+              'Verification reset to unverified',
+            )
+          }
         />
       )}
       {action === 'extend' && (
