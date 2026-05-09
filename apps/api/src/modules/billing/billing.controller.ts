@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Headers,
+  Param,
   UseGuards,
   Inject,
   Req,
@@ -18,8 +19,10 @@ import { Request } from 'express';
 import { LoggerService } from '@care/logger';
 import { BillingService } from './billing.service';
 import { SubscriptionLimitService } from './subscription-limit.service';
-import { Roles, CurrentTenant } from '../../common/decorators';
+import { ExtendTrialDto, CancelTrialDto, GrantTrialDto } from './dto';
+import { Roles, CurrentTenant, CurrentUser } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Controller('billing')
 export class BillingController {
@@ -27,6 +30,7 @@ export class BillingController {
     @Inject(BillingService) private billingService: BillingService,
     @Inject(SubscriptionLimitService) private limitService: SubscriptionLimitService,
     private readonly logger: LoggerService,
+    @Inject(MetricsService) private readonly metrics: MetricsService,
   ) {}
 
   // ── Public: list available plans ──────────────────────
@@ -43,6 +47,53 @@ export class BillingController {
   @Roles(Role.SUPER_ADMIN)
   getAllSubscriptions() {
     return this.billingService.getAllSubscriptions();
+  }
+
+  // ── SUPER_ADMIN: trial admin ──────────────────────────
+
+  @Get('trials')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  listTrials() {
+    return this.billingService.listTrials();
+  }
+
+  @Post('trials/:organizationId/extend')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  extendTrial(
+    @Param('organizationId') organizationId: string,
+    @Body() body: ExtendTrialDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.billingService.extendTrial(
+      organizationId,
+      body.additionalDays,
+      user.id,
+      body.reason,
+    );
+  }
+
+  @Post('trials/:organizationId/cancel')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  cancelTrial(
+    @Param('organizationId') organizationId: string,
+    @Body() body: CancelTrialDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.billingService.cancelTrialAdmin(organizationId, user.id, body.reason);
+  }
+
+  @Post('trials/:organizationId/grant')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  grantTrial(
+    @Param('organizationId') organizationId: string,
+    @Body() body: GrantTrialDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.billingService.grantTrial(organizationId, body.durationDays, user.id, body.reason);
   }
 
   // ── Authenticated: subscription info ──────────────────
@@ -106,6 +157,7 @@ export class BillingController {
     try {
       event = this.billingService.constructWebhookEvent(rawBody, signature);
     } catch (err) {
+      this.metrics.observeStripeWebhook('unknown', 'signature_failed');
       this.logger.logException(
         err,
         { service: 'BillingController', method: 'handleWebhook' },
@@ -115,14 +167,26 @@ export class BillingController {
       throw new BadRequestException('Webhook signature verification failed');
     }
 
+    const start = Date.now();
     try {
       const { deduplicated } = await this.billingService.handleWebhookEvent(event);
+      const duration = (Date.now() - start) / 1000;
+      this.metrics.observeStripeWebhook(
+        event.type,
+        deduplicated ? 'deduplicated' : 'processed',
+        duration,
+      );
       this.logger.info(
         `Webhook processed: ${event.type} (${event.id})${deduplicated ? ' [dedup]' : ''}`,
         { service: 'BillingController', method: 'handleWebhook' },
       );
       return { received: true };
     } catch (err) {
+      this.metrics.observeStripeWebhook(
+        event.type,
+        'processing_failed',
+        (Date.now() - start) / 1000,
+      );
       this.logger.logException(
         err,
         { service: 'BillingController', method: 'handleWebhook' },

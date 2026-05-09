@@ -63,6 +63,9 @@ export class AuthService {
             city: dto.city ?? null,
             postalCode: dto.postalCode ?? null,
             country: dto.country ?? 'GB',
+            companiesHouseNumber: dto.companiesHouseNumber ?? null,
+            cqcProviderId: dto.cqcProviderId ?? null,
+            // verificationStatus defaults to UNVERIFIED via schema
           },
         });
 

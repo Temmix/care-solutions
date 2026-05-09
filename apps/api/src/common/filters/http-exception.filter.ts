@@ -8,10 +8,14 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { LoggerService } from '@care/logger';
+import { MetricsService } from '../../modules/metrics/metrics.service';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  constructor(@Inject(LoggerService) private readonly logger: LoggerService) {}
+  constructor(
+    @Inject(LoggerService) private readonly logger: LoggerService,
+    @Inject(MetricsService) private readonly metrics: MetricsService,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -26,6 +30,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const user = request.user as { id?: string } | undefined;
     const tenantId = (request as unknown as Record<string, unknown>).tenantId as string | undefined;
+
+    // Exception class name is bounded (a finite set of NestJS/domain errors)
+    // and contains no PII — safe to use as a Prometheus label.
+    const exceptionClass =
+      (exception as { constructor?: { name?: string } })?.constructor?.name ?? 'Unknown';
+    this.metrics.observeHttpException(status, exceptionClass);
 
     this.logger.logException(
       exception,

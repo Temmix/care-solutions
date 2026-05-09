@@ -6,10 +6,12 @@ describe('GlobalExceptionFilter', () => {
   let mockResponse: { status: jest.Mock; json: jest.Mock };
   let mockHost: ArgumentsHost;
   let mockLogger: { logException: jest.Mock };
+  let mockMetrics: { observeHttpException: jest.Mock };
 
   beforeEach(() => {
     mockLogger = { logException: jest.fn() };
-    filter = new GlobalExceptionFilter(mockLogger as any);
+    mockMetrics = { observeHttpException: jest.fn() };
+    filter = new GlobalExceptionFilter(mockLogger as any, mockMetrics as any);
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),

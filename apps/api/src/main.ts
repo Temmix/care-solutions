@@ -6,6 +6,7 @@ import { LoggerService } from '@care/logger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { MetricsService } from './modules/metrics/metrics.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -23,8 +24,9 @@ async function bootstrap() {
   );
 
   const loggerService = app.get(LoggerService);
-  app.useGlobalFilters(new GlobalExceptionFilter(loggerService));
-  app.useGlobalInterceptors(new LoggingInterceptor(loggerService));
+  const metricsService = app.get(MetricsService);
+  app.useGlobalFilters(new GlobalExceptionFilter(loggerService, metricsService));
+  app.useGlobalInterceptors(new LoggingInterceptor(loggerService, metricsService));
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || configService.get<number>('API_PORT', 3000);

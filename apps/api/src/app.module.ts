@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -19,6 +20,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ReportsModule } from './modules/reports/reports.module';
 import { IotModule } from './modules/iot/iot.module';
 import { TrainingModule } from './modules/training/training.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { RumModule } from './modules/rum/rum.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -36,6 +39,7 @@ import { HealthController } from './health.controller';
       transports: [{ type: 'console' }, { type: 'file' }],
       fileOptions: { directory: './logs', prefix: 'care-api' },
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     EncryptionModule,
     EventsModule,
@@ -54,6 +58,8 @@ import { HealthController } from './health.controller';
     ReportsModule,
     IotModule,
     TrainingModule,
+    MetricsModule,
+    RumModule,
   ],
   controllers: [HealthController],
 })

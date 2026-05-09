@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    env: prod
+
+scrape_configs:
+  - job_name: clinvara-api
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: [clinvara-api.railway.internal:3000]
+    basic_auth:
+      username: prometheus
+      password_file: /etc/prometheus/scrape_token
+
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter-prod.railway.internal:9187]
+
+  - job_name: prometheus-self
+    static_configs:
+      - targets: [localhost:9090]
