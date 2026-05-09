@@ -7,6 +7,10 @@ describe('TrialReminderService', () => {
     userTenantMembership: { findMany: jest.Mock };
   };
   let notifications: { notifyMany: jest.Mock };
+  let metrics: {
+    observeTrialReminderRun: jest.Mock;
+    setTrialReminderLastRun: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -15,7 +19,11 @@ describe('TrialReminderService', () => {
       userTenantMembership: { findMany: jest.fn() },
     };
     notifications = { notifyMany: jest.fn().mockResolvedValue(undefined) };
-    service = new TrialReminderService(prisma as any, notifications as any);
+    metrics = {
+      observeTrialReminderRun: jest.fn(),
+      setTrialReminderLastRun: jest.fn(),
+    };
+    service = new TrialReminderService(prisma as any, notifications as any, metrics as any);
   });
 
   describe('processBucket', () => {

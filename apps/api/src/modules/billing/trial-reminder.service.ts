@@ -2,6 +2,7 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 const REMINDER_BUCKETS = [7, 3, 1] as const;
 
@@ -12,6 +13,7 @@ export class TrialReminderService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(NotificationsService) private notifications: NotificationsService,
+    @Inject(MetricsService) private metrics: MetricsService,
   ) {}
 
   // Daily at 08:00 Europe/London. Idempotent within a day via lastTrialReminderDay.
@@ -20,6 +22,8 @@ export class TrialReminderService {
     for (const days of REMINDER_BUCKETS) {
       await this.processBucket(days);
     }
+    // Heartbeat for the cron-stale alert. Only set on full run completion.
+    this.metrics.setTrialReminderLastRun(Date.now() / 1000);
   }
 
   /** Send TRIAL_EXPIRING notifications for trials that hit the given days-remaining bucket today. */
@@ -49,7 +53,9 @@ export class TrialReminderService {
           data: { lastTrialReminderDay: daysRemaining },
         });
         sent++;
+        this.metrics.observeTrialReminderRun(daysRemaining, 'success');
       } catch (e) {
+        this.metrics.observeTrialReminderRun(daysRemaining, 'failed');
         this.logger.error(
           `Failed to send ${daysRemaining}d trial reminder for org ${sub.organizationId}: ${(e as Error).message}`,
         );

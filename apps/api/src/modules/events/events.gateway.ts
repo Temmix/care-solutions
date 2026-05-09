@@ -6,7 +6,8 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
+import { MetricsService } from '../metrics/metrics.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -17,7 +18,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(EventsGateway.name);
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    @Inject(MetricsService) private metrics: MetricsService,
+  ) {}
 
   async handleConnection(client: Socket): Promise<void> {
     try {
@@ -40,6 +44,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join user-specific room for targeted notifications
       client.join(`user:${payload.sub}`);
 
+      this.metrics.incrementWsConnections();
       this.logger.log(`Client connected: ${payload.sub} (tenant: ${tenantId})`);
     } catch {
       client.disconnect();
@@ -47,6 +52,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket): void {
+    this.metrics.decrementWsConnections();
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 }
