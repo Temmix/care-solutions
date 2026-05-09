@@ -186,10 +186,11 @@ describe('BillingPage', () => {
   it('shows plan prices', async () => {
     renderPage();
 
+    // Wait for the plan cards to actually render — the h2 renders
+    // unconditionally so it's not a reliable waitpoint for plan content.
     await waitFor(() => {
-      expect(screen.getByText('Available Plans')).toBeInTheDocument();
+      expect(screen.getByText('£59')).toBeInTheDocument();
     });
-    expect(screen.getByText('£59')).toBeInTheDocument();
     expect(screen.getByText('£99')).toBeInTheDocument();
     expect(screen.getByText('£299')).toBeInTheDocument();
   });
@@ -197,14 +198,14 @@ describe('BillingPage', () => {
   it('shows patient and user limits for each plan (excludes FREE)', async () => {
     renderPage();
 
+    // Wait for plan cards to render — see note above.
     await waitFor(() => {
-      expect(screen.getByText('Available Plans')).toBeInTheDocument();
+      expect(screen.getByText('500 patients')).toBeInTheDocument();
     });
     // FREE plan (5 patients) should not appear
     expect(screen.queryByText('5 patients')).not.toBeInTheDocument();
     // 200 patients may appear in both subscription card and plan card
     expect(screen.getAllByText('200 patients').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('500 patients')).toBeInTheDocument();
     expect(screen.getByText('Unlimited patients')).toBeInTheDocument();
   });
 });
