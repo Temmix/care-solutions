@@ -86,6 +86,23 @@ returns 401 to every caller (fail-closed). Set it to any value in
 | Email alerts not arriving                            | SMTP creds wrong, or `alerts@clinvara.com` not verified in Resend                        |
 | 401 on /metrics from Prometheus                      | Scrape token differs between services or env var unset                                   |
 
-## Out of scope for Phase 1
+## Phase 2 — additional Railway service
 
-Business + DB + WebSocket metrics, frontend RUM, staging parity, more dashboards, more alerts. See the original observability plan for phases 2–4.
+After Phase 2 lands, provision one more service:
+
+### `postgres-exporter-prod`
+
+1. Railway → production → **+ New** → **Empty service**
+2. Repo connected, **Root Directory**: `infra/observability/postgres-exporter`
+3. **Region**: `europe-west4-drams3a` (same as Postgres)
+4. Set env var:
+   - `DATA_SOURCE_NAME=postgresql://postgres:${{Postgres-s0gq.PGPASSWORD}}@postgres-s0gq.railway.internal:5432/railway?sslmode=disable`
+   - (Use Railway's variable reference syntax to pull the password from the Postgres service.)
+5. **Networking → Public Networking** → leave OFF
+6. Deploy
+
+Prometheus already has the scrape config for `postgres-exporter-prod.railway.internal:9187` baked in — restart Prometheus after the exporter is up.
+
+## Out of scope for Phase 2
+
+Encryption per-operation timing (deferred — invasive in `encryption.middleware.ts`). Frontend RUM, staging parity. See the original observability plan for phases 3–4.
