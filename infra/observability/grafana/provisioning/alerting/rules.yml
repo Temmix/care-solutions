@@ -1,0 +1,31 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: clinvara-api
+    folder: Clinvara
+    interval: 1m
+    rules:
+      - uid: high-error-rate
+        title: API error rate above 2%
+        condition: A
+        data:
+          - refId: A
+            queryType: range
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus-prod
+            model:
+              expr: sum(rate(http_exceptions_total[5m])) / sum(rate(http_requests_total[5m])) > 0.02
+              intervalMs: 60000
+              maxDataPoints: 43200
+              refId: A
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: API exception rate exceeded 2% for 5 minutes
+          description: |
+            More than 2% of requests are throwing exceptions in production.
+            Check the Errors dashboard and recent deploys.
