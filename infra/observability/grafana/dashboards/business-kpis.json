@@ -1,0 +1,80 @@
+{
+  "uid": "clinvara-business-kpis",
+  "title": "Clinvara — Business KPIs",
+  "tags": ["clinvara", "business"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active subscriptions by tier",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area" },
+      "targets": [
+        {
+          "expr": "sum by (tier) (clinvara_subscriptions_active{status=\"ACTIVE\"})",
+          "legendFormat": "{{tier}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Trials by remaining-days bucket",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "clinvara_trials_active",
+          "legendFormat": "{{bucket}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Stripe webhook outcomes (last 1h)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(clinvara_stripe_webhook_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Webhook duration p95 by event type",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(clinvara_stripe_webhook_duration_seconds_bucket[5m])) by (le, event_type))",
+          "legendFormat": "{{event_type}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Trial reminder cron — last run",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "dateTimeFromNow" } },
+      "targets": [
+        {
+          "expr": "clinvara_trial_reminder_last_run_timestamp_seconds * 1000",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

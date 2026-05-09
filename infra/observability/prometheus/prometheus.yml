@@ -14,6 +14,10 @@ scrape_configs:
       username: prometheus
       password_file: /etc/prometheus/scrape_token
 
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter-prod.railway.internal:9187]
+
   - job_name: prometheus-self
     static_configs:
       - targets: [localhost:9090]
