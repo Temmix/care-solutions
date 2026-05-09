@@ -42,6 +42,10 @@ export class MetricsService {
   readonly wsConnectionsActive: Gauge<string>;
   readonly wsMessagesTotal: Counter<string>;
 
+  // Frontend RUM
+  readonly rumWebVital: Histogram<string>;
+  readonly rumJsErrorsTotal: Counter<string>;
+
   constructor() {
     collectDefaultMetrics({ register: this.registry });
 
@@ -152,6 +156,41 @@ export class MetricsService {
       labelNames: ['event_name', 'direction'],
       registers: [this.registry],
     });
+
+    // Frontend RUM. The metric label is the Web Vital name (LCP, FID, INP,
+    // CLS, TTFB, FCP). Most queries filter by `metric=` so the differing
+    // unit ranges (CLS is unitless, others ms) don't confuse the histogram —
+    // buckets cover both the small (CLS) and large (LCP) ranges. The `page`
+    // label is the route TEMPLATE (frontend strips IDs before sending).
+    this.rumWebVital = new Histogram({
+      name: 'clinvara_rum_web_vital',
+      help: 'Real-user Web Vitals reported from the browser',
+      labelNames: ['metric', 'page', 'rating'],
+      buckets: [
+        0.05,
+        0.1,
+        0.25,
+        0.5,
+        1,
+        2.5, // CLS / unitless / FID seconds
+        100,
+        250,
+        500,
+        1000,
+        2500,
+        4000,
+        6000,
+        10000, // LCP/INP/TTFB ms
+      ],
+      registers: [this.registry],
+    });
+
+    this.rumJsErrorsTotal = new Counter({
+      name: 'clinvara_rum_js_errors_total',
+      help: 'JavaScript errors reported from the browser by page',
+      labelNames: ['page'],
+      registers: [this.registry],
+    });
   }
 
   observeHttpRequest(
@@ -238,6 +277,16 @@ export class MetricsService {
 
   observeWsMessage(eventName: string, direction: 'in' | 'out'): void {
     this.wsMessagesTotal.inc({ event_name: eventName, direction });
+  }
+
+  // ── Frontend RUM ──────────────────────────────────────
+
+  observeRumWebVital(metric: string, page: string, rating: string, value: number): void {
+    this.rumWebVital.observe({ metric, page, rating }, value);
+  }
+
+  observeRumJsError(page: string): void {
+    this.rumJsErrorsTotal.inc({ page });
   }
 
   async render(): Promise<string> {

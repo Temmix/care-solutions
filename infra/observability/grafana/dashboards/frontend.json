@@ -1,0 +1,94 @@
+{
+  "uid": "clinvara-frontend",
+  "title": "Clinvara — Frontend (RUM)",
+  "tags": ["clinvara", "frontend", "rum"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Web Vitals — % rated 'good' (last 24h)",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } },
+      "targets": [
+        {
+          "expr": "sum by (metric) (rate(clinvara_rum_web_vital_count{rating=\"good\"}[24h])) / sum by (metric) (rate(clinvara_rum_web_vital_count[24h]))",
+          "legendFormat": "{{metric}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Web Vitals reports per minute",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (metric) (rate(clinvara_rum_web_vital_count[5m]))",
+          "legendFormat": "{{metric}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "LCP p75 by page",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(clinvara_rum_web_vital_bucket{metric=\"LCP\"}[5m])) by (le, page))",
+          "legendFormat": "{{page}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "INP p75 by page",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.75, sum(rate(clinvara_rum_web_vital_bucket{metric=\"INP\"}[5m])) by (le, page))",
+          "legendFormat": "{{page}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "JS errors per minute by page",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum by (page) (rate(clinvara_rum_js_errors_total[5m]))",
+          "legendFormat": "{{page}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Top 10 error pages (last 1h)",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus-prod" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (page) (increase(clinvara_rum_js_errors_total[1h])))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}
