@@ -24,6 +24,6 @@ export interface LoggerConfig {
 }
 
 export interface TransportConfig {
-  type: 'file' | 'console' | 'database' | 'splunk';
+  type: 'file' | 'console' | 'database' | 'splunk' | 'loki';
   options?: Record<string, unknown>;
 }

@@ -36,8 +36,23 @@ import { HealthController } from './health.controller';
     }),
     LoggerModule.forRoot({
       level: 'info',
-      transports: [{ type: 'console' }, { type: 'file' }],
+      transports: [{ type: 'console' }, { type: 'file' }, { type: 'loki' }],
       fileOptions: { directory: './logs', prefix: 'care-api' },
+      // Loki is opt-in via LOKI_URL env var. If unset, the loki transport
+      // is silently skipped — keeps local dev working without a Loki
+      // sidecar.
+      lokiOptions: process.env.LOKI_URL
+        ? {
+            url: process.env.LOKI_URL,
+            labels: {
+              // `app` marks which Railway service the log came from.
+              // Don't use `service` here — it's set per-entry to the
+              // controller name (e.g. BillingController) for filtering.
+              app: 'clinvara-api',
+              env: process.env.RAILWAY_ENVIRONMENT_NAME ?? 'unknown',
+            },
+          }
+        : undefined,
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
