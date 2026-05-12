@@ -106,3 +106,38 @@ Prometheus already has the scrape config for `postgres-exporter-prod.railway.int
 ## Out of scope for Phase 2
 
 Encryption per-operation timing (deferred — invasive in `encryption.middleware.ts`). Frontend RUM, staging parity. See the original observability plan for phases 3–4.
+
+## Phase 5 — Loki (centralised logs)
+
+After Phase 5 ships, you can view all API logs in Grafana via the `loki` data source.
+
+### Provisioning `loki` (production)
+
+1. Railway dashboard → clinvara → **production** env → **+ New** → **GitHub Repo** → `Temmix/care-solutions`
+2. Rename to `loki`
+3. Settings → **Source → Root Directory**: `infra/observability/loki`
+4. Settings → **Region**: `europe-west4-drams3a`
+5. Settings → **Enable Outbound IPv6**: ON
+6. Settings → **Volumes**: mount `/loki` size 5GB (chunks + index, 30-day retention)
+7. **Networking → Public Networking**: leave OFF (Grafana reaches it via internal DNS)
+8. Deploy
+
+### Wire the API to push logs
+
+Set this env var on `clinvara-api`:
+
+```
+LOKI_URL=http://loki.railway.internal:3100
+```
+
+API redeploys → next requests start pushing logs to Loki via the LokiTransport (batched every 1s or 100 lines).
+
+### View in Grafana
+
+- Connections → Data sources → `loki` → Test → should be green
+- Dashboards → Clinvara → **Logs** → live tail with filters by service + level
+- Or **Explore** with the `loki` data source for ad-hoc LogQL queries
+
+### Cardinality safety
+
+LokiTransport uses only `level` and `service` (controller name) as stream labels plus any static labels. **No userId/tenantId labels** — those go in the log body (full-text searchable) to prevent unbounded stream growth.
