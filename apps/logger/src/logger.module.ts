@@ -2,12 +2,14 @@ import { Module, Global, type DynamicModule } from '@nestjs/common';
 import { LoggerService } from './logger.service';
 import { FileTransport, type FileTransportOptions } from './transports/file.transport';
 import { ConsoleTransport } from './transports/console.transport';
+import { LokiTransport, type LokiTransportOptions } from './transports/loki.transport';
 import type { LogLevel, TransportConfig } from './types';
 
 export interface LoggerModuleOptions {
   level?: LogLevel;
   transports?: TransportConfig[];
   fileOptions?: FileTransportOptions;
+  lokiOptions?: LokiTransportOptions;
 }
 
 @Global()
@@ -39,6 +41,15 @@ export class LoggerModule {
                   break;
                 case 'console':
                   logger.addTransport(new ConsoleTransport());
+                  break;
+                case 'loki':
+                  if (!options.lokiOptions?.url) {
+                    // No LOKI_URL configured — silently skip. Lets the same
+                    // transports list be reused across envs where Loki may
+                    // or may not be provisioned.
+                    break;
+                  }
+                  logger.addTransport(new LokiTransport(options.lokiOptions));
                   break;
                 // Future: case 'database', case 'splunk'
               }

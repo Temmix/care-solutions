@@ -11,3 +11,12 @@ datasources:
     jsonData:
       httpMethod: POST
       timeInterval: 15s
+
+  - name: loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki.railway.internal:3100
+    editable: false
+    jsonData:
+      maxLines: 1000

@@ -1,0 +1,82 @@
+{
+  "uid": "clinvara-logs",
+  "title": "Clinvara — Logs",
+  "tags": ["clinvara", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values({service=~\".+\"}, service)",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "query": "error,warn,info,debug",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log volume by level (last 1h)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (level) (count_over_time({service=~\"$service\"} | json | level=~\"$level\" [1m]))",
+          "legendFormat": "{{level}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error rate by service",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate({service=~\"$service\", level=\"error\"}[1m]))",
+          "legendFormat": "{{service}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Live logs (filter via variables above)",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 8 },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{service=~\"$service\", level=~\"$level\"}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
