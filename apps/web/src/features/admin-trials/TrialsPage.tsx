@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAdminTrials, type TrialRow } from './hooks/use-admin-trials';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { formatOrgType } from '../../lib/format-org-type';
 
 type ActionMode = { kind: 'extend' | 'cancel'; row: TrialRow } | null;
 
@@ -92,7 +93,9 @@ export function TrialsPage(): React.ReactElement {
                     </Link>
                     <div className="text-xs text-slate-500">{row.organization.email}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{row.organization.type}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {formatOrgType(row.organization.type)}
+                  </td>
                   <td className="px-4 py-3 text-slate-600">{row.tier}</td>
                   <td className="px-4 py-3">
                     <DaysBadge days={row.daysRemaining} />
