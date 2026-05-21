@@ -41,7 +41,7 @@ describe('OrganizationsService – getEnabledModules', () => {
     expect(result).toContain('CARE_PLANS');
     expect(result).toContain('CHC');
     expect(result).toContain('IOT');
-    expect(result).not.toContain('PATIENT_FLOW');
+    expect(result).toContain('PATIENT_FLOW');
     expect(result).not.toContain('VIRTUAL_WARDS');
   });
 
@@ -56,9 +56,9 @@ describe('OrganizationsService – getEnabledModules', () => {
     expect(result).toContain('PATIENTS');
     expect(result).toContain('ASSESSMENTS');
     expect(result).toContain('TRAINING');
+    expect(result).toContain('PATIENT_FLOW');
     expect(result).not.toContain('CHC');
     expect(result).not.toContain('IOT');
-    expect(result).not.toContain('PATIENT_FLOW');
     expect(result).not.toContain('VIRTUAL_WARDS');
   });
 
@@ -137,7 +137,7 @@ describe('OrganizationsService – getEnabledModules', () => {
 
     expect(result).toContain('CHC');
     expect(result).toContain('VIRTUAL_WARDS');
-    expect(result).not.toContain('PATIENT_FLOW');
+    expect(result).toContain('PATIENT_FLOW');
     expect(result).not.toContain('IOT');
   });
 });

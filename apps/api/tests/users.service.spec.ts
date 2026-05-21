@@ -58,6 +58,7 @@ describe('UsersService', () => {
       encryption as any,
       blindIndex as any,
       { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
+      { get: jest.fn().mockReturnValue('https://clinvara.com') } as any,
     );
   });
 
@@ -244,6 +245,7 @@ describe('UsersService', () => {
         encEnabled as any,
         blindIdx as any,
         { sendEmail: jest.fn().mockResolvedValue(undefined) } as any,
+        { get: jest.fn().mockReturnValue('https://clinvara.com') } as any,
       );
 
       (prisma.user as any).findFirst = jest.fn().mockResolvedValue(null);
@@ -308,6 +310,7 @@ describe('UsersService', () => {
         encryption as any,
         blindIndex as any,
         emailService as any,
+        { get: jest.fn().mockReturnValue('https://clinvara.com') } as any,
       );
 
       await svc.createTenantUser(
@@ -370,6 +373,7 @@ describe('UsersService', () => {
         encryption as any,
         blindIndex as any,
         emailService as any,
+        { get: jest.fn().mockReturnValue('https://clinvara.com') } as any,
       );
 
       const result = await svc.createTenantUser(
@@ -429,6 +433,7 @@ describe('UsersService', () => {
         encryption as any,
         blindIndex as any,
         emailService as any,
+        { get: jest.fn().mockReturnValue('https://clinvara.com') } as any,
       );
 
       await svc.remove('u1', 'tenant-1');

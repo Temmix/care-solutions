@@ -7,6 +7,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -44,6 +45,7 @@ export class UsersService {
     @Inject(EncryptionService) private encryption: EncryptionService,
     @Inject(BlindIndexService) private blindIndex: BlindIndexService,
     @Inject(EmailService) private emailService: EmailService,
+    @Inject(ConfigService) private configService: ConfigService,
   ) {}
 
   async findAll(tenantId: string | null, page = 1, limit = 20) {
@@ -269,11 +271,12 @@ export class UsersService {
       where: { id: tenantId },
       select: { name: true },
     });
+    const appUrl = this.configService.get<string>('APP_URL', 'https://clinvara.com');
     const { html, text } = renderInvitationEmail({
       firstName: dto.firstName,
       orgName: org?.name ?? 'your organisation',
       tempPassword: dto.password,
-      loginUrl: 'https://app.clinvara.com/login',
+      loginUrl: `${appUrl}/login`,
     });
     this.emailService
       .sendEmail({

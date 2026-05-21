@@ -1,4 +1,5 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NotificationType, NotificationChannel } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
@@ -12,6 +13,7 @@ export class NotificationsService {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private events: EventsService,
     @Inject(EmailService) private emailService: EmailService,
+    @Inject(ConfigService) private configService: ConfigService,
   ) {}
 
   // ── Create & dispatch notification ─────────────────────────
@@ -57,12 +59,13 @@ export class NotificationsService {
           select: { email: true, firstName: true },
         });
         if (user?.email) {
+          const appUrl = this.configService.get<string>('APP_URL', 'https://clinvara.com');
           const { html, text } = renderEmailTemplate({
             recipientName: user.firstName ?? 'there',
             title: params.title,
             body: params.message,
             ctaLabel: params.link ? 'View in Clinvara' : undefined,
-            ctaUrl: params.link ? `https://app.clinvara.com${params.link}` : undefined,
+            ctaUrl: params.link ? `${appUrl}${params.link}` : undefined,
           });
           await this.emailService.sendEmail({
             to: user.email,
