@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminTenants, type PendingTenantRow } from './hooks/use-admin-tenants';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { formatOrgType } from '../../lib/format-org-type';
 
 export function PendingVerificationPage(): React.ReactElement {
   const { listPending, error } = useAdminTenants();
@@ -66,7 +67,7 @@ export function PendingVerificationPage(): React.ReactElement {
                     </Link>
                     <div className="text-xs text-slate-500">{r.email}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{r.type}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatOrgType(r.type)}</td>
                   <td className="px-4 py-3 font-mono text-xs">
                     {r.companiesHouseNumber || <span className="text-slate-400">—</span>}
                   </td>

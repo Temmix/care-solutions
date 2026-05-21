@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAdminTenants, type TenantDetail } from './hooks/use-admin-tenants';
 import { useAdminTrials } from '../admin-trials/hooks/use-admin-trials';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { formatOrgType } from '../../lib/format-org-type';
 
 type ActionMode = 'verify' | 'reject' | 'reset' | 'extend' | 'cancel' | 'grant' | null;
 
@@ -75,7 +76,7 @@ export function TenantDetailPage(): React.ReactElement {
       <section className="bg-white rounded-lg border border-slate-200 p-6">
         <h2 className="text-lg font-semibold mb-4">Identity</h2>
         <dl className="grid grid-cols-2 gap-4 text-sm">
-          <Field label="Type">{tenant.type}</Field>
+          <Field label="Type">{formatOrgType(tenant.type)}</Field>
           <Field label="Email">{tenant.email}</Field>
           <Field label="Phone">{tenant.phone}</Field>
           <Field label="Country">{tenant.country}</Field>
