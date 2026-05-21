@@ -46,9 +46,17 @@ describe('Module Registry', () => {
       expect(getDefaultModules('GP_PRACTICE')).not.toContain('CHC');
     });
 
-    it('includes PATIENT_FLOW for HOSPITAL but not CARE_HOME', () => {
-      expect(getDefaultModules('HOSPITAL')).toContain('PATIENT_FLOW');
-      expect(getDefaultModules('CARE_HOME')).not.toContain('PATIENT_FLOW');
+    it('includes PATIENT_FLOW for all org types (default-on)', () => {
+      for (const orgType of [
+        'HOSPITAL',
+        'CARE_HOME',
+        'GP_PRACTICE',
+        'MENTAL_HEALTH_TRUST',
+        'COMMUNITY_SERVICE',
+        'OTHER',
+      ]) {
+        expect(getDefaultModules(orgType)).toContain('PATIENT_FLOW');
+      }
     });
 
     it('includes VIRTUAL_WARDS for HOSPITAL and COMMUNITY_SERVICE', () => {
