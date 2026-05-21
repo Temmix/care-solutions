@@ -107,11 +107,12 @@ export class AuthService {
       });
 
       // Send welcome email (mandatory, bypasses preferences)
+      const appUrl = this.configService.get<string>('APP_URL', 'https://clinvara.com');
       const { html, text } = renderWelcomeEmail({
         firstName: dto.firstName,
         orgName: dto.tenantName!,
         trialDays: TRIAL_DURATION_DAYS,
-        loginUrl: 'https://app.clinvara.com/login',
+        loginUrl: `${appUrl}/login`,
       });
       this.emailService
         .sendEmail({
@@ -252,7 +253,7 @@ export class AuthService {
       data: { passwordResetToken: token, passwordResetExpiresAt: expiresAt },
     });
 
-    const baseUrl = this.configService.get<string>('APP_URL', 'https://app.clinvara.com');
+    const baseUrl = this.configService.get<string>('APP_URL', 'https://clinvara.com');
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     const { html, text } = renderPasswordResetEmail({
