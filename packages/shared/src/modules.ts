@@ -70,7 +70,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     code: 'PATIENT_FLOW',
     label: 'Patient Flow',
     description: 'Admissions, discharges, transfers, and bed management',
-    defaultEnabledFor: ['HOSPITAL', 'MENTAL_HEALTH_TRUST'],
+    defaultEnabledFor: ['ALL'],
   },
   {
     code: 'CHC',
