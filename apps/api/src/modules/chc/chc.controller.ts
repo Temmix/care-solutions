@@ -23,7 +23,7 @@ import {
   AddChcNoteDto,
   SearchChcCasesDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
 
 interface RequestUser {
@@ -61,6 +61,7 @@ export class ChcController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'ChcCase' })
   getCase(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.chcService.getCase(id, tenantId);
   }
@@ -89,6 +90,7 @@ export class ChcController {
 
   @Get(':id/domain-scores')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'ChcCase', action: 'VIEW_DOMAIN_SCORES' })
   getDomainScores(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.chcService.getDomainScores(id, tenantId);
   }
@@ -98,9 +100,10 @@ export class ChcController {
   addPanelMember(
     @Param('id') id: string,
     @Body() dto: AddPanelMemberDto,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.chcService.addPanelMember(id, dto, tenantId);
+    return this.chcService.addPanelMember(id, dto, user.id, tenantId);
   }
 
   @Delete(':id/panel-members/:memberId')
@@ -108,9 +111,10 @@ export class ChcController {
   removePanelMember(
     @Param('id') id: string,
     @Param('memberId') memberId: string,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.chcService.removePanelMember(id, memberId, tenantId);
+    return this.chcService.removePanelMember(id, memberId, user.id, tenantId);
   }
 
   @Post(':id/decision')

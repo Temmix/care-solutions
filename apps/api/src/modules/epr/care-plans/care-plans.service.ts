@@ -400,6 +400,10 @@ export class CarePlansService {
       },
     });
 
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'CREATE', resource: 'CarePlanNote', resourceId: note.id, tenantId },
+    });
+
     return note;
   }
 

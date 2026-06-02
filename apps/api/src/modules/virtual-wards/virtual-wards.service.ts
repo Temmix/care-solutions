@@ -167,10 +167,15 @@ export class VirtualWardsService {
 
   // ── Protocols ────────────────────────────────────────────
 
-  async createProtocol(enrolmentId: string, dto: CreateProtocolDto, tenantId: string) {
+  async createProtocol(
+    enrolmentId: string,
+    dto: CreateProtocolDto,
+    userId: string,
+    tenantId: string,
+  ) {
     await this.requireEnrolment(enrolmentId, tenantId);
 
-    return this.prisma.monitoringProtocol.create({
+    const protocol = await this.prisma.monitoringProtocol.create({
       data: {
         enrolmentId,
         vitalType: dto.vitalType,
@@ -185,12 +190,26 @@ export class VirtualWardsService {
       },
       include: { thresholds: true },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'CREATE_PROTOCOL',
+        resource: 'VirtualWardEnrolment',
+        resourceId: enrolmentId,
+        tenantId,
+        metadata: { vitalType: dto.vitalType },
+      })
+      .catch(() => {});
+
+    return protocol;
   }
 
   async updateProtocol(
     enrolmentId: string,
     protocolId: string,
     dto: UpdateProtocolDto,
+    userId: string,
     tenantId: string,
   ) {
     await this.requireEnrolment(enrolmentId, tenantId);
@@ -215,7 +234,7 @@ export class VirtualWardsService {
       });
     }
 
-    return this.prisma.monitoringProtocol.update({
+    const updated = await this.prisma.monitoringProtocol.update({
       where: { id: protocolId },
       data: {
         frequencyHours: dto.frequencyHours ?? protocol.frequencyHours,
@@ -223,9 +242,22 @@ export class VirtualWardsService {
       },
       include: { thresholds: true },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'UPDATE_PROTOCOL',
+        resource: 'VirtualWardEnrolment',
+        resourceId: enrolmentId,
+        tenantId,
+        metadata: { protocolId },
+      })
+      .catch(() => {});
+
+    return updated;
   }
 
-  async deleteProtocol(enrolmentId: string, protocolId: string, tenantId: string) {
+  async deleteProtocol(enrolmentId: string, protocolId: string, userId: string, tenantId: string) {
     await this.requireEnrolment(enrolmentId, tenantId);
 
     const protocol = await this.prisma.monitoringProtocol.findUnique({
@@ -236,6 +268,18 @@ export class VirtualWardsService {
     }
 
     await this.prisma.monitoringProtocol.delete({ where: { id: protocolId } });
+
+    this.audit
+      .log({
+        userId,
+        action: 'DELETE_PROTOCOL',
+        resource: 'VirtualWardEnrolment',
+        resourceId: enrolmentId,
+        tenantId,
+        metadata: { protocolId },
+      })
+      .catch(() => {});
+
     return { deleted: true };
   }
 

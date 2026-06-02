@@ -16,7 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { AssessmentsService } from './assessments.service';
 import { CreateAssessmentDto, UpdateAssessmentDto, SearchAssessmentsDto } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
@@ -48,6 +48,7 @@ export class AssessmentsController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'Assessment' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.assessmentsService.findOne(id, tenantId);
   }

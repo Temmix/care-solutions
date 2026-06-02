@@ -551,7 +551,12 @@ export class PatientFlowService {
     return plan;
   }
 
-  async addDischargeTask(encounterId: string, dto: CreateDischargeTaskDto, tenantId: string) {
+  async addDischargeTask(
+    encounterId: string,
+    dto: CreateDischargeTaskDto,
+    userId: string,
+    tenantId: string,
+  ) {
     const plan = await this.prisma.dischargePlan.findFirst({
       where: { encounterId, tenantId, status: { in: ['DRAFT', 'IN_PROGRESS'] } },
     });
@@ -576,6 +581,17 @@ export class PatientFlowService {
         data: { status: 'IN_PROGRESS' },
       });
     }
+
+    this.audit
+      .log({
+        userId,
+        action: 'ADD_DISCHARGE_TASK',
+        resource: 'DischargePlan',
+        resourceId: plan.id,
+        tenantId,
+        metadata: { taskId: task.id, type: dto.type },
+      })
+      .catch(() => {});
 
     return task;
   }
@@ -634,6 +650,18 @@ export class PatientFlowService {
         });
       }
     }
+
+    if (tenantId)
+      this.audit
+        .log({
+          userId,
+          action: 'UPDATE_DISCHARGE_TASK',
+          resource: 'DischargePlan',
+          resourceId: plan.id,
+          tenantId,
+          metadata: { taskId },
+        })
+        .catch(() => {});
 
     return updated;
   }

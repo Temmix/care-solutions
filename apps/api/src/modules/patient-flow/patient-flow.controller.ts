@@ -24,7 +24,7 @@ import {
   CreateDischargeTaskDto,
   UpdateDischargeTaskDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
 
 interface RequestUser {
@@ -124,6 +124,7 @@ export class PatientFlowController {
 
   @Get('encounters/:id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'Encounter' })
   getEncounter(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.patientFlowService.getEncounter(id, tenantId);
   }
@@ -166,6 +167,7 @@ export class PatientFlowController {
 
   @Get('encounters/:id/discharge-plan')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'Encounter', action: 'VIEW_DISCHARGE_PLAN' })
   getDischargePlan(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.patientFlowService.getDischargePlan(id, tenantId);
   }
@@ -175,10 +177,11 @@ export class PatientFlowController {
   addDischargeTask(
     @Param('id') id: string,
     @Body() dto: CreateDischargeTaskDto,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string | null,
   ) {
     if (!tenantId) throw new BadRequestException('Tenant selection required');
-    return this.patientFlowService.addDischargeTask(id, dto, tenantId);
+    return this.patientFlowService.addDischargeTask(id, dto, user.id, tenantId);
   }
 
   @Patch('encounters/:id/discharge-plan/tasks/:taskId')

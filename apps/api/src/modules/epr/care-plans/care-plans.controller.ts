@@ -26,7 +26,7 @@ import {
   CreateNoteDto,
   SearchCarePlansDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
@@ -61,6 +61,7 @@ export class CarePlansController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'CarePlan' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.carePlansService.findOne(id, tenantId);
   }
@@ -165,6 +166,7 @@ export class CarePlansController {
 
   @Get(':id/notes')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'CarePlan', action: 'VIEW_NOTES' })
   getNotes(
     @Param('id') carePlanId: string,
     @CurrentTenant() tenantId: string | null,
