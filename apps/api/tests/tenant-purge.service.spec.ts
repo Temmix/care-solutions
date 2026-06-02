@@ -10,8 +10,32 @@ const buildPrisma = () => ({
   organization: {
     updateMany: jest.fn(),
     findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn(),
+    update: jest.fn().mockResolvedValue({}),
   },
+  patient: {
+    count: jest.fn().mockResolvedValue(5),
+    deleteMany: jest.fn().mockResolvedValue({ count: 5 }),
+  },
+  encounter: {
+    count: jest.fn().mockResolvedValue(2),
+    deleteMany: jest.fn().mockResolvedValue({ count: 2 }),
+  },
+  chcCase: {
+    count: jest.fn().mockResolvedValue(1),
+    deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+  virtualWardEnrolment: {
+    count: jest.fn().mockResolvedValue(0),
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+  },
+  auditLog: { create: jest.fn().mockResolvedValue({}) },
+  $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
 });
+
+const TENANT = 'org-1';
+const ELIGIBLE = { id: TENANT, terminatedAt: new Date(Date.now() - 40 * DAY), dataPurgedAt: null };
+const ENABLED = { TENANT_PURGE_ENABLED: 'true' };
 
 describe('TenantPurgeService', () => {
   describe('reconcileTerminations', () => {
@@ -64,6 +88,104 @@ describe('TenantPurgeService', () => {
 
       const [c] = await service.listPurgeCandidates();
       expect(c.purgeDueAt.getTime()).toBe(terminatedAt.getTime() + 90 * DAY);
+    });
+  });
+
+  describe('executePurge', () => {
+    const run = (prisma: ReturnType<typeof buildPrisma>, cfg: Record<string, string> = ENABLED) =>
+      new TenantPurgeService(prisma as never, buildConfig(cfg) as never);
+
+    it('refuses when the feature flag is off', async () => {
+      const prisma = buildPrisma();
+      await expect(
+        run(prisma, {}).executePurge(TENANT, TENANT, 'r', 'admin', false),
+      ).rejects.toThrow(/disabled/i);
+      expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('rejects a tenant that is not terminated', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue({
+        id: TENANT,
+        terminatedAt: null,
+        dataPurgedAt: null,
+      });
+      await expect(run(prisma).executePurge(TENANT, TENANT, 'r', 'admin', false)).rejects.toThrow(
+        /not terminated/i,
+      );
+    });
+
+    it('rejects while still inside the grace window', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue({
+        id: TENANT,
+        terminatedAt: new Date(Date.now() - 5 * DAY),
+        dataPurgedAt: null,
+      });
+      await expect(run(prisma).executePurge(TENANT, TENANT, 'r', 'admin', false)).rejects.toThrow(
+        /grace window/i,
+      );
+    });
+
+    it('rejects an already-purged tenant', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue({ ...ELIGIBLE, dataPurgedAt: new Date() });
+      await expect(run(prisma).executePurge(TENANT, TENANT, 'r', 'admin', false)).rejects.toThrow(
+        /already been purged/i,
+      );
+    });
+
+    it('rejects a confirmation token that does not match', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue(ELIGIBLE);
+      await expect(run(prisma).executePurge(TENANT, 'wrong', 'r', 'admin', false)).rejects.toThrow(
+        /confirmation/i,
+      );
+      expect(prisma.patient.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('dry-run returns counts without deleting', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue(ELIGIBLE);
+
+      const result = await run(prisma).executePurge(TENANT, TENANT, 'DSAR', 'admin', true);
+
+      expect(result.dryRun).toBe(true);
+      expect(result.purgedAt).toBeNull();
+      expect(result.counts).toEqual({
+        patients: 5,
+        encounters: 2,
+        chcCases: 1,
+        virtualWardEnrolments: 0,
+      });
+      expect(prisma.patient.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: 'PURGE_TENANT_DRY_RUN' }),
+      });
+    });
+
+    it('executes the cascade-ordered deletion and marks the tenant purged', async () => {
+      const prisma = buildPrisma();
+      prisma.organization.findUnique.mockResolvedValue(ELIGIBLE);
+
+      const result = await run(prisma).executePurge(TENANT, TENANT, 'DSAR', 'admin', false);
+
+      const scope = { where: { tenantId: TENANT } };
+      expect(prisma.virtualWardEnrolment.deleteMany).toHaveBeenCalledWith(scope);
+      expect(prisma.chcCase.deleteMany).toHaveBeenCalledWith(scope);
+      expect(prisma.encounter.deleteMany).toHaveBeenCalledWith(scope);
+      expect(prisma.patient.deleteMany).toHaveBeenCalledWith(scope);
+      expect(prisma.organization.update).toHaveBeenCalledWith({
+        where: { id: TENANT },
+        data: { dataPurgedAt: expect.any(Date) },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(result.dryRun).toBe(false);
+      expect(result.purgedAt).toBeInstanceOf(Date);
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: 'PURGE_TENANT' }),
+      });
     });
   });
 });

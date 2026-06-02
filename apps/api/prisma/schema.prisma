@@ -578,6 +578,8 @@ model Organization {
   // Data retention: set when the subscription is terminated; starts the
   // post-termination grace window before Customer Data becomes purge-eligible.
   terminatedAt DateTime?
+  // Set once the tenant's Customer Data has been hard-deleted (prevents re-purge).
+  dataPurgedAt DateTime?
 
   // Stripe billing
   stripeCustomerId String? @unique
