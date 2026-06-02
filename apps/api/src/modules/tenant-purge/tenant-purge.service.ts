@@ -1,4 +1,12 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,6 +22,13 @@ export interface PurgeCandidate {
   terminatedAt: Date;
   purgeDueAt: Date;
   daysSinceDue: number;
+}
+
+export interface PurgeResult {
+  tenantId: string;
+  dryRun: boolean;
+  counts: { patients: number; encounters: number; chcCases: number; virtualWardEnrolments: number };
+  purgedAt: Date | null;
 }
 
 /**
@@ -90,6 +105,103 @@ export class TenantPurgeService {
         purgeDueAt,
         daysSinceDue: Math.floor((Date.now() - purgeDueAt.getTime()) / MS_PER_DAY),
       };
+    });
+  }
+
+  /**
+   * Hard-delete a terminated tenant's patient Customer Data (Phase 2).
+   *
+   * Four explicit gates: feature flag (TENANT_PURGE_ENABLED), eligibility
+   * (terminated + past grace), typed confirmation (the tenant id) and a reason.
+   * `dryRun` returns what WOULD be deleted without deleting. Deletion relies on
+   * the schema's cascades: removing enrolments, CHC cases and encounters first
+   * (their patient FKs don't cascade), then patients (which cascades the rest).
+   * Idempotent via dataPurgedAt.
+   */
+  async executePurge(
+    tenantId: string,
+    confirmation: string,
+    reason: string,
+    actorId: string,
+    dryRun: boolean,
+  ): Promise<PurgeResult> {
+    if (this.config.get<string>('TENANT_PURGE_ENABLED') !== 'true') {
+      throw new ForbiddenException('Tenant data purge is disabled (TENANT_PURGE_ENABLED).');
+    }
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { id: true, terminatedAt: true, dataPurgedAt: true },
+    });
+    if (!org) throw new NotFoundException('Tenant not found.');
+    if (org.dataPurgedAt) throw new ConflictException('Tenant data has already been purged.');
+    if (!org.terminatedAt) {
+      throw new BadRequestException('Tenant is not terminated; nothing is eligible for purge.');
+    }
+
+    const purgeDueAt = new Date(org.terminatedAt.getTime() + this.graceDays() * MS_PER_DAY);
+    if (Date.now() < purgeDueAt.getTime()) {
+      throw new BadRequestException(
+        `Tenant is still within the grace window (eligible from ${purgeDueAt.toISOString()}).`,
+      );
+    }
+
+    if (confirmation !== tenantId) {
+      throw new BadRequestException('Confirmation does not match the tenant id. Purge aborted.');
+    }
+
+    const scope = { tenantId };
+    const counts = {
+      patients: await this.prisma.patient.count({ where: scope }),
+      encounters: await this.prisma.encounter.count({ where: scope }),
+      chcCases: await this.prisma.chcCase.count({ where: scope }),
+      virtualWardEnrolments: await this.prisma.virtualWardEnrolment.count({ where: scope }),
+    };
+
+    if (dryRun) {
+      await this.audit(actorId, tenantId, 'PURGE_TENANT_DRY_RUN', reason, counts);
+      this.logger.log(
+        `Tenant purge DRY-RUN for ${tenantId}: would delete ${JSON.stringify(counts)}`,
+      );
+      return { tenantId, dryRun: true, counts, purgedAt: null };
+    }
+
+    // Delete the non-cascading patient children first, then patients (cascades
+    // identifiers, contacts, events, care plans, assessments, medications,
+    // processing bases, consents and search indexes).
+    await this.prisma.$transaction([
+      this.prisma.virtualWardEnrolment.deleteMany({ where: scope }),
+      this.prisma.chcCase.deleteMany({ where: scope }),
+      this.prisma.encounter.deleteMany({ where: scope }),
+      this.prisma.patient.deleteMany({ where: scope }),
+      this.prisma.organization.update({
+        where: { id: tenantId },
+        data: { dataPurgedAt: new Date() },
+      }),
+    ]);
+
+    const purgedAt = new Date();
+    await this.audit(actorId, tenantId, 'PURGE_TENANT', reason, counts);
+    this.logger.warn(`Tenant purge EXECUTED for ${tenantId}: deleted ${JSON.stringify(counts)}`);
+    return { tenantId, dryRun: false, counts, purgedAt };
+  }
+
+  private async audit(
+    actorId: string,
+    tenantId: string,
+    action: 'PURGE_TENANT' | 'PURGE_TENANT_DRY_RUN',
+    reason: string,
+    counts: Record<string, number>,
+  ): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action,
+        resource: 'Organization',
+        resourceId: tenantId,
+        tenantId,
+        metadata: { reason, ...counts },
+      },
     });
   }
 
