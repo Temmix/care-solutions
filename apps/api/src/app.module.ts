@@ -27,6 +27,7 @@ import { LegalModule } from './modules/legal/legal.module';
 import { RetentionModule } from './modules/retention/retention.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
 import { TenantPurgeModule } from './modules/tenant-purge/tenant-purge.module';
+import { SubProcessorsModule } from './modules/sub-processors/sub-processors.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -85,6 +86,7 @@ import { HealthController } from './health.controller';
     RetentionModule,
     IncidentsModule,
     TenantPurgeModule,
+    SubProcessorsModule,
   ],
   controllers: [HealthController],
 })
