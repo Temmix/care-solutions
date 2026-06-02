@@ -17,17 +17,15 @@ const buildPrisma = () => ({
       .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
         Promise.resolve({ id: 'sp1', status: 'ACTIVE', ...data }),
       ),
-    update: jest
-      .fn()
-      .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve({
-          id: 'sp1',
-          name: 'Acme',
-          status: 'ACTIVE',
-          effectiveDate: new Date(),
-          ...data,
-        }),
-      ),
+    update: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        id: 'sp1',
+        name: 'Acme',
+        status: 'ACTIVE',
+        effectiveDate: new Date(),
+        ...data,
+      }),
+    ),
   },
   auditLog: { create: jest.fn().mockResolvedValue({}) },
 });
