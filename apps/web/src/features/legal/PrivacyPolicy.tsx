@@ -282,8 +282,10 @@ export function PrivacyPolicy(): React.ReactElement {
               <strong>Right to rectification</strong> — Request correction of inaccurate data
             </li>
             <li>
-              <strong>Right to erasure</strong> — Request deletion of your data (subject to legal
-              retention requirements)
+              <strong>Right to erasure</strong> — Request deletion of your data. Where records must
+              be kept for legal or clinical retention reasons, this is fulfilled by irreversible
+              anonymisation: direct identifiers are removed and free-text notes are blanked, while
+              the de-identified clinical record is retained.
             </li>
             <li>
               <strong>Right to restriction</strong> — Request limitation of processing
