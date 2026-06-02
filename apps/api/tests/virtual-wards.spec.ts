@@ -200,7 +200,7 @@ describe('VirtualWardsService', () => {
         thresholds: [{ maxValue: 120, severity: 'HIGH' }],
       };
 
-      const result = await service.createProtocol('vw-1', dto as any, TENANT);
+      const result = await service.createProtocol('vw-1', dto as any, USER_ID, TENANT);
 
       expect(result).toEqual(protocol);
       expect(prisma.monitoringProtocol.create).toHaveBeenCalledWith(
@@ -237,6 +237,7 @@ describe('VirtualWardsService', () => {
         'vw-1',
         'proto-1',
         { thresholds: [{ maxValue: 100, severity: 'LOW' }], frequencyHours: 4 } as any,
+        USER_ID,
         TENANT,
       );
 
@@ -258,9 +259,9 @@ describe('VirtualWardsService', () => {
       });
       prisma.monitoringProtocol.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateProtocol('vw-1', 'nope', {} as any, TENANT)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateProtocol('vw-1', 'nope', {} as any, USER_ID, TENANT),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -278,7 +279,7 @@ describe('VirtualWardsService', () => {
       });
       prisma.monitoringProtocol.delete.mockResolvedValue({});
 
-      const result = await service.deleteProtocol('vw-1', 'proto-1', TENANT);
+      const result = await service.deleteProtocol('vw-1', 'proto-1', USER_ID, TENANT);
       expect(result).toEqual({ deleted: true });
     });
   });
@@ -625,9 +626,9 @@ describe('VirtualWardsController', () => {
     const dto = { vitalType: 'HEART_RATE', frequencyHours: 6, thresholds: [] };
     vwService.createProtocol.mockResolvedValue({});
 
-    await controller.createProtocol('vw-1', dto as any, TENANT);
+    await controller.createProtocol('vw-1', dto as any, USER, TENANT);
 
-    expect(vwService.createProtocol).toHaveBeenCalledWith('vw-1', dto, TENANT);
+    expect(vwService.createProtocol).toHaveBeenCalledWith('vw-1', dto, USER_ID, TENANT);
   });
 
   it('recordObservation delegates with correct args', async () => {
@@ -659,9 +660,9 @@ describe('VirtualWardsController', () => {
   it('deleteProtocol delegates correctly', async () => {
     vwService.deleteProtocol.mockResolvedValue({ deleted: true });
 
-    await controller.deleteProtocol('vw-1', 'proto-1', TENANT);
+    await controller.deleteProtocol('vw-1', 'proto-1', USER, TENANT);
 
-    expect(vwService.deleteProtocol).toHaveBeenCalledWith('vw-1', 'proto-1', TENANT);
+    expect(vwService.deleteProtocol).toHaveBeenCalledWith('vw-1', 'proto-1', USER_ID, TENANT);
   });
 
   it('escalateAlert delegates with escalatedToId from body', async () => {

@@ -189,7 +189,7 @@ describe('PatientFlowService — Discharge Planning', () => {
       prisma.dischargePlan.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.addDischargeTask('enc-1', { type: 'MEDICATION_REVIEW' } as any, tenantId),
+        service.addDischargeTask('enc-1', { type: 'MEDICATION_REVIEW' } as any, 'user-1', tenantId),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -207,6 +207,7 @@ describe('PatientFlowService — Discharge Planning', () => {
       const result = await service.addDischargeTask(
         'enc-1',
         { type: 'MEDICATION_REVIEW' } as any,
+        'user-1',
         tenantId,
       );
 
@@ -228,7 +229,7 @@ describe('PatientFlowService — Discharge Planning', () => {
         status: 'PENDING',
       });
 
-      await service.addDischargeTask('enc-1', { type: 'TRANSPORT' } as any, tenantId);
+      await service.addDischargeTask('enc-1', { type: 'TRANSPORT' } as any, 'user-1', tenantId);
 
       expect(prisma.dischargePlan.update).not.toHaveBeenCalled();
     });

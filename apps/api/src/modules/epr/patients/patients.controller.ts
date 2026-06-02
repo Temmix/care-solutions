@@ -14,7 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto, UpdatePatientDto, SearchPatientDto, CreatePatientEventDto } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
@@ -45,6 +45,7 @@ export class PatientsController {
   }
 
   @Get(':id')
+  @Audit({ resource: 'Patient' })
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: RequestUser,
@@ -75,6 +76,7 @@ export class PatientsController {
   }
 
   @Get(':id/timeline')
+  @Audit({ resource: 'Patient', action: 'VIEW_TIMELINE' })
   getTimeline(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,

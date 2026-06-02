@@ -256,6 +256,7 @@ describe('ChcService', () => {
       const result = await service.addPanelMember(
         'chc-1',
         { userId: 'u2', role: 'Chair' } as any,
+        USER_ID,
         TENANT,
       );
       expect(result).toEqual(member);
@@ -268,7 +269,7 @@ describe('ChcService', () => {
       prisma.chcPanelMember.findUnique.mockResolvedValue({ id: 'pm-1', chcCaseId: 'chc-1' });
       prisma.chcPanelMember.delete.mockResolvedValue({});
 
-      const result = await service.removePanelMember('chc-1', 'pm-1', TENANT);
+      const result = await service.removePanelMember('chc-1', 'pm-1', USER_ID, TENANT);
       expect(result).toEqual({ deleted: true });
     });
 
@@ -276,7 +277,7 @@ describe('ChcService', () => {
       prisma.chcCase.findUnique.mockResolvedValue({ id: 'chc-1', tenantId: TENANT });
       prisma.chcPanelMember.findUnique.mockResolvedValue(null);
 
-      await expect(service.removePanelMember('chc-1', 'nope', TENANT)).rejects.toThrow(
+      await expect(service.removePanelMember('chc-1', 'nope', USER_ID, TENANT)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -504,12 +505,12 @@ describe('ChcController', () => {
     expect(chcService.addNote).toHaveBeenCalledWith('chc-1', dto, USER_ID, TENANT);
   });
 
-  it('removePanelMember delegates with caseId, memberId, tenantId', async () => {
+  it('removePanelMember delegates with caseId, memberId, userId, tenantId', async () => {
     chcService.removePanelMember.mockResolvedValue({ deleted: true });
 
-    await controller.removePanelMember('chc-1', 'pm-1', TENANT);
+    await controller.removePanelMember('chc-1', 'pm-1', USER, TENANT);
 
-    expect(chcService.removePanelMember).toHaveBeenCalledWith('chc-1', 'pm-1', TENANT);
+    expect(chcService.removePanelMember).toHaveBeenCalledWith('chc-1', 'pm-1', USER_ID, TENANT);
   });
 
   it('closeCase delegates with id, userId, tenantId', async () => {

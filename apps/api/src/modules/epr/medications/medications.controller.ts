@@ -21,7 +21,7 @@ import {
   CreateAdministrationDto,
   SearchPrescriptionsDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
+import { Roles, CurrentUser, CurrentTenant, Audit } from '../../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../../common/guards';
 
 interface RequestUser {
@@ -83,6 +83,7 @@ export class MedicationsController {
 
   @Get('prescriptions/:id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'MedicationRequest' })
   findOnePrescription(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.medicationsService.findOnePrescription(id, tenantId);
   }
@@ -112,6 +113,7 @@ export class MedicationsController {
 
   @Get('prescriptions/:id/administrations')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'MedicationRequest', action: 'VIEW_ADMINISTRATIONS' })
   getAdministrations(
     @Param('id') requestId: string,
     @CurrentTenant() tenantId: string | null,
