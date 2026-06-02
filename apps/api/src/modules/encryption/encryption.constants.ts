@@ -98,6 +98,10 @@ export const ENCRYPTED_FIELDS: FieldEncryptionMap = {
     notes: {},
   },
 
+  SecurityIncident: {
+    description: {},
+  },
+
   // ── Tier 2: Staff PII ────────────────────────────────
   User: {
     email: { searchable: true, searchType: 'exact', indexField: 'emailIndex', globalIndex: true },

@@ -25,6 +25,7 @@ import { RumModule } from './modules/rum/rum.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { RetentionModule } from './modules/retention/retention.module';
+import { IncidentsModule } from './modules/incidents/incidents.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -81,6 +82,7 @@ import { HealthController } from './health.controller';
     PrivacyModule,
     LegalModule,
     RetentionModule,
+    IncidentsModule,
   ],
   controllers: [HealthController],
 })

@@ -259,6 +259,34 @@ enum LegalDocumentType {
   ACCEPTABLE_USE_POLICY
 }
 
+// ─── Security / data-protection incidents ───────────────
+
+enum IncidentCategory {
+  DATA_BREACH
+  UNAUTHORISED_ACCESS
+  DATA_LOSS
+  LOST_OR_STOLEN_DEVICE
+  MISDIRECTED_COMMUNICATION
+  SYSTEM_OUTAGE
+  MALWARE_OR_PHISHING
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  CLOSED
+}
+
 // ─── Multi-Tenancy ──────────────────────────────────────
 
 enum MembershipStatus {
@@ -577,6 +605,7 @@ model Organization {
   tenantProcessingBases PatientProcessingBasis[] @relation("TenantProcessingBases")
   tenantConsents        PatientConsent[]         @relation("TenantConsents")
   tenantLegalAcceptances LegalAcceptance[]       @relation("TenantLegalAcceptances")
+  tenantSecurityIncidents SecurityIncident[]     @relation("TenantSecurityIncidents")
 
   // Phase 3: Workforce
   tenantShiftPatterns    ShiftPattern[]      @relation("TenantShiftPatterns")
@@ -834,6 +863,43 @@ model LegalAcceptance {
   @@unique([tenantId, documentType, version])
   @@index([tenantId])
   @@map("legal_acceptances")
+}
+
+// Security / data-protection incident register (NHS DSPT incident management +
+// ICO breach reporting). Append + status transitions; not destructive.
+model SecurityIncident {
+  id          String           @id @default(uuid())
+  reference   String           @unique
+  title       String
+  description String
+  category    IncidentCategory
+  severity    IncidentSeverity
+  status      IncidentStatus   @default(OPEN)
+
+  affectedDataSubjects Int?
+
+  // Timeline
+  occurredAt   DateTime?
+  discoveredAt DateTime  @default(now())
+  containedAt  DateTime?
+  resolvedAt   DateTime?
+
+  // ICO reportability (72-hour rule)
+  icoReportable Boolean   @default(false)
+  icoReportedAt DateTime?
+
+  reportedById String
+  assignedToId String?
+
+  tenantId String
+  tenant   Organization @relation("TenantSecurityIncidents", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, discoveredAt])
+  @@map("security_incidents")
 }
 
 model PatientIdentifier {
