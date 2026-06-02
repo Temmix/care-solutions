@@ -31,6 +31,8 @@ const buildPrisma = () => ({
   chcCase: { findMany: jest.fn().mockResolvedValue([{ id: 'chc1' }]) },
   virtualWardEnrolment: { findMany: jest.fn().mockResolvedValue([{ id: 'vw1' }]) },
   patientEvent: { findMany: jest.fn().mockResolvedValue([{ id: 'ev1' }, { id: 'ev2' }]) },
+  patientProcessingBasis: { findMany: jest.fn().mockResolvedValue([{ id: 'pb1' }]) },
+  patientConsent: { findMany: jest.fn().mockResolvedValue([{ id: 'c1' }]) },
   auditLog: { create: jest.fn().mockResolvedValue({}) },
 });
 

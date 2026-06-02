@@ -103,6 +103,11 @@ export class PatientAnonymizationService {
       where: scope,
       data: { clinicalSummary: TOMBSTONE, dischargeReason: TOMBSTONE },
     });
+    await this.prisma.patientProcessingBasis.updateMany({
+      where: scope,
+      data: { notes: TOMBSTONE },
+    });
+    await this.prisma.patientConsent.updateMany({ where: scope, data: { notes: TOMBSTONE } });
 
     // ── Blank free-text on child records (scoped via parent ids) ──────────
     if (carePlanIds.length) {

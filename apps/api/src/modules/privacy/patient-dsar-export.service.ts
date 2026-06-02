@@ -78,6 +78,9 @@ export interface PatientDsarExport {
   chcCases: unknown[];
   virtualWards: unknown[];
   timeline: unknown[];
+  /** Data-protection records (lawful basis per purpose + specific consents). */
+  processingBases: unknown[];
+  consents: unknown[];
 }
 
 /**
@@ -104,44 +107,58 @@ export class PatientDsarExportService {
       );
     }
 
-    const [carePlans, prescriptions, assessments, encounters, chcCases, virtualWards, timeline] =
-      await Promise.all([
-        this.prisma.carePlan.findMany({ where: { patientId }, include: CARE_PLAN_INCLUDES }),
-        this.prisma.medicationRequest.findMany({
-          where: { patientId },
-          include: PRESCRIPTION_INCLUDES,
-        }),
-        this.prisma.assessment.findMany({ where: { patientId }, include: ASSESSMENT_INCLUDES }),
-        this.prisma.encounter.findMany({
-          where: { patientId },
-          include: {
-            location: true,
-            bed: true,
-            transfers: true,
-            dischargePlan: { include: { tasks: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.chcCase.findMany({
-          where: { patientId },
-          include: { domainScores: true, notes: true, panelMembers: true },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.virtualWardEnrolment.findMany({
-          where: { patientId },
-          include: {
-            protocols: { include: { thresholds: true } },
-            observations: true,
-            alerts: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.patientEvent.findMany({
-          where: { patientId },
-          include: { recordedBy: { select: { id: true, firstName: true, lastName: true } } },
-          orderBy: { occurredAt: 'desc' },
-        }),
-      ]);
+    const [
+      carePlans,
+      prescriptions,
+      assessments,
+      encounters,
+      chcCases,
+      virtualWards,
+      timeline,
+      processingBases,
+      consents,
+    ] = await Promise.all([
+      this.prisma.carePlan.findMany({ where: { patientId }, include: CARE_PLAN_INCLUDES }),
+      this.prisma.medicationRequest.findMany({
+        where: { patientId },
+        include: PRESCRIPTION_INCLUDES,
+      }),
+      this.prisma.assessment.findMany({ where: { patientId }, include: ASSESSMENT_INCLUDES }),
+      this.prisma.encounter.findMany({
+        where: { patientId },
+        include: {
+          location: true,
+          bed: true,
+          transfers: true,
+          dischargePlan: { include: { tasks: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.chcCase.findMany({
+        where: { patientId },
+        include: { domainScores: true, notes: true, panelMembers: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.virtualWardEnrolment.findMany({
+        where: { patientId },
+        include: {
+          protocols: { include: { thresholds: true } },
+          observations: true,
+          alerts: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.patientEvent.findMany({
+        where: { patientId },
+        include: { recordedBy: { select: { id: true, firstName: true, lastName: true } } },
+        orderBy: { occurredAt: 'desc' },
+      }),
+      this.prisma.patientProcessingBasis.findMany({
+        where: { patientId },
+        orderBy: { purpose: 'asc' },
+      }),
+      this.prisma.patientConsent.findMany({ where: { patientId }, orderBy: { type: 'asc' } }),
+    ]);
 
     // ── FHIR collection bundle for the clinical core ─────────────────────
     const resources: FhirEntryResource[] = [
@@ -177,6 +194,8 @@ export class PatientDsarExportService {
           chcCases: chcCases.length,
           virtualWards: virtualWards.length,
           timelineEvents: timeline.length,
+          processingBases: processingBases.length,
+          consents: consents.length,
         },
       },
     });
@@ -190,6 +209,8 @@ export class PatientDsarExportService {
       chcCases,
       virtualWards,
       timeline,
+      processingBases,
+      consents,
     };
   }
 }

@@ -11,6 +11,8 @@ type MockPrisma = {
   chcCase: { findMany: jest.Mock; updateMany: jest.Mock };
   virtualWardEnrolment: { findMany: jest.Mock; updateMany: jest.Mock };
   patientEvent: { updateMany: jest.Mock; create: jest.Mock };
+  patientProcessingBasis: { updateMany: jest.Mock };
+  patientConsent: { updateMany: jest.Mock };
   assessment: { updateMany: jest.Mock };
   medicationRequest: { updateMany: jest.Mock };
   medicationAdministration: { updateMany: jest.Mock };
@@ -55,6 +57,8 @@ const buildPrisma = (overrides: Partial<Record<string, unknown>> = {}): MockPris
     chcNote: updateMany(),
     vitalObservation: updateMany(),
     virtualWardAlert: updateMany(),
+    patientProcessingBasis: updateMany(),
+    patientConsent: updateMany(),
     patientIdentifier: deleteMany(),
     patientContact: deleteMany(),
     patientSearchIndex: deleteMany(),
