@@ -15,6 +15,8 @@ import { RiskLevelBadge } from '../assessments/components/RiskLevelBadge';
 import { useMedications, type FhirMedicationRequest } from '../medications/hooks/use-medications';
 import { PrescriptionStatusBadge } from '../medications/components/PrescriptionStatusBadge';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { PatientDataProtectionActions } from './components/PatientDataProtectionActions';
+import { PatientConsentPanel } from './components/PatientConsentPanel';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UK_PHONE_RE = /^(?:\+44|0)\s?\d[\d\s]{8,12}$/;
@@ -377,6 +379,13 @@ export function PatientDetailPage(): React.ReactElement {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+          )}
+          {!editing && id && (
+            <PatientDataProtectionActions
+              patientId={id}
+              patientName={fullName}
+              onAnonymised={() => window.location.reload()}
+            />
           )}
         </div>
       </div>
@@ -770,6 +779,12 @@ export function PatientDetailPage(): React.ReactElement {
           </div>
         </div>
       </div>
+
+      {id && (
+        <div className="mt-6">
+          <PatientConsentPanel patientId={id} />
+        </div>
+      )}
     </div>
   );
 }

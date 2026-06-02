@@ -202,6 +202,63 @@ enum MedicationForm {
   OTHER
 }
 
+// ─── Data Protection (GDPR lawful basis & consent) ──────
+
+enum ProcessingPurpose {
+  DIRECT_CARE
+  CARE_COORDINATION
+  BILLING
+  SAFEGUARDING
+  SERVICE_IMPROVEMENT
+  RESEARCH
+  LEGAL_COMPLIANCE
+  OTHER
+}
+
+// UK GDPR Article 6(1) lawful bases for processing.
+enum LawfulBasisArticle6 {
+  CONSENT
+  CONTRACT
+  LEGAL_OBLIGATION
+  VITAL_INTERESTS
+  PUBLIC_TASK
+  LEGITIMATE_INTERESTS
+}
+
+// UK GDPR Article 9(2) conditions for processing special-category (health) data.
+enum LawfulBasisArticle9 {
+  EXPLICIT_CONSENT
+  EMPLOYMENT_SOCIAL_SECURITY
+  VITAL_INTERESTS
+  NOT_FOR_PROFIT
+  MADE_PUBLIC_BY_SUBJECT
+  LEGAL_CLAIMS
+  SUBSTANTIAL_PUBLIC_INTEREST
+  HEALTH_OR_SOCIAL_CARE
+  PUBLIC_HEALTH
+  ARCHIVING_RESEARCH
+}
+
+enum ConsentType {
+  DATA_SHARING
+  THIRD_PARTY_SHARING
+  RESEARCH
+  MARKETING
+  PHOTOGRAPHY
+}
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+}
+
+enum LegalDocumentType {
+  DPA
+  PRIVACY_POLICY
+  TERMS_OF_SERVICE
+  ACCEPTABLE_USE_POLICY
+}
+
 // ─── Multi-Tenancy ──────────────────────────────────────
 
 enum MembershipStatus {
@@ -516,6 +573,11 @@ model Organization {
   tenantMedicationRequests MedicationRequest[]        @relation("TenantMedicationRequests")
   tenantMedicationAdmins  MedicationAdministration[] @relation("TenantMedicationAdmins")
 
+  // Data protection
+  tenantProcessingBases PatientProcessingBasis[] @relation("TenantProcessingBases")
+  tenantConsents        PatientConsent[]         @relation("TenantConsents")
+  tenantLegalAcceptances LegalAcceptance[]       @relation("TenantLegalAcceptances")
+
   // Phase 3: Workforce
   tenantShiftPatterns    ShiftPattern[]      @relation("TenantShiftPatterns")
   tenantShifts           Shift[]             @relation("TenantShifts")
@@ -684,9 +746,17 @@ model Patient {
   chcCases              ChcCase[]
   virtualWardEnrolments VirtualWardEnrolment[]
 
+  // Data protection: lawful basis records + specific consents
+  processingBases PatientProcessingBasis[]
+  consents        PatientConsent[]
+
   // Encryption: blind index for postal code lookup, search index for name search
   postalCodeIndex String?
   searchIndexes   PatientSearchIndex[]
+
+  // GDPR right to erasure: set when the record has been irreversibly anonymised
+  anonymizedAt   DateTime?
+  anonymizedById String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -696,6 +766,74 @@ model Patient {
   @@index([managingOrganizationId])
   @@index([tenantId])
   @@map("patients")
+}
+
+// Per-purpose record of the lawful basis under which a patient's data is
+// processed (UK GDPR Art. 6 + Art. 9). One record per (patient, purpose).
+model PatientProcessingBasis {
+  id               String               @id @default(uuid())
+  purpose          ProcessingPurpose
+  article6Basis    LawfulBasisArticle6
+  article9Condition LawfulBasisArticle9?
+  notes            String?
+  recordedById     String
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantProcessingBases", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, purpose])
+  @@index([tenantId])
+  @@map("patient_processing_bases")
+}
+
+// A specific consent a patient has granted or withdrawn (separate from the
+// clinical lawful basis above). One record per (patient, type).
+model PatientConsent {
+  id           String        @id @default(uuid())
+  type         ConsentType
+  status       ConsentStatus
+  grantedAt    DateTime?
+  withdrawnAt  DateTime?
+  notes        String?
+  recordedById String
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantConsents", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, type])
+  @@index([tenantId])
+  @@map("patient_consents")
+}
+
+// Org-level record that a tenant accepted a specific version of a legal
+// document (DPA, Privacy Policy, Terms, AUP), with who accepted and when.
+model LegalAcceptance {
+  id           String            @id @default(uuid())
+  documentType LegalDocumentType
+  version      String
+  acceptedById String
+  ipAddress    String?
+  userAgent    String?
+  acceptedAt   DateTime          @default(now())
+
+  tenantId String
+  tenant   Organization @relation("TenantLegalAcceptances", fields: [tenantId], references: [id])
+
+  @@unique([tenantId, documentType, version])
+  @@index([tenantId])
+  @@map("legal_acceptances")
 }
 
 model PatientIdentifier {

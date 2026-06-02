@@ -90,6 +90,14 @@ export const ENCRYPTED_FIELDS: FieldEncryptionMap = {
     notes: {},
   },
 
+  PatientProcessingBasis: {
+    notes: {},
+  },
+
+  PatientConsent: {
+    notes: {},
+  },
+
   // ── Tier 2: Staff PII ────────────────────────────────
   User: {
     email: { searchable: true, searchType: 'exact', indexField: 'emailIndex', globalIndex: true },

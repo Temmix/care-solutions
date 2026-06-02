@@ -34,6 +34,7 @@ import { MedicationTypesSettingsPage } from './features/settings/MedicationTypes
 import { TrainingTypesSettingsPage } from './features/settings/TrainingTypesSettingsPage';
 import { ModuleVisibilitySettingsPage } from './features/settings/ModuleVisibilitySettingsPage';
 import { OrganisationSettingsPage } from './features/settings/OrganisationSettingsPage';
+import { DataProtectionSettingsPage } from './features/settings/DataProtectionSettingsPage';
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
 import { MedicationsDetailPage } from './features/medications/MedicationsDetailPage';
@@ -450,6 +451,7 @@ export function App(): React.ReactElement {
             <Route path="settings/training-types" element={<TrainingTypesSettingsPage />} />
             <Route path="settings/modules" element={<ModuleVisibilitySettingsPage />} />
             <Route path="settings/notifications" element={<NotificationPreferencesPage />} />
+            <Route path="settings/data-protection" element={<DataProtectionSettingsPage />} />
           </Route>
           <Route
             path="/change-password"
