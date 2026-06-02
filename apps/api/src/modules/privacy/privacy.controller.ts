@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   Param,
@@ -11,6 +12,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { PatientAnonymizationService } from './patient-anonymization.service';
+import { PatientDsarExportService, type PatientDsarExport } from './patient-dsar-export.service';
 import { AnonymisePatientDto } from './dto/anonymise-patient.dto';
 import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
 import { RolesGuard, TenantGuard } from '../../common/guards';
@@ -27,7 +29,23 @@ export class PrivacyController {
   constructor(
     @Inject(PatientAnonymizationService)
     private readonly anonymization: PatientAnonymizationService,
+    @Inject(PatientDsarExportService)
+    private readonly dsarExport: PatientDsarExportService,
   ) {}
+
+  /**
+   * Export all of a patient's personal data (GDPR right of access / portability).
+   * Restricted to org admins (SUPER_ADMIN bypasses). Audit-logged as EXPORT.
+   */
+  @Get('patients/:id/export')
+  @Roles(Role.ADMIN, Role.TENANT_ADMIN)
+  exportPatient(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string,
+  ): Promise<PatientDsarExport> {
+    return this.dsarExport.exportPatient(id, user.id, tenantId, new Date());
+  }
 
   /**
    * Irreversibly anonymise a patient (GDPR right to erasure).
