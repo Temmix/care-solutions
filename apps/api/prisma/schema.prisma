@@ -287,6 +287,11 @@ enum IncidentStatus {
   CLOSED
 }
 
+enum SubProcessorStatus {
+  ACTIVE
+  REMOVED
+}
+
 // ─── Multi-Tenancy ──────────────────────────────────────
 
 enum MembershipStatus {
@@ -904,6 +909,30 @@ model SecurityIncident {
   @@index([tenantId, status])
   @@index([tenantId, discoveredAt])
   @@map("security_incidents")
+}
+
+// Platform-wide register of data sub-processors (Clinvara's vendors). Shared
+// across all tenants; supports advance-notice of additions/removals (DPA: 30
+// days' notice of sub-processor changes).
+model SubProcessor {
+  id          String             @id @default(uuid())
+  name        String
+  purpose     String
+  location    String
+  url         String?
+  status      SubProcessorStatus @default(ACTIVE)
+  // When this record's status takes effect. A future date = an announced
+  // change still inside its notice period.
+  effectiveDate DateTime
+  announcedAt   DateTime         @default(now())
+  notes         String?
+  createdById   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, effectiveDate])
+  @@map("sub_processors")
 }
 
 model PatientIdentifier {
