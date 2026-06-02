@@ -575,6 +575,10 @@ model Organization {
   verifiedBy           User?              @relation("OrgVerifier", fields: [verifiedById], references: [id])
   verificationNotes    String?
 
+  // Data retention: set when the subscription is terminated; starts the
+  // post-termination grace window before Customer Data becomes purge-eligible.
+  terminatedAt DateTime?
+
   // Stripe billing
   stripeCustomerId String? @unique
 
