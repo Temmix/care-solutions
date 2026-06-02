@@ -7,6 +7,7 @@ const ACTOR = 'user-1';
 
 type MockPrisma = {
   patient: { findFirst: jest.Mock; update: jest.Mock };
+  user: { update: jest.Mock };
   carePlan: { findMany: jest.Mock };
   chcCase: { findMany: jest.Mock; updateMany: jest.Mock };
   virtualWardEnrolment: { findMany: jest.Mock; updateMany: jest.Mock };
@@ -42,6 +43,7 @@ const buildPrisma = (overrides: Partial<Record<string, unknown>> = {}): MockPris
       }),
       update: jest.fn().mockResolvedValue({ id: PATIENT_ID }),
     },
+    user: { update: jest.fn().mockResolvedValue({}) },
     carePlan: { findMany: jest.fn().mockResolvedValue([]) },
     chcCase: { findMany: jest.fn().mockResolvedValue([]), ...updateMany() },
     virtualWardEnrolment: { findMany: jest.fn().mockResolvedValue([]), ...updateMany() },
@@ -184,6 +186,40 @@ describe('PatientAnonymizationService', () => {
     expect(prisma.encounter.updateMany).toHaveBeenCalledWith({
       where: { patientId: PATIENT_ID, tenantId: TENANT },
       data: { notes: '[ERASED]' },
+    });
+  });
+
+  it('does not touch a user account when the patient has no linked login', async () => {
+    const prisma = buildPrisma();
+    const service = build(prisma);
+
+    await service.anonymisePatient(PATIENT_ID, PATIENT_ID, 'reason', ACTOR, TENANT);
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('anonymises the linked patient-portal user account when present', async () => {
+    const prisma = buildPrisma();
+    prisma.patient.findFirst.mockResolvedValue({
+      id: PATIENT_ID,
+      birthDate: new Date(Date.UTC(1980, 4, 15)),
+      anonymizedAt: null,
+      userId: 'usr-9',
+    });
+    const service = build(prisma);
+
+    await service.anonymisePatient(PATIENT_ID, PATIENT_ID, 'reason', ACTOR, TENANT);
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'usr-9' },
+      data: expect.objectContaining({
+        firstName: '[ERASED]',
+        lastName: '[ERASED]',
+        email: 'anonymised-usr-9@deleted.invalid',
+        isActive: false,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+      }),
     });
   });
 
