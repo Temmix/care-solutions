@@ -39,6 +39,7 @@ import { IncidentRegisterPage } from './features/settings/IncidentRegisterPage';
 import { SubProcessorsPage } from './features/settings/SubProcessorsPage';
 import { ProcessingSummaryPage } from './features/settings/ProcessingSummaryPage';
 import { DataProtectionContactPage } from './features/settings/DataProtectionContactPage';
+import { TenantPurgeConsolePage } from './features/settings/TenantPurgeConsolePage';
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
 import { MedicationsDetailPage } from './features/medications/MedicationsDetailPage';
@@ -460,6 +461,7 @@ export function App(): React.ReactElement {
             <Route path="settings/sub-processors" element={<SubProcessorsPage />} />
             <Route path="settings/processing-summary" element={<ProcessingSummaryPage />} />
             <Route path="settings/dpo-contact" element={<DataProtectionContactPage />} />
+            <Route path="settings/tenant-purge" element={<TenantPurgeConsolePage />} />
           </Route>
           <Route
             path="/change-password"
