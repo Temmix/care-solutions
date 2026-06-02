@@ -45,7 +45,7 @@ export class PatientAnonymizationService {
   ): Promise<AnonymisationResult> {
     const patient = await this.prisma.patient.findFirst({
       where: { id: patientId, tenantId },
-      select: { id: true, birthDate: true, anonymizedAt: true },
+      select: { id: true, birthDate: true, anonymizedAt: true, userId: true },
     });
     if (!patient) {
       throw new NotFoundException(
@@ -148,6 +148,24 @@ export class PatientAnonymizationService {
     // ── Delete pure-identifier rows (no clinical value once anonymised) ───
     await this.prisma.patientIdentifier.deleteMany({ where: { patientId } });
     await this.prisma.patientContact.deleteMany({ where: { patientId } });
+
+    // ── Anonymise the linked patient-portal user account (if any) ────────
+    // The patient may have their own login (patient.userId). Strip its
+    // identifiers, deactivate it and clear any password-reset token so the
+    // identity is erased too — not just unlinked.
+    if (patient.userId) {
+      await this.prisma.user.update({
+        where: { id: patient.userId },
+        data: {
+          firstName: TOMBSTONE,
+          lastName: TOMBSTONE,
+          email: `anonymised-${patient.userId}@deleted.invalid`,
+          isActive: false,
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        },
+      });
+    }
 
     // ── Redact the Patient row itself ────────────────────────────────────
     // birthDate is generalised to the year only (Jan 1) to keep age-band
