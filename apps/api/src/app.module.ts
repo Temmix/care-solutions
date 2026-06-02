@@ -23,6 +23,7 @@ import { TrainingModule } from './modules/training/training.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { RumModule } from './modules/rum/rum.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
+import { LegalModule } from './modules/legal/legal.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -77,6 +78,7 @@ import { HealthController } from './health.controller';
     MetricsModule,
     RumModule,
     PrivacyModule,
+    LegalModule,
   ],
   controllers: [HealthController],
 })

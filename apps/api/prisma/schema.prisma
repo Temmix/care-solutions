@@ -252,6 +252,13 @@ enum ConsentStatus {
   WITHDRAWN
 }
 
+enum LegalDocumentType {
+  DPA
+  PRIVACY_POLICY
+  TERMS_OF_SERVICE
+  ACCEPTABLE_USE_POLICY
+}
+
 // ─── Multi-Tenancy ──────────────────────────────────────
 
 enum MembershipStatus {
@@ -569,6 +576,7 @@ model Organization {
   // Data protection
   tenantProcessingBases PatientProcessingBasis[] @relation("TenantProcessingBases")
   tenantConsents        PatientConsent[]         @relation("TenantConsents")
+  tenantLegalAcceptances LegalAcceptance[]       @relation("TenantLegalAcceptances")
 
   // Phase 3: Workforce
   tenantShiftPatterns    ShiftPattern[]      @relation("TenantShiftPatterns")
@@ -807,6 +815,25 @@ model PatientConsent {
   @@unique([patientId, type])
   @@index([tenantId])
   @@map("patient_consents")
+}
+
+// Org-level record that a tenant accepted a specific version of a legal
+// document (DPA, Privacy Policy, Terms, AUP), with who accepted and when.
+model LegalAcceptance {
+  id           String            @id @default(uuid())
+  documentType LegalDocumentType
+  version      String
+  acceptedById String
+  ipAddress    String?
+  userAgent    String?
+  acceptedAt   DateTime          @default(now())
+
+  tenantId String
+  tenant   Organization @relation("TenantLegalAcceptances", fields: [tenantId], references: [id])
+
+  @@unique([tenantId, documentType, version])
+  @@index([tenantId])
+  @@map("legal_acceptances")
 }
 
 model PatientIdentifier {
