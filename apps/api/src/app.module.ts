@@ -22,6 +22,7 @@ import { IotModule } from './modules/iot/iot.module';
 import { TrainingModule } from './modules/training/training.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { RumModule } from './modules/rum/rum.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -75,6 +76,7 @@ import { HealthController } from './health.controller';
     TrainingModule,
     MetricsModule,
     RumModule,
+    PrivacyModule,
   ],
   controllers: [HealthController],
 })
