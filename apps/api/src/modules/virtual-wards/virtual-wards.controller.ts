@@ -23,8 +23,8 @@ import {
   DischargeVwDto,
   SearchEnrolmentsDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant, Audit } from '../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, Audit, ClinicalData } from '../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -33,7 +33,8 @@ interface RequestUser {
 }
 
 @Controller('virtual-wards')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class VirtualWardsController {
   constructor(@Inject(VirtualWardsService) private vwService: VirtualWardsService) {}
 
