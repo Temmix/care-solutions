@@ -67,7 +67,7 @@ describe('AuditLogPage', () => {
     );
   });
 
-  it('reveals full forensic detail (raw action, UUID, email, route) when a row is expanded', async () => {
+  it('reveals detail (raw action, UUID, email) when a row is expanded', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
 
@@ -79,7 +79,17 @@ describe('AuditLogPage', () => {
     expect(screen.getByText(/sarah@x\.test/)).toBeInTheDocument();
     // raw resourceId surfaced (== patientId here, so it appears in both rows)
     expect(screen.getAllByText('pat-1-uuid').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('/api/patients/:id')).toBeInTheDocument(); // route
+  });
+
+  it('does not display route or raw metadata in the detail panel', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('cell', { name: 'Viewed' }));
+
+    expect(screen.queryByText('Route')).not.toBeInTheDocument();
+    expect(screen.queryByText('Metadata')).not.toBeInTheDocument();
+    expect(screen.queryByText('/api/patients/:id')).not.toBeInTheDocument();
   });
 
   it('passes the action filter through to the API query', async () => {

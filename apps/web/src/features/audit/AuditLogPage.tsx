@@ -124,11 +124,6 @@ function describeTarget(log: AuditLogEntry): { main: string; sub?: string; patie
   return { main: resLabel, sub: shortId };
 }
 
-function metadataRoute(metadata?: Record<string, unknown>): string | undefined {
-  const route = metadata?.route;
-  return typeof route === 'string' ? route : undefined;
-}
-
 export function AuditLogPage(): React.ReactElement {
   const { searchLogs } = useAuditLogs();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -302,7 +297,6 @@ export function AuditLogPage(): React.ReactElement {
               logs.map((log) => {
                 const target = describeTarget(log);
                 const expanded = expandedId === log.id;
-                const route = metadataRoute(log.metadata);
                 return (
                   <Fragment key={log.id}>
                     <tr
@@ -385,26 +379,6 @@ export function AuditLogPage(): React.ReactElement {
                                       {log.patientId}
                                     </code>
                                   )}
-                                </dd>
-                              </>
-                            )}
-
-                            {route && (
-                              <>
-                                <dt className="text-slate-400">Route</dt>
-                                <dd className="text-slate-700">
-                                  <code className="text-xs">{route}</code>
-                                </dd>
-                              </>
-                            )}
-
-                            {log.metadata && Object.keys(log.metadata).length > 0 && (
-                              <>
-                                <dt className="text-slate-400">Metadata</dt>
-                                <dd className="text-slate-700">
-                                  <pre className="text-xs bg-white border border-slate-100 rounded p-2 overflow-x-auto">
-                                    {JSON.stringify(log.metadata, null, 2)}
-                                  </pre>
                                 </dd>
                               </>
                             )}
