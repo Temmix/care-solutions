@@ -15,8 +15,8 @@ import { PatientAnonymizationService } from './patient-anonymization.service';
 import { PatientDsarExportService, type PatientDsarExport } from './patient-dsar-export.service';
 import { PrivacySummaryService, type ProcessingActivitiesSummary } from './privacy-summary.service';
 import { AnonymisePatientDto } from './dto/anonymise-patient.dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, ClinicalData } from '../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -25,7 +25,8 @@ interface RequestUser {
 }
 
 @Controller('privacy')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class PrivacyController {
   constructor(
     @Inject(PatientAnonymizationService)

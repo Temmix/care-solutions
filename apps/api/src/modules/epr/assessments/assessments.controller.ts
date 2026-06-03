@@ -16,8 +16,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import { AssessmentsService } from './assessments.service';
 import { CreateAssessmentDto, UpdateAssessmentDto, SearchAssessmentsDto } from './dto';
-import { Roles, CurrentUser, CurrentTenant, Audit } from '../../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, Audit, ClinicalData } from '../../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -26,7 +26,8 @@ interface RequestUser {
 }
 
 @Controller('assessments')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class AssessmentsController {
   constructor(@Inject(AssessmentsService) private assessmentsService: AssessmentsService) {}
 

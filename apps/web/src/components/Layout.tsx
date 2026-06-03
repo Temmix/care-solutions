@@ -127,6 +127,7 @@ const navItems = [
     to: '/app/patients',
     label: 'Patients',
     moduleCode: 'PATIENTS',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -147,6 +148,7 @@ const navItems = [
     to: '/app/care-plans',
     label: 'Care Plans',
     moduleCode: 'CARE_PLANS',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -167,6 +169,7 @@ const navItems = [
     to: '/app/medications',
     label: 'Medications',
     moduleCode: 'MEDICATIONS',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -187,6 +190,7 @@ const navItems = [
     to: '/app/assessments',
     label: 'Assessments',
     moduleCode: 'ASSESSMENTS',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -345,6 +349,7 @@ const navItems = [
     to: '/app/patient-flow',
     label: 'Patient Flow',
     moduleCode: 'PATIENT_FLOW',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -365,6 +370,7 @@ const navItems = [
     to: '/app/chc',
     label: 'CHC',
     moduleCode: 'CHC',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -385,6 +391,7 @@ const navItems = [
     to: '/app/virtual-wards',
     label: 'Virtual Wards',
     moduleCode: 'VIRTUAL_WARDS',
+    clinical: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -727,6 +734,9 @@ export function Layout(): React.ReactElement {
       <nav className="flex-1 px-3 overflow-y-auto">
         <div className="space-y-1">
           {navItems.map((item) => {
+            // Platform admins (SUPER_ADMIN) have no clinical role — never show
+            // them patient clinical data, even after selecting a tenant.
+            if (item.clinical && isSuperAdmin) return null;
             if (item.superAdminOnly && !isSuperAdmin) return null;
             if (item.platformOnly && !isPlatformAdmin) return null;
             if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;

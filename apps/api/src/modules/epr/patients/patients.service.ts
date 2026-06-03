@@ -99,12 +99,14 @@ export class PatientsService {
     const skip = (page - 1) * limit;
     const encrypted = this.encryption.isEnabled();
 
-    const where: Prisma.PatientWhereInput = { active: true };
-
-    // Scope to tenant (SUPER_ADMIN with no tenantId sees all)
-    if (tenantId) {
-      where.tenantId = tenantId;
+    // Patient data is always tenant-scoped. A missing tenant must NOT fall
+    // through to an unscoped, cross-tenant query (defence-in-depth alongside
+    // ClinicalAccessGuard, which blocks platform admins from this endpoint).
+    if (!tenantId) {
+      throw new ForbiddenException('A tenant context is required to search patient records.');
     }
+
+    const where: Prisma.PatientWhereInput = { active: true, tenantId };
 
     // Collect ID filters from blind index searches (intersected at the end)
     let idFilter: Set<string> | null = null;
@@ -177,8 +179,10 @@ export class PatientsService {
   }
 
   async findOne(id: string, tenantId: string | null, userId?: string, userRole?: string) {
-    const where: Prisma.PatientWhereInput = { id };
-    if (tenantId) where.tenantId = tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException('A tenant context is required to read a patient record.');
+    }
+    const where: Prisma.PatientWhereInput = { id, tenantId };
 
     const patient = await this.prisma.patient.findFirst({
       where,

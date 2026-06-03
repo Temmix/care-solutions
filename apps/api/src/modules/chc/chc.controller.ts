@@ -23,8 +23,8 @@ import {
   AddChcNoteDto,
   SearchChcCasesDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant, Audit } from '../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, Audit, ClinicalData } from '../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -33,7 +33,8 @@ interface RequestUser {
 }
 
 @Controller('chc/cases')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class ChcController {
   constructor(@Inject(ChcService) private chcService: ChcService) {}
 
