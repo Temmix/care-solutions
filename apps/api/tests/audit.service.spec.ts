@@ -26,6 +26,7 @@ const buildPrisma = (rows: Row[]) => ({
   auditLog: {
     findMany: jest.fn().mockResolvedValue(rows),
     count: jest.fn().mockResolvedValue(rows.length),
+    create: jest.fn().mockResolvedValue({}),
   },
   patient: { findMany: jest.fn().mockResolvedValue([]) },
   user: { findMany: jest.fn().mockResolvedValue([]) },
@@ -129,5 +130,59 @@ describe('AuditService.search — target enrichment', () => {
     expect(data[0].patientName).toBeUndefined();
     expect(data[0].resourceName).toBeUndefined();
     expect(data[0].resourceId).toBe('sh-1');
+  });
+});
+
+describe('AuditService.exportCsv', () => {
+  const at = new Date('2026-06-03T11:45:07.000Z');
+
+  it('returns a CSV header + one row per entry with the resolved subject', async () => {
+    const prisma = buildPrisma([
+      row({ resource: 'Patient', resourceId: 'pat-1', action: 'VIEW', createdAt: at }),
+    ]);
+    prisma.patient.findMany.mockResolvedValue([
+      { id: 'pat-1', givenName: 'Jane', middleName: null, familyName: 'Doe' },
+    ]);
+
+    const csv = await build(prisma).exportCsv({}, TENANT, 'actor-1');
+    const lines = csv.split('\n');
+
+    expect(lines[0]).toBe('"Timestamp","User","Email","Action","Resource","Subject","Resource ID"');
+    expect(lines[1]).toBe(
+      '"2026-06-03T11:45:07.000Z","Sarah Smith","s@x.test","VIEW","Patient","Jane Doe","pat-1"',
+    );
+  });
+
+  it('escapes embedded quotes/commas so fields stay intact', async () => {
+    const prisma = buildPrisma([
+      row({
+        resource: 'Patient',
+        resourceId: 'pat-2',
+        createdAt: at,
+        user: { firstName: 'Ann, "AJ"', lastName: 'Lee', email: 'a@x.test' },
+      }),
+    ]);
+    prisma.patient.findMany.mockResolvedValue([
+      { id: 'pat-2', givenName: 'Bob', middleName: null, familyName: 'Roe' },
+    ]);
+
+    const csv = await build(prisma).exportCsv({}, TENANT, 'actor-1');
+
+    expect(csv.split('\n')[1]).toContain('"Ann, ""AJ"" Lee"');
+  });
+
+  it('records the export itself as an audit event', async () => {
+    const prisma = buildPrisma([row({ resource: 'Shift', resourceId: 'sh-1', createdAt: at })]);
+
+    await build(prisma).exportCsv({}, TENANT, 'actor-9');
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'actor-9',
+        action: 'EXPORT_AUDIT_LOG',
+        resource: 'AuditLog',
+        tenantId: TENANT,
+      }),
+    });
   });
 });

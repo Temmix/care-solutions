@@ -22,6 +22,9 @@ const PATIENT_LINKED_RESOURCES = [
 
 type PatientLinkedResource = (typeof PATIENT_LINKED_RESOURCES)[number];
 
+/** Hard cap on a single CSV export (most recent rows first). */
+const AUDIT_EXPORT_CAP = 50_000;
+
 @Injectable()
 export class AuditService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
@@ -58,17 +61,7 @@ export class AuditService {
     const page = parseInt(dto.page ?? '1', 10);
     const limit = parseInt(dto.limit ?? '20', 10);
     const skip = (page - 1) * limit;
-
-    const where: Prisma.AuditLogWhereInput = { tenantId };
-    if (dto.userId) where.userId = dto.userId;
-    if (dto.action) where.action = dto.action;
-    if (dto.resource) where.resource = dto.resource;
-    if (dto.resourceId) where.resourceId = dto.resourceId;
-    if (dto.startDate || dto.endDate) {
-      where.createdAt = {};
-      if (dto.startDate) where.createdAt.gte = new Date(dto.startDate);
-      if (dto.endDate) where.createdAt.lte = new Date(dto.endDate);
-    }
+    const where = this.buildWhere(dto, tenantId);
 
     const [data, total] = await Promise.all([
       this.prisma.auditLog.findMany({
@@ -84,6 +77,65 @@ export class AuditService {
     ]);
 
     return { data: await this.enrichTargets(data, tenantId), total, page, limit };
+  }
+
+  private buildWhere(dto: SearchAuditLogsDto, tenantId: string): Prisma.AuditLogWhereInput {
+    const where: Prisma.AuditLogWhereInput = { tenantId };
+    if (dto.userId) where.userId = dto.userId;
+    if (dto.action) where.action = dto.action;
+    if (dto.resource) where.resource = dto.resource;
+    if (dto.resourceId) where.resourceId = dto.resourceId;
+    if (dto.startDate || dto.endDate) {
+      where.createdAt = {};
+      if (dto.startDate) where.createdAt.gte = new Date(dto.startDate);
+      if (dto.endDate) where.createdAt.lte = new Date(dto.endDate);
+    }
+    return where;
+  }
+
+  // ── CSV export ───────────────────────────────────────────
+
+  /**
+   * Export the matching audit entries (same filters as search, no pagination)
+   * as CSV with resolved subjects. Capped at AUDIT_EXPORT_CAP most-recent rows.
+   * Exporting the audit log is itself an auditable event.
+   */
+  async exportCsv(dto: SearchAuditLogsDto, tenantId: string, actorId: string): Promise<string> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: this.buildWhere(dto, tenantId),
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: AUDIT_EXPORT_CAP,
+    });
+    const enriched = await this.enrichTargets(rows, tenantId);
+
+    await this.log({
+      userId: actorId,
+      action: 'EXPORT_AUDIT_LOG',
+      resource: 'AuditLog',
+      tenantId,
+      metadata: { rows: enriched.length, capped: enriched.length >= AUDIT_EXPORT_CAP },
+    });
+
+    const header = ['Timestamp', 'User', 'Email', 'Action', 'Resource', 'Subject', 'Resource ID'];
+    const escape = (value: unknown): string => `"${(value ?? '').toString().replace(/"/g, '""')}"`;
+    const lines = [header.map(escape).join(',')];
+    for (const r of enriched) {
+      lines.push(
+        [
+          r.createdAt.toISOString(),
+          `${r.user.firstName} ${r.user.lastName}`,
+          r.user.email,
+          r.action,
+          r.resource,
+          r.patientName ?? r.resourceName ?? '',
+          r.resourceId ?? '',
+        ]
+          .map(escape)
+          .join(','),
+      );
+    }
+    return lines.join('\n');
   }
 
   // ── Target resolution (resourceId → human-readable subject) ──
