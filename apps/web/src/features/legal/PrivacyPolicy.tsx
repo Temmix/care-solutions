@@ -252,7 +252,9 @@ export function PrivacyPolicy(): React.ReactElement {
           <h2 className="text-lg font-semibold text-slate-900 mt-8">8. Data Retention</h2>
           <p>
             8.1. <strong>Customer Data</strong> is retained for the duration of your subscription.
-            Upon termination, you have 30 days to export your data before it is permanently deleted.
+            You can export your data on demand at any time using the platform&apos;s export
+            features. Upon termination, you have a further 30 days to export before data becomes
+            eligible for permanent deletion.
           </p>
           <p>
             8.2. <strong>Audit logs</strong> are retained for a minimum of 3 years in accordance
