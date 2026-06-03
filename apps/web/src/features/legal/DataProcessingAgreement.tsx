@@ -375,15 +375,19 @@ export function DataProcessingAgreement(): React.ReactElement {
           <ul>
             <li>
               The Controller has <strong>30 days</strong> to export Customer Data using the
-              platform&apos;s export features
+              platform&apos;s export features (export is also available on demand at any time during
+              the subscription)
             </li>
             <li>
-              After the 30-day export window, the Processor shall delete all Customer Data from
-              production systems within 30 days
+              After this 30-day window, Customer Data becomes <strong>eligible for deletion</strong>
+              . The Processor will delete it from production systems on the Controller&apos;s
+              written request, or as part of the Processor&apos;s offboarding process, and will
+              provide written confirmation once deletion is complete
             </li>
             <li>
-              Customer Data in automated backups will be purged as backups rotate (within 7 days of
-              production deletion)
+              Deletion from production systems is performed under controlled, logged access by
+              authorised personnel. Customer Data in automated backups will be purged as backups
+              rotate (within 7 days of production deletion)
             </li>
           </ul>
           <p>
