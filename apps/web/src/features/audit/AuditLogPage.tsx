@@ -125,13 +125,14 @@ function describeTarget(log: AuditLogEntry): { main: string; sub?: string; patie
 }
 
 export function AuditLogPage(): React.ReactElement {
-  const { searchLogs } = useAuditLogs();
+  const { searchLogs, exportLogs } = useAuditLogs();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const limit = 25;
 
   const [resource, setResource] = useState('');
@@ -158,6 +159,32 @@ export function AuditLogPage(): React.ReactElement {
       .finally(() => setLoading(false));
   }, [searchLogs, page, resource, action, startDate, endDate]);
 
+  const handleExport = async (): Promise<void> => {
+    setExporting(true);
+    setError('');
+    try {
+      const csv = await exportLogs({
+        resource: resource || undefined,
+        action: action || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export audit logs');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / limit);
   const COLS = 5;
 
@@ -170,12 +197,21 @@ export function AuditLogPage(): React.ReactElement {
             {total} record{total !== 1 ? 's' : ''} · click a row for full detail
           </p>
         </div>
-        <Link
-          to="/app/audit/compliance"
-          className="px-4 py-2 bg-accent hover:bg-accent-dark text-white border-none rounded-lg text-sm font-medium no-underline transition-colors"
-        >
-          Compliance Dashboard
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            disabled={exporting || total === 0}
+            className="px-4 py-2 bg-accent hover:bg-accent-dark text-white border-none rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+          <Link
+            to="/app/audit/compliance"
+            className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-medium no-underline transition-colors"
+          >
+            Compliance Dashboard
+          </Link>
+        </div>
       </div>
 
       <ErrorAlert message={error} className="mb-4" />

@@ -58,6 +58,18 @@ export function useAuditLogs() {
     return api.get<AuditSearchResult>(`/audit/logs${qs ? `?${qs}` : ''}`);
   }, []);
 
+  const exportLogs = useCallback(async (params: SearchParams = {}): Promise<string> => {
+    const query = new URLSearchParams();
+    if (params.userId) query.set('userId', params.userId);
+    if (params.action) query.set('action', params.action);
+    if (params.resource) query.set('resource', params.resource);
+    if (params.resourceId) query.set('resourceId', params.resourceId);
+    if (params.startDate) query.set('startDate', params.startDate);
+    if (params.endDate) query.set('endDate', params.endDate);
+    const qs = query.toString();
+    return api.getText(`/audit/logs/export${qs ? `?${qs}` : ''}`);
+  }, []);
+
   const getComplianceSummary = useCallback(
     async (startDate?: string, endDate?: string): Promise<ComplianceSummary> => {
       const query = new URLSearchParams();
@@ -69,5 +81,5 @@ export function useAuditLogs() {
     [],
   );
 
-  return { searchLogs, getComplianceSummary };
+  return { searchLogs, exportLogs, getComplianceSummary };
 }
