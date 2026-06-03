@@ -3,6 +3,25 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SearchAuditLogsDto } from './dto';
 
+/** Value the anonymisation feature writes into erased name fields. */
+const ERASED = '[ERASED]';
+
+/**
+ * Resources whose `resourceId` points at a record that belongs to a patient.
+ * For these we resolve resourceId → record → patientId → patient name so the
+ * audit entry can say *whose* record was touched, not just a bare UUID.
+ */
+const PATIENT_LINKED_RESOURCES = [
+  'CarePlan',
+  'Assessment',
+  'MedicationRequest',
+  'Encounter',
+  'ChcCase',
+  'VirtualWardEnrolment',
+] as const;
+
+type PatientLinkedResource = (typeof PATIENT_LINKED_RESOURCES)[number];
+
 @Injectable()
 export class AuditService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
@@ -64,7 +83,132 @@ export class AuditService {
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return { data: await this.enrichTargets(data, tenantId), total, page, limit };
+  }
+
+  // ── Target resolution (resourceId → human-readable subject) ──
+
+  /**
+   * Enrich a page of audit rows with the subject they concern: the patient
+   * (for patient-linked resources) and/or a resolved resource name. All lookups
+   * are batched per resource type (no N+1) and tenant-scoped. Records that have
+   * been hard-deleted resolve to `undefined`; anonymised patients resolve to a
+   * clear "(erased patient)" marker rather than the raw `[ERASED]` tombstone.
+   */
+  private async enrichTargets<T extends { resource: string; resourceId: string | null }>(
+    rows: T[],
+    tenantId: string,
+  ): Promise<(T & { patientId?: string; patientName?: string; resourceName?: string })[]> {
+    // Row index → resolved patientId.
+    const patientIdByRow = new Map<number, string>();
+
+    // Direct Patient views: the resourceId *is* the patient id.
+    rows.forEach((r, i) => {
+      if (r.resource === 'Patient' && r.resourceId) patientIdByRow.set(i, r.resourceId);
+    });
+
+    // Patient-linked resources: batch-resolve record id → patientId.
+    for (const resource of PATIENT_LINKED_RESOURCES) {
+      const hits = rows
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => r.resource === resource && r.resourceId);
+      if (!hits.length) continue;
+      const ids = [...new Set(hits.map(({ r }) => r.resourceId as string))];
+      const patientIdByRecord = await this.patientIdsForResource(resource, ids, tenantId);
+      for (const { r, i } of hits) {
+        const pid = patientIdByRecord.get(r.resourceId as string);
+        if (pid) patientIdByRow.set(i, pid);
+      }
+    }
+
+    // Batch-fetch every referenced patient and build a display-name map.
+    const patientNameById = await this.patientNames(
+      [...new Set(patientIdByRow.values())],
+      tenantId,
+    );
+
+    // Resolve User-resource targets (e.g. role changes) to a name.
+    const userResourceIds = [
+      ...new Set(
+        rows
+          .filter((r) => r.resource === 'User' && r.resourceId)
+          .map((r) => r.resourceId as string),
+      ),
+    ];
+    const userNameById = await this.userNames(userResourceIds);
+
+    return rows.map((r, i) => {
+      const patientId = patientIdByRow.get(i);
+      return {
+        ...r,
+        patientId,
+        patientName: patientId ? patientNameById.get(patientId) : undefined,
+        resourceName:
+          r.resource === 'User' && r.resourceId ? userNameById.get(r.resourceId) : undefined,
+      };
+    });
+  }
+
+  private async patientIdsForResource(
+    resource: PatientLinkedResource,
+    ids: string[],
+    tenantId: string,
+  ): Promise<Map<string, string>> {
+    const where = { id: { in: ids }, tenantId };
+    const select = { id: true, patientId: true };
+    let records: { id: string; patientId: string }[];
+    switch (resource) {
+      case 'CarePlan':
+        records = await this.prisma.carePlan.findMany({ where, select });
+        break;
+      case 'Assessment':
+        records = await this.prisma.assessment.findMany({ where, select });
+        break;
+      case 'MedicationRequest':
+        records = await this.prisma.medicationRequest.findMany({ where, select });
+        break;
+      case 'Encounter':
+        records = await this.prisma.encounter.findMany({ where, select });
+        break;
+      case 'ChcCase':
+        records = await this.prisma.chcCase.findMany({ where, select });
+        break;
+      case 'VirtualWardEnrolment':
+        records = await this.prisma.virtualWardEnrolment.findMany({ where, select });
+        break;
+    }
+    return new Map(records.map((r) => [r.id, r.patientId]));
+  }
+
+  private async patientNames(ids: string[], tenantId: string): Promise<Map<string, string>> {
+    if (!ids.length) return new Map();
+    const patients = await this.prisma.patient.findMany({
+      where: { id: { in: ids }, tenantId },
+      select: { id: true, givenName: true, middleName: true, familyName: true },
+    });
+    return new Map(
+      patients.map((p) => {
+        const erased = p.givenName === ERASED && p.familyName === ERASED;
+        const name = erased
+          ? '(erased patient)'
+          : [p.givenName, p.middleName, p.familyName].filter(Boolean).join(' ').trim();
+        return [p.id, name || '(unnamed patient)'];
+      }),
+    );
+  }
+
+  private async userNames(ids: string[]): Promise<Map<string, string>> {
+    if (!ids.length) return new Map();
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    return new Map(
+      users.map((u) => [
+        u.id,
+        [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || '(unknown user)',
+      ]),
+    );
   }
 
   // ── Compliance summary ───────────────────────────────────

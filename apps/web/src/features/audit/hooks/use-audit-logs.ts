@@ -10,6 +10,11 @@ export interface AuditLogEntry {
   metadata?: Record<string, unknown>;
   createdAt: string;
   user: { firstName: string; lastName: string; email: string };
+  /** Resolved server-side: the patient the entry concerns, if any. */
+  patientId?: string;
+  patientName?: string;
+  /** Resolved display name for non-patient resources (e.g. a User). */
+  resourceName?: string;
 }
 
 export interface AuditSearchResult {
