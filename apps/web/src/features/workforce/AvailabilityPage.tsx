@@ -3,6 +3,7 @@ import { useWorkforce, type StaffAvailability } from './hooks/use-workforce';
 import { useAuth } from '../../hooks/use-auth';
 import { Link } from 'react-router-dom';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { toDateKey } from '../../lib/date';
 
 const availabilityTypes = ['AVAILABLE', 'UNAVAILABLE', 'ANNUAL_LEAVE', 'SICK_LEAVE', 'TRAINING'];
 
@@ -39,8 +40,8 @@ export function AvailabilityPage(): React.ReactElement {
   const load = async () => {
     try {
       // Show next 30 days
-      const from = new Date().toISOString().split('T')[0];
-      const to = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+      const from = toDateKey(new Date());
+      const to = toDateKey(new Date(Date.now() + 30 * 86400000));
 
       if (viewMode === 'team' && isAdmin) {
         const result = await listAvailability({ from, to });

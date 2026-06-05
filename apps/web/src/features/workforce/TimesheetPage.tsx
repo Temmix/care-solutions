@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTimesheets } from './hooks/use-timesheets';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { toDateKey } from '../../lib/date';
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   CLOCKED_IN: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Clocked In' },
@@ -28,8 +29,8 @@ function getWeekRange(): { from: string; to: string } {
   sunday.setHours(23, 59, 59, 999);
 
   return {
-    from: monday.toISOString().split('T')[0],
-    to: sunday.toISOString().split('T')[0],
+    from: toDateKey(monday),
+    to: toDateKey(sunday),
   };
 }
 
