@@ -80,3 +80,22 @@ export interface TodayAssignment {
   shift: Shift;
   clockRecord: ClockRecord | null;
 }
+
+export interface ShiftAssignmentSummary {
+  id: string;
+  role: string | null;
+  user: { id: string; firstName: string; lastName: string; role: Role };
+}
+
+/** A shift as returned by GET /api/shifts (includes all assignments). */
+export interface RosterShift extends Shift {
+  assignments: ShiftAssignmentSummary[];
+}
+
+/** Paginated envelope from GET /api/shifts. */
+export interface ShiftListResponse {
+  data: RosterShift[];
+  total: number;
+  page: number;
+  limit: number;
+}
