@@ -13,8 +13,16 @@ export interface ShiftDayGroup {
 
 const DAYS_AHEAD = 28; // four weeks
 
+/**
+ * YYYY-MM-DD from the date's LOCAL calendar parts (not UTC). Using toISOString
+ * here would return the UTC day, which in timezones ahead of UTC (e.g. BST)
+ * shifts back a day — mislabelling today's shift as "Tomorrow".
+ */
 function toDateParam(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
