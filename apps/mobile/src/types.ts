@@ -127,3 +127,59 @@ export interface TrainingRecord {
   notes: string | null;
   certificates: TrainingCertificate[];
 }
+
+export type AvailabilityType =
+  | 'AVAILABLE'
+  | 'UNAVAILABLE'
+  | 'ANNUAL_LEAVE'
+  | 'SICK_LEAVE'
+  | 'TRAINING';
+
+/** A record from GET /api/availability/me. */
+export interface Availability {
+  id: string;
+  date: string;
+  endDate: string | null;
+  type: AvailabilityType;
+  startTime: string | null;
+  endTime: string | null;
+  notes: string | null;
+}
+
+export type SwapStatus = 'PENDING' | 'ACCEPTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
+
+interface SwapPerson {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role?: Role;
+}
+
+/** A shift assignment as embedded in a swap request. */
+export interface SwapAssignmentRef {
+  id: string;
+  shift: {
+    id: string;
+    date: string;
+    shiftPattern: { name: string; startTime: string; endTime: string };
+    location: { name: string } | null;
+  };
+}
+
+/** A swap request from GET /api/swaps (open) or /api/swaps/mine. */
+export interface SwapRequest {
+  id: string;
+  status: SwapStatus;
+  reason: string | null;
+  requester: SwapPerson;
+  responder?: SwapPerson | null;
+  originalShiftAssignment: SwapAssignmentRef;
+  targetShiftAssignment?: SwapAssignmentRef | null;
+}
+
+/** A minimal "one of my upcoming shifts" entry for swap pickers. */
+export interface MyAssignmentOption {
+  assignmentId: string;
+  date: string;
+  label: string;
+}
