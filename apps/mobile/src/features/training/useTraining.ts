@@ -14,7 +14,9 @@ function humanizeCode(code: string): string {
   return code
     .split('_')
     .filter(Boolean)
-    .map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .map((w) =>
+      w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+    )
     .join(' ');
 }
 
