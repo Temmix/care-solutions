@@ -53,7 +53,14 @@ function getWeekDates(offset: number): { start: Date; end: Date; dates: Date[] }
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  // Use LOCAL calendar parts, not toISOString (UTC). The week columns are built
+  // at local midnight, so toISOString would roll them back a day in timezones
+  // ahead of UTC (e.g. BST) — landing the "today" highlight and every shift on
+  // the wrong column.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
