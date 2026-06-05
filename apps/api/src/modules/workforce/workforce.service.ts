@@ -37,6 +37,23 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+/**
+ * Resolve the effective timestamp for a clock event. Offline-queued events
+ * carry the device capture time so the record reflects when it really happened.
+ * Falls back to server time when absent, and guards against future timestamps
+ * (clock skew) beyond a 5-minute tolerance.
+ */
+function resolveCapturedAt(capturedAt: string | undefined, serverNow: Date): Date {
+  if (!capturedAt) return serverNow;
+  const captured = new Date(capturedAt);
+  if (Number.isNaN(captured.getTime())) return serverNow;
+  const toleranceMs = 5 * 60 * 1000;
+  if (captured.getTime() > serverNow.getTime() + toleranceMs) {
+    throw new BadRequestException('Captured time cannot be in the future.');
+  }
+  return captured;
+}
+
 /** Get shift absolute start/end in minutes-since-midnight, handling overnight shifts */
 function shiftTimeRange(
   startTime: string,
@@ -1547,6 +1564,20 @@ export class WorkforceService {
   }
 
   async clockIn(dto: ClockInDto, userId: string, tenantId: string) {
+    // Idempotent replay: an offline-queued clock-in retried with the same key
+    // returns the original record instead of erroring.
+    if (dto.clientEventId) {
+      const existing = await this.prisma.clockRecord.findUnique({
+        where: { clientEventId: dto.clientEventId },
+      });
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new ForbiddenException('Clock event does not belong to you');
+        }
+        return existing;
+      }
+    }
+
     const assignment = await this.prisma.shiftAssignment.findUnique({
       where: { id: dto.shiftAssignmentId },
       include: {
@@ -1563,8 +1594,10 @@ export class WorkforceService {
       throw new BadRequestException('Already clocked in for this shift');
     }
 
-    // Time window check: can clock in from 30 min before shift start until shift end
-    const now = new Date();
+    // Use the device capture time for offline-synced events; reject future
+    // timestamps (clock skew) beyond a small tolerance.
+    const serverNow = new Date();
+    const now = resolveCapturedAt(dto.capturedAt, serverNow);
     const shiftDate = new Date(assignment.shift.date);
     const { startMin, endMin, overnight } = shiftTimeRange(
       assignment.shift.shiftPattern.startTime,
@@ -1615,6 +1648,7 @@ export class WorkforceService {
         clockInLatitude: dto.latitude,
         clockInLongitude: dto.longitude,
         clockInDistance: distance,
+        clientEventId: dto.clientEventId,
         userId,
         tenantId,
         shiftAssignmentId: dto.shiftAssignmentId,
@@ -1631,6 +1665,20 @@ export class WorkforceService {
   }
 
   async clockOut(dto: ClockOutDto, userId: string, tenantId: string) {
+    // Idempotent replay: an offline-queued clock-out retried with the same key
+    // returns the already-clocked-out record instead of erroring.
+    if (dto.clientEventId) {
+      const existing = await this.prisma.clockRecord.findUnique({
+        where: { clockOutClientEventId: dto.clientEventId },
+      });
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new ForbiddenException('Clock event does not belong to you');
+        }
+        return existing;
+      }
+    }
+
     const assignment = await this.prisma.shiftAssignment.findUnique({
       where: { id: dto.shiftAssignmentId },
       include: { clockRecord: true, shift: true },
@@ -1651,9 +1699,10 @@ export class WorkforceService {
       where: { id: assignment.clockRecord.id },
       data: {
         status: ClockRecordStatus.CLOCKED_OUT,
-        clockOutAt: new Date(),
+        clockOutAt: resolveCapturedAt(dto.capturedAt, new Date()),
         clockOutLatitude: dto.latitude,
         clockOutLongitude: dto.longitude,
+        clockOutClientEventId: dto.clientEventId,
         notes: dto.notes,
       },
     });
