@@ -14,6 +14,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useGeolocation, haversineMetres, type Coords } from './useGeolocation';
 import { useClock, type AssignmentView } from './useClock';
 import { clearFailed } from './offline-queue';
+import { OnShiftCard } from '../reports/OnShiftCard';
 import { clockWindow, clockInWindowState, fmtTime, humanizeUntil } from './clock-window';
 import type { TodayAssignment } from '../../types';
 
@@ -117,6 +118,8 @@ export default function ClockScreen() {
       )}
 
       {error && <Text style={styles.error}>{error}</Text>}
+
+      <OnShiftCard />
 
       {views.length === 0 && !error && (
         <View style={styles.centered}>

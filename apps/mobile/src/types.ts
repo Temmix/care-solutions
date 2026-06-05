@@ -183,3 +183,59 @@ export interface MyAssignmentOption {
   date: string;
   label: string;
 }
+
+// ── Shift reports (care reporting on shift) ──────────────────
+
+export type ShiftReportCategory =
+  | 'GENERAL_NOTE'
+  | 'PERSONAL_CARE'
+  | 'NUTRITION_HYDRATION'
+  | 'CONTINENCE'
+  | 'MOBILITY'
+  | 'MOOD_BEHAVIOUR'
+  | 'SLEEP'
+  | 'INCIDENT'
+  | 'SAFEGUARDING';
+
+export type ShiftReportPriority = 'NORMAL' | 'CONCERN' | 'URGENT';
+
+/** A patient the worker may report on, from GET /shift-reports/context. */
+export interface ShiftContextPatient {
+  patientId: string;
+  name: string;
+  encounterId: string | null;
+  bedId: string | null;
+  bed: string | null;
+}
+
+/** GET /shift-reports/context response. */
+export interface ShiftContext {
+  onShift: boolean;
+  shiftAssignmentId?: string;
+  shift?: {
+    id: string;
+    date: string;
+    pattern: { name: string; startTime: string; endTime: string };
+  };
+  location?: { id: string; name: string; type: string } | null;
+  reportingClosesAt?: string;
+  patients?: ShiftContextPatient[];
+}
+
+/** A report row from GET /shift-reports. */
+export interface ShiftReport {
+  id: string;
+  category: ShiftReportCategory;
+  priority: ShiftReportPriority;
+  content: string;
+  patientId: string;
+  recordedAt: string;
+  patient?: { id: string; givenName: string; familyName: string };
+}
+
+export interface ShiftReportListResponse {
+  data: ShiftReport[];
+  total: number;
+  page: number;
+  limit: number;
+}
