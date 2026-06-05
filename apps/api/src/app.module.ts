@@ -29,6 +29,7 @@ import { RetentionModule } from './modules/retention/retention.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
 import { TenantPurgeModule } from './modules/tenant-purge/tenant-purge.module';
 import { SubProcessorsModule } from './modules/sub-processors/sub-processors.module';
+import { ShiftReportsModule } from './modules/shift-reports/shift-reports.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -91,6 +92,7 @@ import { HealthController } from './health.controller';
     IncidentsModule,
     TenantPurgeModule,
     SubProcessorsModule,
+    ShiftReportsModule,
   ],
   controllers: [HealthController],
 })

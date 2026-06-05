@@ -531,6 +531,9 @@ model User {
   // Mobile push-notification devices
   deviceTokens DeviceToken[] @relation("UserDeviceTokens")
 
+  // Care reports filed on shift
+  shiftReports ShiftReport[]
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -667,6 +670,9 @@ model Organization {
   // Mobile push-notification devices
   tenantDeviceTokens DeviceToken[] @relation("TenantDeviceTokens")
 
+  // Care reports filed on shift
+  tenantShiftReports ShiftReport[]
+
   subscription Subscription?
 
   createdAt DateTime @default(now())
@@ -789,6 +795,9 @@ model Patient {
 
   // Phase 3: Patient Flow
   encounters Encounter[]
+
+  // Care reports filed on shift
+  shiftReports ShiftReport[]
 
   // Phase 4: Specialized Pathways
   chcCases              ChcCase[]
@@ -1360,6 +1369,9 @@ model ShiftAssignment {
   // Clock records
   clockRecord ClockRecord?
 
+  // Care reports filed during this shift
+  shiftReports ShiftReport[]
+
   @@unique([shiftId, userId])
   @@index([userId])
   @@index([shiftId])
@@ -1474,6 +1486,7 @@ model Location {
   transfersFrom     Transfer[]   @relation("TransferFromLocation")
   transfersTo       Transfer[]   @relation("TransferToLocation")
   patients          Patient[]    @relation("PatientHomeLocation")
+  shiftReports      ShiftReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1499,6 +1512,7 @@ model Bed {
   encounters    Encounter[]  @relation("EncounterBed")
   transfersFrom Transfer[]   @relation("TransferFromBed")
   transfersTo   Transfer[]   @relation("TransferToBed")
+  shiftReports  ShiftReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1507,6 +1521,70 @@ model Bed {
   @@index([tenantId])
   @@index([status])
   @@map("beds")
+}
+
+enum ShiftReportCategory {
+  GENERAL_NOTE
+  PERSONAL_CARE
+  NUTRITION_HYDRATION
+  CONTINENCE
+  MOBILITY
+  MOOD_BEHAVIOUR
+  SLEEP
+  INCIDENT
+  SAFEGUARDING
+}
+
+enum ShiftReportPriority {
+  NORMAL
+  CONCERN
+  URGENT
+}
+
+/// A care report filed by a worker during a shift, scoped to the shift's
+/// location and a patient/bed there. Append-only (corrections = new entries).
+model ShiftReport {
+  id       String              @id @default(uuid())
+  category ShiftReportCategory @default(GENERAL_NOTE)
+  priority ShiftReportPriority @default(NORMAL)
+  content  String
+  detail   Json? // structured fields (phase 2); kept open so the model stays stable
+
+  shiftAssignmentId String
+  shiftAssignment   ShiftAssignment @relation(fields: [shiftAssignmentId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+  encounter   Encounter? @relation(fields: [encounterId], references: [id])
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  bedId String?
+  bed   Bed?   @relation(fields: [bedId], references: [id])
+
+  recordedById String
+  recordedBy   User   @relation(fields: [recordedById], references: [id])
+
+  tenantId String
+  tenant   Organization @relation(fields: [tenantId], references: [id])
+
+  // Offline idempotency (mirrors clock-in): a replay with the same key returns
+  // the original record. capturedAt is the device write time used for the
+  // reporting-window check so offline reports aren't wrongly rejected on sync.
+  clientEventId String?   @unique
+  capturedAt    DateTime?
+
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([patientId, recordedAt])
+  @@index([locationId, recordedAt])
+  @@index([shiftAssignmentId])
+  @@index([tenantId, recordedAt])
+  @@map("shift_reports")
 }
 
 model Encounter {
@@ -1536,6 +1614,7 @@ model Encounter {
 
   transfers     Transfer[]
   dischargePlan DischargePlan?
+  shiftReports  ShiftReport[]
 
   // Phase 4: Specialized Pathways
   chcCases              ChcCase[]
