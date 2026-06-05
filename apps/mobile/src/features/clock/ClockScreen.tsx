@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { colors, spacing } from '../../theme';
 import { useGeolocation, haversineMetres, type Coords } from './useGeolocation';
 import { useClock, type AssignmentView } from './useClock';
 import { clearFailed } from './offline-queue';
+import { clockWindow, clockInWindowState, fmtTimeUTC, humanizeUntil } from './clock-window';
 import type { TodayAssignment } from '../../types';
 
 function formatRange(a: TodayAssignment): string {
@@ -34,6 +35,12 @@ export default function ClockScreen() {
   const { loading, error, views, pending, failed, online, refresh, clockIn, clockOut, syncNow } =
     useClock();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Tick so the clock-in window countdown updates and the button enables on time.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
 
   const onClockIn = async (view: AssignmentView) => {
     setBusyId(view.assignment.id);
@@ -116,6 +123,8 @@ export default function ClockScreen() {
         const { assignment, state, pendingKind } = view;
         const dist = distanceLabel(assignment, geo.coords);
         const busy = busyId === assignment.id;
+        const win = clockWindow(assignment.shift);
+        const winState = clockInWindowState(win, now);
         return (
           <View key={assignment.id} style={styles.card}>
             <Text style={styles.shiftName}>{assignment.shift.shiftPattern.name}</Text>
@@ -131,7 +140,7 @@ export default function ClockScreen() {
               </Text>
             )}
 
-            {state === 'not_clocked_in' && (
+            {state === 'not_clocked_in' && winState === 'open' && (
               <Pressable
                 style={[styles.button, styles.clockIn]}
                 onPress={() => onClockIn(view)}
@@ -139,6 +148,19 @@ export default function ClockScreen() {
               >
                 <Text style={styles.buttonText}>{busy ? 'Working…' : 'Clock In'}</Text>
               </Pressable>
+            )}
+            {state === 'not_clocked_in' && winState === 'before' && (
+              <View style={[styles.button, styles.notYet]}>
+                <Text style={styles.notYetText}>
+                  Clock-in opens {fmtTimeUTC(win.windowStart)} (in{' '}
+                  {humanizeUntil(win.windowStart - now)})
+                </Text>
+              </View>
+            )}
+            {state === 'not_clocked_in' && winState === 'ended' && (
+              <View style={[styles.button, styles.notYet]}>
+                <Text style={styles.notYetText}>Clock-in window has closed</Text>
+              </View>
             )}
             {state === 'clocked_in' && (
               <Pressable
@@ -202,6 +224,8 @@ const styles = StyleSheet.create({
   clockIn: { backgroundColor: colors.primary },
   clockOut: { backgroundColor: colors.danger },
   done: { backgroundColor: '#ecfdf5' },
+  notYet: { backgroundColor: '#f1f5f9' },
+  notYetText: { color: colors.muted, fontWeight: '600', fontSize: 14 },
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
   doneText: { color: colors.success, fontWeight: '700', fontSize: 15 },
 });
