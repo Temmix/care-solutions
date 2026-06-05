@@ -13,7 +13,7 @@ import { colors, spacing } from '../../theme';
 import { useGeolocation, haversineMetres, type Coords } from './useGeolocation';
 import { useClock, type AssignmentView } from './useClock';
 import { clearFailed } from './offline-queue';
-import { clockWindow, clockInWindowState, fmtTimeUTC, humanizeUntil } from './clock-window';
+import { clockWindow, clockInWindowState, fmtTime, humanizeUntil } from './clock-window';
 import type { TodayAssignment } from '../../types';
 
 function formatRange(a: TodayAssignment): string {
@@ -152,7 +152,7 @@ export default function ClockScreen() {
             {state === 'not_clocked_in' && winState === 'before' && (
               <View style={[styles.button, styles.notYet]}>
                 <Text style={styles.notYetText}>
-                  Clock-in opens {fmtTimeUTC(win.windowStart)} (in{' '}
+                  Clock-in opens {fmtTime(win.windowStart)} (in{' '}
                   {humanizeUntil(win.windowStart - now)})
                 </Text>
               </View>
