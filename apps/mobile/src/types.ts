@@ -99,3 +99,31 @@ export interface ShiftListResponse {
   page: number;
   limit: number;
 }
+
+export type TrainingPriority = 'MANDATORY' | 'RECOMMENDED' | 'OPTIONAL';
+export type TrainingStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'EXPIRED' | 'OVERDUE';
+
+export interface TrainingCertificate {
+  id: string;
+  name: string;
+  issuer: string;
+  certificateNumber: string | null;
+  issueDate: string;
+  expiryDate: string | null;
+}
+
+/** A record from GET /api/training/me (the worker's own training). */
+export interface TrainingRecord {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  priority: TrainingPriority;
+  status: TrainingStatus;
+  provider: string | null;
+  completedDate: string | null;
+  expiryDate: string | null;
+  score: number | null;
+  notes: string | null;
+  certificates: TrainingCertificate[];
+}
