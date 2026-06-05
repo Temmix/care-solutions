@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { colors, spacing } from '../../theme';
+import { useAuth } from '../../auth/AuthContext';
 import { useGeolocation, haversineMetres, type Coords } from './useGeolocation';
 import { useClock, type AssignmentView } from './useClock';
 import { clearFailed } from './offline-queue';
@@ -32,6 +33,10 @@ function distanceLabel(a: TodayAssignment, coords: Coords | null): string | null
 
 export default function ClockScreen() {
   const geo = useGeolocation();
+  const { memberships, tenantId } = useAuth();
+  // The selected org's timezone drives the clock-in window (falls back to the
+  // app default inside clock-window when undefined).
+  const orgTimezone = memberships.find((m) => m.organizationId === tenantId)?.organization.timezone;
   const { loading, error, views, pending, failed, online, refresh, clockIn, clockOut, syncNow } =
     useClock();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -123,7 +128,7 @@ export default function ClockScreen() {
         const { assignment, state, pendingKind } = view;
         const dist = distanceLabel(assignment, geo.coords);
         const busy = busyId === assignment.id;
-        const win = clockWindow(assignment.shift);
+        const win = clockWindow(assignment.shift, orgTimezone);
         const winState = clockInWindowState(win, now);
         return (
           <View key={assignment.id} style={styles.card}>
@@ -152,7 +157,7 @@ export default function ClockScreen() {
             {state === 'not_clocked_in' && winState === 'before' && (
               <View style={[styles.button, styles.notYet]}>
                 <Text style={styles.notYetText}>
-                  Clock-in opens {fmtTime(win.windowStart)} (in{' '}
+                  Clock-in opens {fmtTime(win.windowStart, orgTimezone)} (in{' '}
                   {humanizeUntil(win.windowStart - now)})
                 </Text>
               </View>

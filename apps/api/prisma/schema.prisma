@@ -573,6 +573,8 @@ model Organization {
   city         String?
   postalCode   String?
   country      String?          @default("GB")
+  // IANA timezone for interpreting shift wall-clock times (e.g. Europe/London).
+  timezone     String           @default("Europe/London")
 
   // Identity verification (KYB)
   companiesHouseNumber String?
