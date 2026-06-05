@@ -528,6 +528,9 @@ model User {
   // Clock records
   clockRecords ClockRecord[] @relation("UserClockRecords")
 
+  // Mobile push-notification devices
+  deviceTokens DeviceToken[] @relation("UserDeviceTokens")
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -658,6 +661,9 @@ model Organization {
 
   // Clock records
   tenantClockRecords ClockRecord[] @relation("TenantClockRecords")
+
+  // Mobile push-notification devices
+  tenantDeviceTokens DeviceToken[] @relation("TenantDeviceTokens")
 
   subscription Subscription?
 
@@ -1371,6 +1377,11 @@ model ClockRecord {
   autoClockOut      Boolean           @default(false)
   notes             String?
 
+  // Idempotency keys for offline-queued mobile clock events. Re-submitting an
+  // event with the same key returns the existing record instead of erroring.
+  clientEventId         String? @unique
+  clockOutClientEventId String? @unique
+
   shiftAssignmentId String          @unique
   shiftAssignment   ShiftAssignment @relation(fields: [shiftAssignmentId], references: [id])
 
@@ -1386,6 +1397,28 @@ model ClockRecord {
   @@index([userId, clockInAt])
   @@index([tenantId, clockInAt])
   @@map("clock_records")
+}
+
+/// Push-notification device registration for the mobile app. One user may have
+/// several devices; a single Expo push token is globally unique.
+model DeviceToken {
+  id         String         @id @default(uuid())
+  token      String         @unique
+  platform   DevicePlatform
+  lastSeenAt DateTime       @default(now())
+
+  userId String
+  user   User   @relation("UserDeviceTokens", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantDeviceTokens", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("device_tokens")
 }
 
 model StaffAvailability {
@@ -2036,6 +2069,12 @@ enum NotificationType {
 enum NotificationChannel {
   IN_APP
   EMAIL
+  PUSH
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
 }
 
 model Notification {

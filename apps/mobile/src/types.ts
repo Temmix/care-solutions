@@ -1,0 +1,82 @@
+/**
+ * Client-side mirrors of the Clinvara API contracts the mobile app consumes.
+ *
+ * NOTE: these intentionally duplicate a subset of `@care/shared` /  the Prisma
+ * models. Wiring the workspace package into Metro (watchFolders + transpile of
+ * the TS source) is a follow-up; until then these keep the app self-contained.
+ * Keep them in sync with apps/api when the corresponding endpoints change.
+ */
+
+export type Role =
+  | 'TENANT_ADMIN'
+  | 'ADMIN'
+  | 'CLINICIAN'
+  | 'NURSE'
+  | 'CARER'
+  | 'PATIENT'
+  | 'SYSTEM';
+
+export interface Membership {
+  organizationId: string;
+  role: Role;
+  organization: { id: string; name: string; type: string };
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  memberships: Membership[];
+  mustChangePassword?: boolean;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: Role;
+}
+
+export type ClockRecordStatus = 'CLOCKED_IN' | 'CLOCKED_OUT' | 'AUTO_CLOCKED_OUT';
+
+export interface ClockRecord {
+  id: string;
+  status: ClockRecordStatus;
+  clockInAt: string;
+  clockOutAt: string | null;
+  clockInDistance: number | null;
+  autoClockOut: boolean;
+}
+
+export interface ShiftLocation {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  geofenceRadius: number | null;
+}
+
+export interface ShiftPattern {
+  id: string;
+  name: string;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  breakMinutes: number;
+}
+
+export interface Shift {
+  id: string;
+  date: string;
+  status: string;
+  shiftPattern: ShiftPattern;
+  location: ShiftLocation | null;
+}
+
+/** Shape returned by GET /api/shifts/my-today (array of assignments). */
+export interface TodayAssignment {
+  id: string;
+  userId: string;
+  role: Role;
+  shift: Shift;
+  clockRecord: ClockRecord | null;
+}

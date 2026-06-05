@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -12,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificationsService } from './notifications.service';
-import { SearchNotificationsDto, UpdatePreferencesDto } from './dto';
+import { SearchNotificationsDto, UpdatePreferencesDto, RegisterDeviceTokenDto } from './dto';
 import { CurrentUser, CurrentTenant } from '../../common/decorators';
 import { TenantGuard } from '../../common/guards';
 
@@ -59,5 +60,24 @@ export class NotificationsController {
   @Put('preferences')
   updatePreferences(@CurrentUser() user: RequestUser, @Body() dto: UpdatePreferencesDto) {
     return this.notificationsService.updatePreferences(user.id, dto);
+  }
+
+  @Post('device-tokens')
+  registerDeviceToken(
+    @CurrentUser() user: RequestUser,
+    @CurrentTenant() tenantId: string,
+    @Body() dto: RegisterDeviceTokenDto,
+  ) {
+    return this.notificationsService.registerDeviceToken(
+      user.id,
+      tenantId,
+      dto.token,
+      dto.platform,
+    );
+  }
+
+  @Delete('device-tokens/:token')
+  unregisterDeviceToken(@CurrentUser() user: RequestUser, @Param('token') token: string) {
+    return this.notificationsService.unregisterDeviceToken(user.id, token);
   }
 }

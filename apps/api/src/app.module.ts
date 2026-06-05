@@ -2,6 +2,7 @@ import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -61,6 +62,9 @@ import { HealthController } from './health.controller';
         : undefined,
     }),
     ScheduleModule.forRoot(),
+    // Rate limiting. Applied selectively (e.g. auth routes) via ThrottlerGuard
+    // rather than globally, so existing API behaviour is unchanged.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
     PrismaModule,
     EncryptionModule,
     EventsModule,
