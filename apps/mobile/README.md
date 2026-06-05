@@ -70,6 +70,39 @@ Prerequisites you must set up (outside this repo):
 - **Apple Developer Program** membership + an App Store Connect app record.
 - **Google Play Console** developer account + app listing.
 
+## Push notifications
+
+How it works in-app (already wired):
+
+- After sign-in, `usePushRegistration` requests permission, gets the Expo push
+  token, and registers it with `POST /api/notifications/device-tokens`. On
+  sign-out the token is unregistered.
+- The API's `NotificationsService.notify()` sends a push (via Expo) whenever it
+  notifies a user — gated on the user's `PUSH` preference — for events like
+  training assigned/expiring and shift-swap updates. The payload carries
+  `data: { type, link }`.
+- `useNotificationObserver` routes a **tapped** notification to the right tab
+  (`TRAINING*` → Training, `SHIFT_SWAP*` → Swaps, other `SHIFT*` → Clock),
+  handling both a running app and a cold start.
+- Push is a **no-op in Expo Go** (removed since SDK 53) and on simulators — it
+  only activates in a dev/production build.
+
+To turn it on (one-time, needs your Expo account):
+
+```bash
+npm i -g eas-cli && eas login
+eas init                       # creates the EAS project + prints the projectId
+# set that id in app.json → expo.extra.eas.projectId (replaces the placeholder)
+eas build --profile development --platform ios   # or android — a dev build (not Expo Go)
+```
+
+- **Android:** FCM is handled by Expo's push service — no extra credentials for
+  testing via Expo push tokens.
+- **iOS:** EAS provisions an **APNs key** during the build (requires the Apple
+  Developer account above).
+- Test by triggering a notifying event (e.g. an admin assigns the worker
+  training, or approves their swap) and confirm the push arrives + deep-links.
+
 ## Conventions
 
 Strict TypeScript, no `any`; shares `@care/eslint-config`. Run `npm run lint` and
