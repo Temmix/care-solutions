@@ -4,6 +4,20 @@ import type { TrainingRecord } from '../../types';
 
 export const EXPIRING_SOON_DAYS = 30;
 
+interface TrainingType {
+  code: string;
+  name: string;
+}
+
+/** Fallback for codes with no configured type: "BLS_FIRST_AID" -> "BLS First Aid". */
+function humanizeCode(code: string): string {
+  return code
+    .split('_')
+    .filter(Boolean)
+    .map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join(' ');
+}
+
 /** Days until a date (negative = already past). null if no date. */
 export function daysUntil(iso: string | null): number | null {
   if (!iso) return null;
@@ -29,6 +43,8 @@ interface UseTraining {
   records: TrainingRecord[];
   overdueCount: number;
   expiringCount: number;
+  /** Friendly name for a training category code (falls back to a humanized code). */
+  categoryLabel: (code: string) => string;
   refresh: () => Promise<void>;
 }
 
@@ -37,13 +53,20 @@ const PRIORITY_RANK: Record<string, number> = { MANDATORY: 0, RECOMMENDED: 1, OP
 /** The signed-in worker's own training records, most-urgent first. */
 export function useTraining(): UseTraining {
   const [records, setRecords] = useState<TrainingRecord[]>([]);
+  const [typeNames, setTypeNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const data = await api.get<TrainingRecord[]>('/training/me');
+      // Load the type config for friendly labels alongside the records; the
+      // config is non-critical, so a failure there doesn't block the records.
+      const [data, types] = await Promise.all([
+        api.get<TrainingRecord[]>('/training/me'),
+        api.get<TrainingType[]>('/training-types').catch(() => [] as TrainingType[]),
+      ]);
+      setTypeNames(Object.fromEntries(types.map((t) => [t.code, t.name])));
       // Most urgent first: overdue, then expiring soon, then by priority/title.
       const sorted = [...data].sort((a, b) => {
         const sev = (r: TrainingRecord) => (isOverdue(r) ? 0 : isExpiringSoon(r) ? 1 : 2);
@@ -65,12 +88,18 @@ export function useTraining(): UseTraining {
     void refresh();
   }, [refresh]);
 
+  const categoryLabel = useCallback(
+    (code: string) => typeNames[code] ?? humanizeCode(code),
+    [typeNames],
+  );
+
   return {
     loading,
     error,
     records,
     overdueCount: records.filter(isOverdue).length,
     expiringCount: records.filter(isExpiringSoon).length,
+    categoryLabel,
     refresh,
   };
 }

@@ -50,7 +50,13 @@ function expiryLabel(record: TrainingRecord): { text: string; color: string } | 
   return { text: `Expires ${date}`, color: colors.muted };
 }
 
-function TrainingCard({ record }: { record: TrainingRecord }) {
+function TrainingCard({
+  record,
+  categoryLabel,
+}: {
+  record: TrainingRecord;
+  categoryLabel: (code: string) => string;
+}) {
   const [open, setOpen] = useState(false);
   const s = statusStyle(record.status);
   const expiry = expiryLabel(record);
@@ -71,7 +77,7 @@ function TrainingCard({ record }: { record: TrainingRecord }) {
             <Text style={styles.mandatoryText}>Mandatory</Text>
           </View>
         )}
-        <Text style={styles.category}>{record.category}</Text>
+        <Text style={styles.category}>{categoryLabel(record.category)}</Text>
       </View>
 
       {expiry && <Text style={[styles.expiry, { color: expiry.color }]}>{expiry.text}</Text>}
@@ -121,7 +127,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 export default function TrainingScreen() {
-  const { loading, error, records, overdueCount, expiringCount, refresh } = useTraining();
+  const { loading, error, records, overdueCount, expiringCount, categoryLabel, refresh } =
+    useTraining();
 
   if (loading) {
     return (
@@ -163,7 +170,7 @@ export default function TrainingScreen() {
       )}
 
       {records.map((record) => (
-        <TrainingCard key={record.id} record={record} />
+        <TrainingCard key={record.id} record={record} categoryLabel={categoryLabel} />
       ))}
     </ScrollView>
   );
