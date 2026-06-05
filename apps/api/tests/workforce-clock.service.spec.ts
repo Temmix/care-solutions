@@ -175,4 +175,58 @@ describe('WorkforceService clock-in/out (mobile)', () => {
       expect(events.emitClockOut).toHaveBeenCalled();
     });
   });
+
+  // Shift HH:mm are wall-clock times in Europe/London. In summer (BST, UTC+1)
+  // a 07:00 shift starts at 06:00 UTC, so the window opens 05:30 UTC. Using a
+  // past June date keeps these stable regardless of when the suite runs.
+  describe('clockIn timezone window (Europe/London / BST)', () => {
+    function summerAssignment() {
+      return makeAssignment({
+        shift: {
+          tenantId,
+          date: new Date('2020-06-05'), // June -> BST (UTC+1)
+          shiftPattern: { startTime: '07:00', endTime: '19:00', breakMinutes: 0 },
+          location: null,
+        },
+      });
+    }
+
+    it('accepts a clock-in at 07:00 BST (06:00 UTC) — would be "too early" under UTC', async () => {
+      prisma.clockRecord.findUnique.mockResolvedValue(null);
+      prisma.shiftAssignment.findUnique.mockResolvedValue(summerAssignment());
+      prisma.clockRecord.create.mockImplementation(({ data }: any) => ({ id: 'c', ...data }));
+
+      // 06:00 UTC = 07:00 BST: inside the window (opens 06:30 BST = 05:30 UTC).
+      await service.clockIn(
+        {
+          shiftAssignmentId: assignmentId,
+          latitude: 1,
+          longitude: 2,
+          capturedAt: '2020-06-05T06:00:00.000Z',
+        },
+        userId,
+        tenantId,
+      );
+      expect(prisma.clockRecord.create).toHaveBeenCalled();
+    });
+
+    it('rejects a clock-in before the BST window opens (06:30 BST = 05:30 UTC)', async () => {
+      prisma.clockRecord.findUnique.mockResolvedValue(null);
+      prisma.shiftAssignment.findUnique.mockResolvedValue(summerAssignment());
+
+      // 05:00 UTC = 06:00 BST: before the window opens at 06:30 BST.
+      await expect(
+        service.clockIn(
+          {
+            shiftAssignmentId: assignmentId,
+            latitude: 1,
+            longitude: 2,
+            capturedAt: '2020-06-05T05:00:00.000Z',
+          },
+          userId,
+          tenantId,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
 });

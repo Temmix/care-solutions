@@ -17,6 +17,7 @@ import { ClockInDto } from './dto/clock-in.dto';
 import { ClockOutDto } from './dto/clock-out.dto';
 import { TimesheetQueryDto } from './dto/timesheet-query.dto';
 import { haversineDistance } from './utils/haversine';
+import { zonedShiftInstant } from './shift-time';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -1598,20 +1599,15 @@ export class WorkforceService {
     // timestamps (clock skew) beyond a small tolerance.
     const serverNow = new Date();
     const now = resolveCapturedAt(dto.capturedAt, serverNow);
-    const shiftDate = new Date(assignment.shift.date);
-    const { startMin, endMin, overnight } = shiftTimeRange(
+    const { startMin, endMin } = shiftTimeRange(
       assignment.shift.shiftPattern.startTime,
       assignment.shift.shiftPattern.endTime,
     );
 
-    const shiftStart = new Date(shiftDate);
-    shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
-
-    const shiftEnd = new Date(shiftDate);
-    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
-
-    const windowStart = new Date(shiftStart);
-    windowStart.setMinutes(windowStart.getMinutes() - 30);
+    // Shift HH:mm are wall-clock times in the org timezone (handles GMT/BST).
+    const shiftStart = zonedShiftInstant(assignment.shift.date, startMin);
+    const shiftEnd = zonedShiftInstant(assignment.shift.date, endMin);
+    const windowStart = new Date(shiftStart.getTime() - 30 * 60_000);
 
     if (now < windowStart) {
       throw new BadRequestException(
@@ -1725,14 +1721,10 @@ export class WorkforceService {
   ) {
     if (record.status !== ClockRecordStatus.CLOCKED_IN) return null;
 
-    const shiftDate = new Date(shift.date);
     const { endMin } = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
+    const shiftEnd = zonedShiftInstant(shift.date, endMin);
 
-    const shiftEnd = new Date(shiftDate);
-    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
-
-    const autoClockOutThreshold = new Date(shiftEnd);
-    autoClockOutThreshold.setHours(autoClockOutThreshold.getHours() + 1);
+    const autoClockOutThreshold = new Date(shiftEnd.getTime() + 60 * 60_000);
 
     if (new Date() > autoClockOutThreshold) {
       return this.prisma.clockRecord.update({
@@ -1789,11 +1781,8 @@ export class WorkforceService {
     // Compute flags
     const items = records.map((record) => {
       const pattern = record.shiftAssignment.shift.shiftPattern;
-      const shiftDate = new Date(record.shiftAssignment.shift.date);
       const { startMin } = shiftTimeRange(pattern.startTime, pattern.endTime);
-
-      const shiftStart = new Date(shiftDate);
-      shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
+      const shiftStart = zonedShiftInstant(record.shiftAssignment.shift.date, startMin);
 
       const lateMinutes = Math.max(
         0,
