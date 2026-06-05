@@ -23,6 +23,9 @@ function createMockPrisma() {
     shiftAssignment: {
       findUnique: jest.fn(),
     },
+    organization: {
+      findUnique: jest.fn().mockResolvedValue({ timezone: 'Europe/London' }),
+    },
   };
 }
 
@@ -222,6 +225,28 @@ describe('WorkforceService clock-in/out (mobile)', () => {
             latitude: 1,
             longitude: 2,
             capturedAt: '2020-06-05T05:00:00.000Z',
+          },
+          userId,
+          tenantId,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('applies the org timezone — a New York org rejects what London would accept', async () => {
+      prisma.clockRecord.findUnique.mockResolvedValue(null);
+      prisma.shiftAssignment.findUnique.mockResolvedValue(summerAssignment());
+      // Same shift, but the tenant is in America/New_York (EDT, UTC-4): 07:00
+      // local = 11:00 UTC, so the window opens 10:30 UTC.
+      prisma.organization.findUnique.mockResolvedValue({ timezone: 'America/New_York' });
+
+      // 08:00 UTC is inside London's window (open) but before New York's (10:30).
+      await expect(
+        service.clockIn(
+          {
+            shiftAssignmentId: assignmentId,
+            latitude: 1,
+            longitude: 2,
+            capturedAt: '2020-06-05T08:00:00.000Z',
           },
           userId,
           tenantId,

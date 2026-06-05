@@ -19,7 +19,7 @@ export type Role =
 export interface Membership {
   organizationId: string;
   role: Role;
-  organization: { id: string; name: string; type: string };
+  organization: { id: string; name: string; type: string; timezone?: string };
 }
 
 export interface AuthResponse {

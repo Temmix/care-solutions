@@ -22,7 +22,7 @@ const MEMBERSHIP_SELECT = {
   organizationId: true,
   role: true,
   organization: {
-    select: { id: true, name: true, type: true },
+    select: { id: true, name: true, type: true, timezone: true },
   },
 } as const;
 

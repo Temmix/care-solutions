@@ -17,7 +17,7 @@ import { ClockInDto } from './dto/clock-in.dto';
 import { ClockOutDto } from './dto/clock-out.dto';
 import { TimesheetQueryDto } from './dto/timesheet-query.dto';
 import { haversineDistance } from './utils/haversine';
-import { zonedShiftInstant } from './shift-time';
+import { zonedShiftInstant, APP_TIMEZONE } from './shift-time';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -1551,10 +1551,11 @@ export class WorkforceService {
       orderBy: { shift: { shiftPattern: { startTime: 'asc' } } },
     });
 
-    // Lazy auto-clock-out
+    // Lazy auto-clock-out (all shifts share this tenant's timezone).
+    const tz = await this.getOrgTimezone(tenantId);
     for (const assignment of assignments) {
       if (assignment.clockRecord) {
-        const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift);
+        const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift, tz);
         if (updated) {
           assignment.clockRecord = updated;
         }
@@ -1605,8 +1606,9 @@ export class WorkforceService {
     );
 
     // Shift HH:mm are wall-clock times in the org timezone (handles GMT/BST).
-    const shiftStart = zonedShiftInstant(assignment.shift.date, startMin);
-    const shiftEnd = zonedShiftInstant(assignment.shift.date, endMin);
+    const tz = await this.getOrgTimezone(tenantId);
+    const shiftStart = zonedShiftInstant(assignment.shift.date, startMin, tz);
+    const shiftEnd = zonedShiftInstant(assignment.shift.date, endMin, tz);
     const windowStart = new Date(shiftStart.getTime() - 30 * 60_000);
 
     if (now < windowStart) {
@@ -1712,17 +1714,27 @@ export class WorkforceService {
     return clockRecord;
   }
 
+  /** Resolve the organisation's IANA timezone (falls back to the app default). */
+  private async getOrgTimezone(tenantId: string): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    return org?.timezone || APP_TIMEZONE;
+  }
+
   private async lazyAutoClockOut(
     record: { id: string; status: ClockRecordStatus; clockInAt: Date },
     shift: {
       date: Date;
       shiftPattern: { startTime: string; endTime: string; breakMinutes: number };
     },
+    timeZone: string,
   ) {
     if (record.status !== ClockRecordStatus.CLOCKED_IN) return null;
 
     const { endMin } = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
-    const shiftEnd = zonedShiftInstant(shift.date, endMin);
+    const shiftEnd = zonedShiftInstant(shift.date, endMin, timeZone);
 
     const autoClockOutThreshold = new Date(shiftEnd.getTime() + 60 * 60_000);
 
@@ -1778,11 +1790,12 @@ export class WorkforceService {
       this.prisma.clockRecord.count({ where }),
     ]);
 
-    // Compute flags
+    // Compute flags (all records share this tenant's timezone).
+    const tz = tenantId ? await this.getOrgTimezone(tenantId) : APP_TIMEZONE;
     const items = records.map((record) => {
       const pattern = record.shiftAssignment.shift.shiftPattern;
       const { startMin } = shiftTimeRange(pattern.startTime, pattern.endTime);
-      const shiftStart = zonedShiftInstant(record.shiftAssignment.shift.date, startMin);
+      const shiftStart = zonedShiftInstant(record.shiftAssignment.shift.date, startMin, tz);
 
       const lateMinutes = Math.max(
         0,

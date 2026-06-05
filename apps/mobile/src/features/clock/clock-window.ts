@@ -45,8 +45,8 @@ function tzOffsetMs(utcMs: number, timeZone: string): number {
   }
 }
 
-/** Epoch ms for `minutesSinceMidnight` of the shift's day, in the app timezone. */
-function zonedInstant(shift: Shift, minutesSinceMidnight: number): number {
+/** Epoch ms for `minutesSinceMidnight` of the shift's day, in `timeZone`. */
+function zonedInstant(shift: Shift, minutesSinceMidnight: number, timeZone: string): number {
   const d = new Date(shift.date);
   const dayOffset = Math.floor(minutesSinceMidnight / 1440);
   const within = minutesSinceMidnight % 1440;
@@ -57,7 +57,7 @@ function zonedInstant(shift: Shift, minutesSinceMidnight: number): number {
     Math.floor(within / 60),
     within % 60,
   );
-  return guess - tzOffsetMs(guess, APP_TIMEZONE);
+  return guess - tzOffsetMs(guess, timeZone);
 }
 
 export interface ClockWindow {
@@ -66,12 +66,13 @@ export interface ClockWindow {
   shiftEnd: number;
 }
 
-export function clockWindow(shift: Shift): ClockWindow {
+/** `timeZone` is the org's IANA zone; defaults to the app default if omitted. */
+export function clockWindow(shift: Shift, timeZone: string = APP_TIMEZONE): ClockWindow {
   const startMin = timeToMinutes(shift.shiftPattern.startTime);
   let endMin = timeToMinutes(shift.shiftPattern.endTime);
   if (endMin <= startMin) endMin += 24 * 60; // overnight shift
-  const shiftStart = zonedInstant(shift, startMin);
-  const shiftEnd = zonedInstant(shift, endMin);
+  const shiftStart = zonedInstant(shift, startMin, timeZone);
+  const shiftEnd = zonedInstant(shift, endMin, timeZone);
   return { windowStart: shiftStart - CLOCK_IN_LEAD_MIN * 60_000, shiftStart, shiftEnd };
 }
 
@@ -83,11 +84,11 @@ export function clockInWindowState(w: ClockWindow, now: number): ClockInWindowSt
   return 'open';
 }
 
-/** Format an instant as HH:mm in the app timezone (matches the card's times). */
-export function fmtTime(ms: number): string {
+/** Format an instant as HH:mm in `timeZone` (matches the card's times). */
+export function fmtTime(ms: number, timeZone: string = APP_TIMEZONE): string {
   try {
     return new Intl.DateTimeFormat('en-GB', {
-      timeZone: APP_TIMEZONE,
+      timeZone,
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
