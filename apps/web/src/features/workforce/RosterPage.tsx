@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../hooks/use-auth';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api-client';
+import { toDateKey } from '../../lib/date';
 import { ErrorAlert, WarningList } from '../../components/ErrorAlert';
 
 interface LocationOption {
@@ -52,16 +53,9 @@ function getWeekDates(offset: number): { start: Date; end: Date; dates: Date[] }
   return { start, end, dates };
 }
 
-function formatDate(d: Date): string {
-  // Use LOCAL calendar parts, not toISOString (UTC). The week columns are built
-  // at local midnight, so toISOString would roll them back a day in timezones
-  // ahead of UTC (e.g. BST) — landing the "today" highlight and every shift on
-  // the wrong column.
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+// Local calendar day (not toISOString/UTC) so the "today" highlight and shift
+// columns don't shift a day in timezones ahead of UTC (e.g. BST).
+const formatDate = toDateKey;
 
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const monthNames = [
