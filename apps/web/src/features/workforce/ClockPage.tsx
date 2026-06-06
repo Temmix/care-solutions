@@ -50,6 +50,7 @@ function ShiftCard({
   const { shift, clockRecord } = assignment;
   const pattern = shift.shiftPattern;
   const location = shift.location;
+  const [confirmingOut, setConfirmingOut] = useState(false);
 
   // Client-side distance estimate
   let distanceText: string | null = null;
@@ -148,14 +149,40 @@ function ShiftCard({
             {isClockingIn ? 'Clocking In...' : 'Clock In'}
           </button>
         )}
-        {canClockOut && (
+        {canClockOut && !confirmingOut && (
           <button
-            onClick={() => onClockOut(assignment.id)}
+            onClick={() => setConfirmingOut(true)}
             disabled={isClockingOut}
             className="flex-1 py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-50 bg-slate-800 text-white hover:bg-slate-700"
           >
             {isClockingOut ? 'Clocking Out...' : 'Clock Out'}
           </button>
+        )}
+        {canClockOut && confirmingOut && (
+          <div className="flex-1">
+            <p className="text-xs text-slate-500 mb-2">
+              End your shift? You can't clock back in afterwards.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmingOut(false)}
+                disabled={isClockingOut}
+                className="flex-1 py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-50 border border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmingOut(false);
+                  onClockOut(assignment.id);
+                }}
+                disabled={isClockingOut}
+                className="flex-1 py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
+              >
+                {isClockingOut ? 'Clocking Out...' : 'Yes, clock out'}
+              </button>
+            </div>
+          </div>
         )}
         {!canClockIn && !canClockOut && !clockRecord && (
           <div className="text-xs text-slate-400 py-2">
