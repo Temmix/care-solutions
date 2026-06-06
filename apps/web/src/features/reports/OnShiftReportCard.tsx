@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { ReportModal } from './ReportModal';
+import { ExpandableText } from './ExpandableText';
 import { useShiftReports } from './hooks/use-shift-reports';
 import { CATEGORY_LABELS, type ShiftReportPriority } from './types';
 
@@ -74,7 +75,7 @@ export function OnShiftReportCard(): React.ReactElement | null {
                     })}
                   </span>
                 </div>
-                <p className="text-sm text-slate-600 line-clamp-2">{r.content}</p>
+                <ExpandableText text={r.content} className="text-sm text-slate-600" />
               </li>
             );
           })}

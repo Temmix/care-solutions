@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useAdminShiftReports } from './hooks/use-admin-shift-reports';
+import { ExpandableText } from './ExpandableText';
 import { CATEGORY_LABELS, type ShiftReportPriority } from './types';
 
 const LIMIT = 25;
@@ -164,8 +165,8 @@ export function ShiftReportsPage(): React.ReactElement {
                             {badge.label}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-600 max-w-md">
-                          <span className="line-clamp-2">{r.content}</span>
+                        <td className="py-3 px-4 text-slate-600 max-w-md align-top">
+                          <ExpandableText text={r.content} />
                         </td>
                         <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
                           {r.location?.name ?? '-'}

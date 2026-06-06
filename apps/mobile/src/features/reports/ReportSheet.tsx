@@ -9,6 +9,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { colors, spacing } from '../../theme';
 import type { ShiftContextPatient, ShiftReportCategory, ShiftReportPriority } from '../../types';
@@ -76,12 +78,15 @@ export function ReportSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.sheet}>
           {!patient ? (
             <>
               <Text style={styles.title}>Who is this report about?</Text>
-              <ScrollView style={{ maxHeight: 420 }}>
+              <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
                 {patients.length === 0 && (
                   <Text style={styles.empty}>No patients at your location.</Text>
                 )}
@@ -97,7 +102,7 @@ export function ReportSheet({
               </Pressable>
             </>
           ) : (
-            <ScrollView>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formBody}>
               <Text style={styles.title}>
                 Report · {patient.name}
                 {patient.bed ? ` (Bed ${patient.bed})` : ''}
@@ -166,7 +171,7 @@ export function ReportSheet({
             </ScrollView>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -180,6 +185,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     maxHeight: '88%',
   },
+  formBody: { paddingBottom: spacing.lg },
   title: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   empty: { color: colors.muted, paddingVertical: spacing.md },
   option: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },

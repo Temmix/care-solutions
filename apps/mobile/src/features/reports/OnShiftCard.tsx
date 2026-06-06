@@ -18,21 +18,25 @@ function categoryLabel(c: string): string {
 }
 
 function ReportRow({ report }: { report: ShiftReport }) {
+  const [expanded, setExpanded] = useState(false);
   const name = report.patient
     ? `${report.patient.givenName} ${report.patient.familyName}`
     : 'Patient';
   return (
-    <View style={styles.reportRow}>
+    <Pressable style={styles.reportRow} onPress={() => setExpanded((e) => !e)}>
       <View style={styles.reportHead}>
         <Text style={styles.reportName}>{name}</Text>
         <Text style={styles.reportMeta}>
           {categoryLabel(report.category)} · {fmtClock(report.recordedAt)}
         </Text>
       </View>
-      <Text style={styles.reportContent} numberOfLines={2}>
+      <Text style={styles.reportContent} numberOfLines={expanded ? undefined : 2}>
         {report.content}
       </Text>
-    </View>
+      {!expanded && report.content.length > 80 && (
+        <Text style={styles.reportMore}>Tap to read more</Text>
+      )}
+    </Pressable>
   );
 }
 
@@ -150,4 +154,5 @@ const styles = StyleSheet.create({
   reportName: { fontSize: 14, fontWeight: '600', color: colors.text },
   reportMeta: { fontSize: 11, color: colors.muted },
   reportContent: { fontSize: 13, color: colors.text },
+  reportMore: { fontSize: 11, fontWeight: '600', color: colors.primary, marginTop: 2 },
 });
