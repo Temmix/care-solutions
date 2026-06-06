@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,6 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { colors, spacing } from '../../theme';
 import type { ShiftContextPatient, ShiftReportCategory, ShiftReportPriority } from '../../types';
@@ -50,6 +48,7 @@ export function ReportSheet({
   const [priority, setPriority] = useState<ShiftReportPriority>('NORMAL');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const formScroll = useRef<ScrollView>(null);
 
   const reset = () => {
     setPatient(null);
@@ -78,10 +77,7 @@ export function ReportSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={styles.backdrop}>
         <View style={styles.sheet}>
           {!patient ? (
             <>
@@ -102,7 +98,12 @@ export function ReportSheet({
               </Pressable>
             </>
           ) : (
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formBody}>
+            <ScrollView
+              ref={formScroll}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets
+              contentContainerStyle={styles.formBody}
+            >
               <Text style={styles.title}>
                 Report · {patient.name}
                 {patient.bed ? ` (Bed ${patient.bed})` : ''}
@@ -146,6 +147,9 @@ export function ReportSheet({
                 placeholder="What happened during the shift…"
                 placeholderTextColor={colors.muted}
                 multiline
+                onFocus={() =>
+                  setTimeout(() => formScroll.current?.scrollToEnd({ animated: true }), 100)
+                }
               />
 
               <View style={styles.actions}>
@@ -171,7 +175,7 @@ export function ReportSheet({
             </ScrollView>
           )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
