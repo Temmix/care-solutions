@@ -17,7 +17,7 @@ import { ClockInDto } from './dto/clock-in.dto';
 import { ClockOutDto } from './dto/clock-out.dto';
 import { TimesheetQueryDto } from './dto/timesheet-query.dto';
 import { haversineDistance } from './utils/haversine';
-import { zonedShiftInstant, APP_TIMEZONE } from './shift-time';
+import { zonedShiftInstant, orgCalendarDayUtc, APP_TIMEZONE } from './shift-time';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -1525,19 +1525,27 @@ export class WorkforceService {
   // ── Clock In / Out ──────────────────────────────────
 
   async getMyShiftsToday(userId: string, tenantId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const tz = await this.getOrgTimezone(tenantId);
+    // "Today" as the organisation sees it (not the server's UTC day), expressed
+    // as the stored @db.Date (UTC midnight) so it compares to shift.date.
+    const today = orgCalendarDayUtc(tz);
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const assignments = await this.prisma.shiftAssignment.findMany({
       where: {
         userId,
         shift: {
           tenantId,
-          date: { gte: today, lt: tomorrow },
           status: { in: [ShiftStatus.PUBLISHED, ShiftStatus.IN_PROGRESS] },
         },
+        // Show today's shifts to clock into, plus any shift the worker is still
+        // clocked into — an overnight/evening shift started "yesterday" is past
+        // the calendar-day window but must remain visible so they can clock out.
+        OR: [
+          { shift: { date: { gte: today, lt: tomorrow } } },
+          { clockRecord: { is: { clockOutAt: null } } },
+        ],
       },
       include: {
         shift: {
@@ -1552,7 +1560,6 @@ export class WorkforceService {
     });
 
     // Lazy auto-clock-out (all shifts share this tenant's timezone).
-    const tz = await this.getOrgTimezone(tenantId);
     for (const assignment of assignments) {
       if (assignment.clockRecord) {
         const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift, tz);

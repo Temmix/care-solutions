@@ -34,6 +34,26 @@ function tzOffsetMs(utcMs: number, timeZone: string): number {
 }
 
 /**
+ * The calendar day in `timeZone` for instant `at`, returned as the UTC-midnight
+ * Date used to store shift dates (@db.Date). Use this to compute "today" in the
+ * organisation's timezone rather than the server's — e.g. just after midnight in
+ * London the server (UTC) may still be on the previous calendar day.
+ */
+export function orgCalendarDayUtc(timeZone: string = APP_TIMEZONE, at: Date = new Date()): Date {
+  const dtf = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const map: Record<string, number> = {};
+  for (const p of dtf.formatToParts(at)) {
+    if (p.type !== 'literal') map[p.type] = Number(p.value);
+  }
+  return new Date(Date.UTC(map.year, map.month - 1, map.day));
+}
+
+/**
  * Absolute instant for `minutesSinceMidnight` of the calendar day in `date`
  * (its UTC parts), interpreted as wall-clock time in `timeZone`. Minutes >= 1440
  * roll into the next day, so overnight shift ends work transparently.
