@@ -15,7 +15,7 @@ const makeResult = (overrides = {}) => ({
       recordedAt: '2026-06-06T12:30:00.000Z',
       patient: { id: 'p-1', givenName: 'Jane', familyName: 'Doe' },
       location: { id: 'loc-1', name: 'Ward A', type: 'WARD' },
-      bed: { id: 'b-1', identifier: '1A' },
+      bed: { id: 'b-1', identifier: 'Bed 1' },
       recordedBy: { id: 'u-1', firstName: 'Sarah', lastName: 'Smith', role: 'NURSE' },
     },
   ],
@@ -39,7 +39,9 @@ describe('ShiftReportsPage', () => {
     expect(screen.getByText('Urgent')).toBeInTheDocument();
     expect(screen.getByText('Patient had a fall in the bathroom')).toBeInTheDocument();
     expect(screen.getByText('Sarah Smith')).toBeInTheDocument();
-    expect(screen.getByText(/Bed 1A/)).toBeInTheDocument();
+    // Bed identifier is shown as-is, not double-prefixed ("Bed Bed 1").
+    expect(screen.getByText(/· Bed 1/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bed Bed 1/)).not.toBeInTheDocument();
   });
 
   it('requests the first page with a default limit on mount', async () => {
