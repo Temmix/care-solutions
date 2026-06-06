@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { WorkforceService } from '../src/modules/workforce/workforce.service';
+import { orgCalendarDayUtc } from '../src/modules/workforce/shift-time';
 
 // Focused spec for the mobile-driven clock-in/out behaviour: idempotent replays
 // (offline queue) and device-captured timestamps.
@@ -22,6 +23,7 @@ function createMockPrisma() {
     },
     shiftAssignment: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     organization: {
       findUnique: jest.fn().mockResolvedValue({ timezone: 'Europe/London' }),
@@ -252,6 +254,61 @@ describe('WorkforceService clock-in/out (mobile)', () => {
           tenantId,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('getMyShiftsToday (overnight / timezone)', () => {
+    it('computes "today" in the org timezone, not the server UTC day', async () => {
+      prisma.organization.findUnique.mockResolvedValue({ timezone: 'Europe/London' });
+      prisma.shiftAssignment.findMany.mockResolvedValue([]);
+
+      await service.getMyShiftsToday(userId, tenantId);
+
+      const where = prisma.shiftAssignment.findMany.mock.calls[0][0].where;
+      const dateRange = where.OR[0].shift.date;
+      // Expected boundary = UTC midnight of the current Europe/London calendar day.
+      const expected = orgCalendarDayUtc('Europe/London');
+      expect(dateRange.gte.getTime()).toBe(expected.getTime());
+      // Window is exactly one day wide.
+      expect(dateRange.lt.getTime() - dateRange.gte.getTime()).toBe(24 * 60 * 60_000);
+    });
+
+    it('includes any shift with an open clock-in regardless of date (overnight clock-out)', async () => {
+      prisma.organization.findUnique.mockResolvedValue({ timezone: 'Europe/London' });
+      prisma.shiftAssignment.findMany.mockResolvedValue([]);
+
+      await service.getMyShiftsToday(userId, tenantId);
+
+      const where = prisma.shiftAssignment.findMany.mock.calls[0][0].where;
+      // Second OR branch matches assignments still clocked in (no clock-out yet).
+      expect(where.OR).toContainEqual({ clockRecord: { is: { clockOutAt: null } } });
+    });
+
+    it('returns an in-progress overnight shift so the worker can still clock out', async () => {
+      prisma.organization.findUnique.mockResolvedValue({ timezone: 'Europe/London' });
+      // A shift far in the future keeps lazy auto-clock-out a no-op, so the open
+      // record stays CLOCKED_IN — modelling a shift whose window hasn't ended.
+      const openOvernight = makeAssignment({
+        clockRecord: {
+          id: 'clock-1',
+          status: 'CLOCKED_IN',
+          clockInAt: new Date(),
+          clockOutAt: null,
+        },
+        shift: {
+          tenantId,
+          date: new Date('2999-01-01'),
+          shiftPattern: { startTime: '20:00', endTime: '08:00', breakMinutes: 0 },
+          location: null,
+        },
+      });
+      prisma.shiftAssignment.findMany.mockResolvedValue([openOvernight]);
+
+      const result = await service.getMyShiftsToday(userId, tenantId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].clockRecord?.status).toBe('CLOCKED_IN');
+      expect(prisma.clockRecord.update).not.toHaveBeenCalled();
     });
   });
 });
