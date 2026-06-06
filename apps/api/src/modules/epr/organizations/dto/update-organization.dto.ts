@@ -1,11 +1,16 @@
 import { IsString, IsEnum, IsOptional, IsBoolean, IsArray, IsIn } from 'class-validator';
 import { OrganizationType } from '@prisma/client';
 import { MODULE_CODES } from '@care/shared';
+import { IsIanaTimeZone } from '../../../../common/validators/is-iana-timezone';
 
 export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsIanaTimeZone()
+  timezone?: string;
 
   @IsOptional()
   @IsEnum(OrganizationType)

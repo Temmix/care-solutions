@@ -210,7 +210,7 @@ export class ChcService {
   ) {
     await this.requireCase(caseId, tenantId);
 
-    return this.prisma.chcDomainScore.upsert({
+    const score = await this.prisma.chcDomainScore.upsert({
       where: { chcCaseId_domain: { chcCaseId: caseId, domain: dto.domain } },
       create: {
         chcCaseId: caseId,
@@ -227,6 +227,19 @@ export class ChcService {
         assessorId: userId,
       },
     });
+
+    this.audit
+      .log({
+        userId,
+        action: 'UPSERT_DOMAIN_SCORE',
+        resource: 'ChcCase',
+        resourceId: caseId,
+        tenantId,
+        metadata: { domain: dto.domain, level: dto.level },
+      })
+      .catch(() => {});
+
+    return score;
   }
 
   async getDomainScores(caseId: string, tenantId: string) {
@@ -241,10 +254,10 @@ export class ChcService {
 
   // ── Panel members ────────────────────────────────────────
 
-  async addPanelMember(caseId: string, dto: AddPanelMemberDto, tenantId: string) {
+  async addPanelMember(caseId: string, dto: AddPanelMemberDto, actorId: string, tenantId: string) {
     await this.requireCase(caseId, tenantId);
 
-    return this.prisma.chcPanelMember.create({
+    const member = await this.prisma.chcPanelMember.create({
       data: {
         chcCaseId: caseId,
         userId: dto.userId,
@@ -252,9 +265,22 @@ export class ChcService {
       },
       include: { user: { select: { firstName: true, lastName: true, email: true } } },
     });
+
+    this.audit
+      .log({
+        userId: actorId,
+        action: 'ADD_PANEL_MEMBER',
+        resource: 'ChcCase',
+        resourceId: caseId,
+        tenantId,
+        metadata: { memberUserId: dto.userId, role: dto.role },
+      })
+      .catch(() => {});
+
+    return member;
   }
 
-  async removePanelMember(caseId: string, memberId: string, tenantId: string) {
+  async removePanelMember(caseId: string, memberId: string, actorId: string, tenantId: string) {
     await this.requireCase(caseId, tenantId);
 
     const member = await this.prisma.chcPanelMember.findUnique({ where: { id: memberId } });
@@ -263,6 +289,18 @@ export class ChcService {
     }
 
     await this.prisma.chcPanelMember.delete({ where: { id: memberId } });
+
+    this.audit
+      .log({
+        userId: actorId,
+        action: 'REMOVE_PANEL_MEMBER',
+        resource: 'ChcCase',
+        resourceId: caseId,
+        tenantId,
+        metadata: { memberId },
+      })
+      .catch(() => {});
+
     return { deleted: true };
   }
 
@@ -351,6 +389,17 @@ export class ChcService {
     });
 
     await this.recordStatusChange(id, chcCase.patientId, 'ANNUAL_REVIEW', userId, tenantId);
+
+    this.audit
+      .log({
+        userId,
+        action: 'TRIGGER_ANNUAL_REVIEW',
+        resource: 'ChcCase',
+        resourceId: id,
+        tenantId,
+      })
+      .catch(() => {});
+
     return updated;
   }
 

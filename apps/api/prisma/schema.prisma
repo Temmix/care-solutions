@@ -202,6 +202,96 @@ enum MedicationForm {
   OTHER
 }
 
+// ─── Data Protection (GDPR lawful basis & consent) ──────
+
+enum ProcessingPurpose {
+  DIRECT_CARE
+  CARE_COORDINATION
+  BILLING
+  SAFEGUARDING
+  SERVICE_IMPROVEMENT
+  RESEARCH
+  LEGAL_COMPLIANCE
+  OTHER
+}
+
+// UK GDPR Article 6(1) lawful bases for processing.
+enum LawfulBasisArticle6 {
+  CONSENT
+  CONTRACT
+  LEGAL_OBLIGATION
+  VITAL_INTERESTS
+  PUBLIC_TASK
+  LEGITIMATE_INTERESTS
+}
+
+// UK GDPR Article 9(2) conditions for processing special-category (health) data.
+enum LawfulBasisArticle9 {
+  EXPLICIT_CONSENT
+  EMPLOYMENT_SOCIAL_SECURITY
+  VITAL_INTERESTS
+  NOT_FOR_PROFIT
+  MADE_PUBLIC_BY_SUBJECT
+  LEGAL_CLAIMS
+  SUBSTANTIAL_PUBLIC_INTEREST
+  HEALTH_OR_SOCIAL_CARE
+  PUBLIC_HEALTH
+  ARCHIVING_RESEARCH
+}
+
+enum ConsentType {
+  DATA_SHARING
+  THIRD_PARTY_SHARING
+  RESEARCH
+  MARKETING
+  PHOTOGRAPHY
+}
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+}
+
+enum LegalDocumentType {
+  DPA
+  PRIVACY_POLICY
+  TERMS_OF_SERVICE
+  ACCEPTABLE_USE_POLICY
+}
+
+// ─── Security / data-protection incidents ───────────────
+
+enum IncidentCategory {
+  DATA_BREACH
+  UNAUTHORISED_ACCESS
+  DATA_LOSS
+  LOST_OR_STOLEN_DEVICE
+  MISDIRECTED_COMMUNICATION
+  SYSTEM_OUTAGE
+  MALWARE_OR_PHISHING
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  CLOSED
+}
+
+enum SubProcessorStatus {
+  ACTIVE
+  REMOVED
+}
+
 // ─── Multi-Tenancy ──────────────────────────────────────
 
 enum MembershipStatus {
@@ -438,6 +528,12 @@ model User {
   // Clock records
   clockRecords ClockRecord[] @relation("UserClockRecords")
 
+  // Mobile push-notification devices
+  deviceTokens DeviceToken[] @relation("UserDeviceTokens")
+
+  // Care reports filed on shift
+  shiftReports ShiftReport[]
+
   // Encryption: blind index for email lookup
   emailIndex String?
 
@@ -480,6 +576,8 @@ model Organization {
   city         String?
   postalCode   String?
   country      String?          @default("GB")
+  // IANA timezone for interpreting shift wall-clock times (e.g. Europe/London).
+  timezone     String           @default("Europe/London")
 
   // Identity verification (KYB)
   companiesHouseNumber String?
@@ -489,6 +587,12 @@ model Organization {
   verifiedById         String?
   verifiedBy           User?              @relation("OrgVerifier", fields: [verifiedById], references: [id])
   verificationNotes    String?
+
+  // Data retention: set when the subscription is terminated; starts the
+  // post-termination grace window before Customer Data becomes purge-eligible.
+  terminatedAt DateTime?
+  // Set once the tenant's Customer Data has been hard-deleted (prevents re-purge).
+  dataPurgedAt DateTime?
 
   // Stripe billing
   stripeCustomerId String? @unique
@@ -515,6 +619,12 @@ model Organization {
   tenantMedications       Medication[]               @relation("TenantMedications")
   tenantMedicationRequests MedicationRequest[]        @relation("TenantMedicationRequests")
   tenantMedicationAdmins  MedicationAdministration[] @relation("TenantMedicationAdmins")
+
+  // Data protection
+  tenantProcessingBases PatientProcessingBasis[] @relation("TenantProcessingBases")
+  tenantConsents        PatientConsent[]         @relation("TenantConsents")
+  tenantLegalAcceptances LegalAcceptance[]       @relation("TenantLegalAcceptances")
+  tenantSecurityIncidents SecurityIncident[]     @relation("TenantSecurityIncidents")
 
   // Phase 3: Workforce
   tenantShiftPatterns    ShiftPattern[]      @relation("TenantShiftPatterns")
@@ -556,6 +666,12 @@ model Organization {
 
   // Clock records
   tenantClockRecords ClockRecord[] @relation("TenantClockRecords")
+
+  // Mobile push-notification devices
+  tenantDeviceTokens DeviceToken[] @relation("TenantDeviceTokens")
+
+  // Care reports filed on shift
+  tenantShiftReports ShiftReport[]
 
   subscription Subscription?
 
@@ -680,13 +796,24 @@ model Patient {
   // Phase 3: Patient Flow
   encounters Encounter[]
 
+  // Care reports filed on shift
+  shiftReports ShiftReport[]
+
   // Phase 4: Specialized Pathways
   chcCases              ChcCase[]
   virtualWardEnrolments VirtualWardEnrolment[]
 
+  // Data protection: lawful basis records + specific consents
+  processingBases PatientProcessingBasis[]
+  consents        PatientConsent[]
+
   // Encryption: blind index for postal code lookup, search index for name search
   postalCodeIndex String?
   searchIndexes   PatientSearchIndex[]
+
+  // GDPR right to erasure: set when the record has been irreversibly anonymised
+  anonymizedAt   DateTime?
+  anonymizedById String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -696,6 +823,135 @@ model Patient {
   @@index([managingOrganizationId])
   @@index([tenantId])
   @@map("patients")
+}
+
+// Per-purpose record of the lawful basis under which a patient's data is
+// processed (UK GDPR Art. 6 + Art. 9). One record per (patient, purpose).
+model PatientProcessingBasis {
+  id               String               @id @default(uuid())
+  purpose          ProcessingPurpose
+  article6Basis    LawfulBasisArticle6
+  article9Condition LawfulBasisArticle9?
+  notes            String?
+  recordedById     String
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantProcessingBases", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, purpose])
+  @@index([tenantId])
+  @@map("patient_processing_bases")
+}
+
+// A specific consent a patient has granted or withdrawn (separate from the
+// clinical lawful basis above). One record per (patient, type).
+model PatientConsent {
+  id           String        @id @default(uuid())
+  type         ConsentType
+  status       ConsentStatus
+  grantedAt    DateTime?
+  withdrawnAt  DateTime?
+  notes        String?
+  recordedById String
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantConsents", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, type])
+  @@index([tenantId])
+  @@map("patient_consents")
+}
+
+// Org-level record that a tenant accepted a specific version of a legal
+// document (DPA, Privacy Policy, Terms, AUP), with who accepted and when.
+model LegalAcceptance {
+  id           String            @id @default(uuid())
+  documentType LegalDocumentType
+  version      String
+  acceptedById String
+  ipAddress    String?
+  userAgent    String?
+  acceptedAt   DateTime          @default(now())
+
+  tenantId String
+  tenant   Organization @relation("TenantLegalAcceptances", fields: [tenantId], references: [id])
+
+  @@unique([tenantId, documentType, version])
+  @@index([tenantId])
+  @@map("legal_acceptances")
+}
+
+// Security / data-protection incident register (NHS DSPT incident management +
+// ICO breach reporting). Append + status transitions; not destructive.
+model SecurityIncident {
+  id          String           @id @default(uuid())
+  reference   String           @unique
+  title       String
+  description String
+  category    IncidentCategory
+  severity    IncidentSeverity
+  status      IncidentStatus   @default(OPEN)
+
+  affectedDataSubjects Int?
+
+  // Timeline
+  occurredAt   DateTime?
+  discoveredAt DateTime  @default(now())
+  containedAt  DateTime?
+  resolvedAt   DateTime?
+
+  // ICO reportability (72-hour rule)
+  icoReportable Boolean   @default(false)
+  icoReportedAt DateTime?
+
+  reportedById String
+  assignedToId String?
+
+  tenantId String
+  tenant   Organization @relation("TenantSecurityIncidents", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, discoveredAt])
+  @@map("security_incidents")
+}
+
+// Platform-wide register of data sub-processors (Clinvara's vendors). Shared
+// across all tenants; supports advance-notice of additions/removals (DPA: 30
+// days' notice of sub-processor changes).
+model SubProcessor {
+  id          String             @id @default(uuid())
+  name        String
+  purpose     String
+  location    String
+  url         String?
+  status      SubProcessorStatus @default(ACTIVE)
+  // When this record's status takes effect. A future date = an announced
+  // change still inside its notice period.
+  effectiveDate DateTime
+  announcedAt   DateTime         @default(now())
+  notes         String?
+  createdById   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, effectiveDate])
+  @@map("sub_processors")
 }
 
 model PatientIdentifier {
@@ -1113,6 +1369,9 @@ model ShiftAssignment {
   // Clock records
   clockRecord ClockRecord?
 
+  // Care reports filed during this shift
+  shiftReports ShiftReport[]
+
   @@unique([shiftId, userId])
   @@index([userId])
   @@index([shiftId])
@@ -1132,6 +1391,11 @@ model ClockRecord {
   autoClockOut      Boolean           @default(false)
   notes             String?
 
+  // Idempotency keys for offline-queued mobile clock events. Re-submitting an
+  // event with the same key returns the existing record instead of erroring.
+  clientEventId         String? @unique
+  clockOutClientEventId String? @unique
+
   shiftAssignmentId String          @unique
   shiftAssignment   ShiftAssignment @relation(fields: [shiftAssignmentId], references: [id])
 
@@ -1147,6 +1411,28 @@ model ClockRecord {
   @@index([userId, clockInAt])
   @@index([tenantId, clockInAt])
   @@map("clock_records")
+}
+
+/// Push-notification device registration for the mobile app. One user may have
+/// several devices; a single Expo push token is globally unique.
+model DeviceToken {
+  id         String         @id @default(uuid())
+  token      String         @unique
+  platform   DevicePlatform
+  lastSeenAt DateTime       @default(now())
+
+  userId String
+  user   User   @relation("UserDeviceTokens", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Organization @relation("TenantDeviceTokens", fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("device_tokens")
 }
 
 model StaffAvailability {
@@ -1200,6 +1486,7 @@ model Location {
   transfersFrom     Transfer[]   @relation("TransferFromLocation")
   transfersTo       Transfer[]   @relation("TransferToLocation")
   patients          Patient[]    @relation("PatientHomeLocation")
+  shiftReports      ShiftReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1225,6 +1512,7 @@ model Bed {
   encounters    Encounter[]  @relation("EncounterBed")
   transfersFrom Transfer[]   @relation("TransferFromBed")
   transfersTo   Transfer[]   @relation("TransferToBed")
+  shiftReports  ShiftReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1233,6 +1521,70 @@ model Bed {
   @@index([tenantId])
   @@index([status])
   @@map("beds")
+}
+
+enum ShiftReportCategory {
+  GENERAL_NOTE
+  PERSONAL_CARE
+  NUTRITION_HYDRATION
+  CONTINENCE
+  MOBILITY
+  MOOD_BEHAVIOUR
+  SLEEP
+  INCIDENT
+  SAFEGUARDING
+}
+
+enum ShiftReportPriority {
+  NORMAL
+  CONCERN
+  URGENT
+}
+
+/// A care report filed by a worker during a shift, scoped to the shift's
+/// location and a patient/bed there. Append-only (corrections = new entries).
+model ShiftReport {
+  id       String              @id @default(uuid())
+  category ShiftReportCategory @default(GENERAL_NOTE)
+  priority ShiftReportPriority @default(NORMAL)
+  content  String
+  detail   Json? // structured fields (phase 2); kept open so the model stays stable
+
+  shiftAssignmentId String
+  shiftAssignment   ShiftAssignment @relation(fields: [shiftAssignmentId], references: [id])
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+  encounter   Encounter? @relation(fields: [encounterId], references: [id])
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  bedId String?
+  bed   Bed?   @relation(fields: [bedId], references: [id])
+
+  recordedById String
+  recordedBy   User   @relation(fields: [recordedById], references: [id])
+
+  tenantId String
+  tenant   Organization @relation(fields: [tenantId], references: [id])
+
+  // Offline idempotency (mirrors clock-in): a replay with the same key returns
+  // the original record. capturedAt is the device write time used for the
+  // reporting-window check so offline reports aren't wrongly rejected on sync.
+  clientEventId String?   @unique
+  capturedAt    DateTime?
+
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([patientId, recordedAt])
+  @@index([locationId, recordedAt])
+  @@index([shiftAssignmentId])
+  @@index([tenantId, recordedAt])
+  @@map("shift_reports")
 }
 
 model Encounter {
@@ -1262,6 +1614,7 @@ model Encounter {
 
   transfers     Transfer[]
   dischargePlan DischargePlan?
+  shiftReports  ShiftReport[]
 
   // Phase 4: Specialized Pathways
   chcCases              ChcCase[]
@@ -1797,6 +2150,12 @@ enum NotificationType {
 enum NotificationChannel {
   IN_APP
   EMAIL
+  PUSH
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
 }
 
 model Notification {

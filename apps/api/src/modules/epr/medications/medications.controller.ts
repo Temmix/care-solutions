@@ -21,8 +21,8 @@ import {
   CreateAdministrationDto,
   SearchPrescriptionsDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, Audit, ClinicalData } from '../../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -31,7 +31,8 @@ interface RequestUser {
 }
 
 @Controller('medications')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class MedicationsController {
   constructor(@Inject(MedicationsService) private medicationsService: MedicationsService) {}
 
@@ -83,6 +84,7 @@ export class MedicationsController {
 
   @Get('prescriptions/:id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'MedicationRequest' })
   findOnePrescription(@Param('id') id: string, @CurrentTenant() tenantId: string | null) {
     return this.medicationsService.findOnePrescription(id, tenantId);
   }
@@ -112,6 +114,7 @@ export class MedicationsController {
 
   @Get('prescriptions/:id/administrations')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'MedicationRequest', action: 'VIEW_ADMINISTRATIONS' })
   getAdministrations(
     @Param('id') requestId: string,
     @CurrentTenant() tenantId: string | null,

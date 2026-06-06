@@ -2,6 +2,7 @@ import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -22,6 +23,13 @@ import { IotModule } from './modules/iot/iot.module';
 import { TrainingModule } from './modules/training/training.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { RumModule } from './modules/rum/rum.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
+import { LegalModule } from './modules/legal/legal.module';
+import { RetentionModule } from './modules/retention/retention.module';
+import { IncidentsModule } from './modules/incidents/incidents.module';
+import { TenantPurgeModule } from './modules/tenant-purge/tenant-purge.module';
+import { SubProcessorsModule } from './modules/sub-processors/sub-processors.module';
+import { ShiftReportsModule } from './modules/shift-reports/shift-reports.module';
 import { LoggerModule } from '@care/logger';
 import { HealthController } from './health.controller';
 
@@ -55,6 +63,9 @@ import { HealthController } from './health.controller';
         : undefined,
     }),
     ScheduleModule.forRoot(),
+    // Rate limiting. Applied selectively (e.g. auth routes) via ThrottlerGuard
+    // rather than globally, so existing API behaviour is unchanged.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
     PrismaModule,
     EncryptionModule,
     EventsModule,
@@ -75,6 +86,13 @@ import { HealthController } from './health.controller';
     TrainingModule,
     MetricsModule,
     RumModule,
+    PrivacyModule,
+    LegalModule,
+    RetentionModule,
+    IncidentsModule,
+    TenantPurgeModule,
+    SubProcessorsModule,
+    ShiftReportsModule,
   ],
   controllers: [HealthController],
 })

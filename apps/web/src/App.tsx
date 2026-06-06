@@ -34,6 +34,12 @@ import { MedicationTypesSettingsPage } from './features/settings/MedicationTypes
 import { TrainingTypesSettingsPage } from './features/settings/TrainingTypesSettingsPage';
 import { ModuleVisibilitySettingsPage } from './features/settings/ModuleVisibilitySettingsPage';
 import { OrganisationSettingsPage } from './features/settings/OrganisationSettingsPage';
+import { DataProtectionSettingsPage } from './features/settings/DataProtectionSettingsPage';
+import { IncidentRegisterPage } from './features/settings/IncidentRegisterPage';
+import { SubProcessorsPage } from './features/settings/SubProcessorsPage';
+import { ProcessingSummaryPage } from './features/settings/ProcessingSummaryPage';
+import { DataProtectionContactPage } from './features/settings/DataProtectionContactPage';
+import { TenantPurgeConsolePage } from './features/settings/TenantPurgeConsolePage';
 import { MedicationsListPage } from './features/medications/MedicationsListPage';
 import { MedicationsCreatePage } from './features/medications/MedicationsCreatePage';
 import { MedicationsDetailPage } from './features/medications/MedicationsDetailPage';
@@ -48,6 +54,7 @@ import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
 import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
 import { ClockPage } from './features/workforce/ClockPage';
 import { TimesheetPage } from './features/workforce/TimesheetPage';
+import { ShiftReportsPage } from './features/reports/ShiftReportsPage';
 import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
 import { ChcListPage } from './features/chc/ChcListPage';
 import { ChcCreatePage } from './features/chc/ChcCreatePage';
@@ -251,6 +258,14 @@ export function App(): React.ReactElement {
                 </ModuleGuard>
               }
             />
+            <Route
+              path="shift-reports"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <ShiftReportsPage />
+                </ModuleGuard>
+              }
+            />
 
             {/* Compliance */}
             <Route
@@ -450,6 +465,12 @@ export function App(): React.ReactElement {
             <Route path="settings/training-types" element={<TrainingTypesSettingsPage />} />
             <Route path="settings/modules" element={<ModuleVisibilitySettingsPage />} />
             <Route path="settings/notifications" element={<NotificationPreferencesPage />} />
+            <Route path="settings/data-protection" element={<DataProtectionSettingsPage />} />
+            <Route path="settings/incidents" element={<IncidentRegisterPage />} />
+            <Route path="settings/sub-processors" element={<SubProcessorsPage />} />
+            <Route path="settings/processing-summary" element={<ProcessingSummaryPage />} />
+            <Route path="settings/dpo-contact" element={<DataProtectionContactPage />} />
+            <Route path="settings/tenant-purge" element={<TenantPurgeConsolePage />} />
           </Route>
           <Route
             path="/change-password"

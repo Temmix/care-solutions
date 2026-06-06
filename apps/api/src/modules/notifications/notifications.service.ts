@@ -1,9 +1,10 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NotificationType, NotificationChannel } from '@prisma/client';
+import { NotificationType, NotificationChannel, DevicePlatform } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
 import { EmailService } from './email.service';
+import { PushService } from './push.service';
 import { SearchNotificationsDto, UpdatePreferencesDto } from './dto';
 import { renderEmailTemplate } from './email-templates';
 
@@ -13,6 +14,7 @@ export class NotificationsService {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(EventsService) private events: EventsService,
     @Inject(EmailService) private emailService: EmailService,
+    @Inject(PushService) private pushService: PushService,
     @Inject(ConfigService) private configService: ConfigService,
   ) {}
 
@@ -75,9 +77,43 @@ export class NotificationsService {
           });
         }
       }
+
+      // Check PUSH preference and send to registered mobile devices
+      const shouldPush = await this.shouldNotify(params.userId, params.type, 'PUSH');
+      if (shouldPush) {
+        await this.pushService.sendToUser(params.userId, {
+          title: params.title,
+          body: params.message,
+          data: { type: params.type, link: params.link },
+        });
+      }
     } catch {
       // Fire-and-forget: don't block business logic
     }
+  }
+
+  // ── Device tokens (mobile push) ────────────────────────────
+
+  /** Register or refresh a device's push token for the current user. */
+  async registerDeviceToken(
+    userId: string,
+    tenantId: string,
+    token: string,
+    platform: DevicePlatform,
+  ) {
+    return this.prisma.deviceToken.upsert({
+      where: { token },
+      create: { token, platform, userId, tenantId },
+      // A device that re-registers (re-login, token rotation) is reassigned to
+      // the current user so we never push stale data to the wrong account.
+      update: { userId, tenantId, platform, lastSeenAt: new Date() },
+    });
+  }
+
+  /** Unregister a device token (logout / disable notifications). */
+  async unregisterDeviceToken(userId: string, token: string): Promise<{ count: number }> {
+    const result = await this.prisma.deviceToken.deleteMany({ where: { token, userId } });
+    return { count: result.count };
   }
 
   // ── Notify multiple users ──────────────────────────────────

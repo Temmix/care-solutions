@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Clinvara",
+    "slug": "clinvara-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "clinvara",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f766e"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.clinvara.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Clinvara uses your location to verify you are on-site when you clock in and out of a shift."
+      }
+    },
+    "android": {
+      "package": "com.clinvara.mobile",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Clinvara uses your location to verify you are on-site when you clock in and out of a shift."
+        }
+      ],
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

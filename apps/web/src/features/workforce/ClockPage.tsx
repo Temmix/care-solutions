@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGeolocation } from './hooks/use-geolocation';
 import { useClock, type MyShiftToday } from './hooks/use-clock';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { OnShiftReportCard } from '../reports/OnShiftReportCard';
 
 const STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   CLOCKED_IN: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Clocked In' },
@@ -294,6 +295,9 @@ export function ClockPage(): React.ReactElement {
           />
         ))}
       </div>
+
+      {/* On-shift care reporting (renders only when clocked in & in window) */}
+      <OnShiftReportCard />
     </div>
   );
 }

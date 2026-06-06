@@ -132,14 +132,12 @@ describe('PatientsService', () => {
       );
     });
 
-    it('should not scope by tenantId when tenantId is null (SUPER_ADMIN)', async () => {
+    it('should fail closed (not span all tenants) when tenantId is null', async () => {
       prisma.patient.findMany.mockResolvedValue([]);
       prisma.patient.count.mockResolvedValue(0);
 
-      await service.search({} as any, null);
-
-      const callArgs = prisma.patient.findMany.mock.calls[0][0];
-      expect(callArgs.where.tenantId).toBeUndefined();
+      await expect(service.search({} as any, null)).rejects.toThrow(ForbiddenException);
+      expect(prisma.patient.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -274,15 +272,11 @@ describe('PatientsService', () => {
       expect(result).toEqual({ id: 'p1', resourceType: 'Patient' });
     });
 
-    it('should not scope by tenantId when tenantId is null', async () => {
+    it('should fail closed when tenantId is null', async () => {
       prisma.patient.findFirst.mockResolvedValue({ id: 'p1', userId: 'u1' });
 
-      await service.findOne('p1', null);
-
-      expect(prisma.patient.findFirst).toHaveBeenCalledWith({
-        where: { id: 'p1' },
-        include: expect.any(Object),
-      });
+      await expect(service.findOne('p1', null)).rejects.toThrow(ForbiddenException);
+      expect(prisma.patient.findFirst).not.toHaveBeenCalled();
     });
   });
 

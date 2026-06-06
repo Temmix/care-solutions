@@ -23,8 +23,8 @@ import {
   DischargeVwDto,
   SearchEnrolmentsDto,
 } from './dto';
-import { Roles, CurrentUser, CurrentTenant } from '../../common/decorators';
-import { RolesGuard, TenantGuard } from '../../common/guards';
+import { Roles, CurrentUser, CurrentTenant, Audit, ClinicalData } from '../../common/decorators';
+import { RolesGuard, TenantGuard, ClinicalAccessGuard } from '../../common/guards';
 
 interface RequestUser {
   id: string;
@@ -33,7 +33,8 @@ interface RequestUser {
 }
 
 @Controller('virtual-wards')
-@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), TenantGuard, RolesGuard, ClinicalAccessGuard)
+@ClinicalData()
 export class VirtualWardsController {
   constructor(@Inject(VirtualWardsService) private vwService: VirtualWardsService) {}
 
@@ -61,6 +62,7 @@ export class VirtualWardsController {
 
   @Get('enrolments/:id')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'VirtualWardEnrolment' })
   getEnrolment(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.vwService.getEnrolment(id, tenantId);
   }
@@ -70,9 +72,10 @@ export class VirtualWardsController {
   createProtocol(
     @Param('id') id: string,
     @Body() dto: CreateProtocolDto,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.vwService.createProtocol(id, dto, tenantId);
+    return this.vwService.createProtocol(id, dto, user.id, tenantId);
   }
 
   @Patch('enrolments/:id/protocols/:protocolId')
@@ -81,9 +84,10 @@ export class VirtualWardsController {
     @Param('id') id: string,
     @Param('protocolId') protocolId: string,
     @Body() dto: UpdateProtocolDto,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.vwService.updateProtocol(id, protocolId, dto, tenantId);
+    return this.vwService.updateProtocol(id, protocolId, dto, user.id, tenantId);
   }
 
   @Delete('enrolments/:id/protocols/:protocolId')
@@ -91,9 +95,10 @@ export class VirtualWardsController {
   deleteProtocol(
     @Param('id') id: string,
     @Param('protocolId') protocolId: string,
+    @CurrentUser() user: RequestUser,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.vwService.deleteProtocol(id, protocolId, tenantId);
+    return this.vwService.deleteProtocol(id, protocolId, user.id, tenantId);
   }
 
   @Post('enrolments/:id/observations')
@@ -109,12 +114,14 @@ export class VirtualWardsController {
 
   @Get('enrolments/:id/observations')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'VirtualWardEnrolment', action: 'VIEW_OBSERVATIONS' })
   getObservations(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.vwService.getObservations(id, tenantId);
   }
 
   @Get('enrolments/:id/alerts')
   @Roles(Role.ADMIN, Role.CLINICIAN, Role.NURSE, Role.CARER)
+  @Audit({ resource: 'VirtualWardEnrolment', action: 'VIEW_ALERTS' })
   getAlerts(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.vwService.getAlerts(id, tenantId);
   }

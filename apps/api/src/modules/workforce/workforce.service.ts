@@ -17,6 +17,7 @@ import { ClockInDto } from './dto/clock-in.dto';
 import { ClockOutDto } from './dto/clock-out.dto';
 import { TimesheetQueryDto } from './dto/timesheet-query.dto';
 import { haversineDistance } from './utils/haversine';
+import { zonedShiftInstant, APP_TIMEZONE } from './shift-time';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShiftPatternDto } from './dto/create-shift-pattern.dto';
 import { UpdateShiftPatternDto } from './dto/update-shift-pattern.dto';
@@ -35,6 +36,23 @@ import { NotificationsService } from '../notifications/notifications.service';
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
+}
+
+/**
+ * Resolve the effective timestamp for a clock event. Offline-queued events
+ * carry the device capture time so the record reflects when it really happened.
+ * Falls back to server time when absent, and guards against future timestamps
+ * (clock skew) beyond a 5-minute tolerance.
+ */
+function resolveCapturedAt(capturedAt: string | undefined, serverNow: Date): Date {
+  if (!capturedAt) return serverNow;
+  const captured = new Date(capturedAt);
+  if (Number.isNaN(captured.getTime())) return serverNow;
+  const toleranceMs = 5 * 60 * 1000;
+  if (captured.getTime() > serverNow.getTime() + toleranceMs) {
+    throw new BadRequestException('Captured time cannot be in the future.');
+  }
+  return captured;
 }
 
 /** Get shift absolute start/end in minutes-since-midnight, handling overnight shifts */
@@ -1533,10 +1551,11 @@ export class WorkforceService {
       orderBy: { shift: { shiftPattern: { startTime: 'asc' } } },
     });
 
-    // Lazy auto-clock-out
+    // Lazy auto-clock-out (all shifts share this tenant's timezone).
+    const tz = await this.getOrgTimezone(tenantId);
     for (const assignment of assignments) {
       if (assignment.clockRecord) {
-        const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift);
+        const updated = await this.lazyAutoClockOut(assignment.clockRecord, assignment.shift, tz);
         if (updated) {
           assignment.clockRecord = updated;
         }
@@ -1547,6 +1566,20 @@ export class WorkforceService {
   }
 
   async clockIn(dto: ClockInDto, userId: string, tenantId: string) {
+    // Idempotent replay: an offline-queued clock-in retried with the same key
+    // returns the original record instead of erroring.
+    if (dto.clientEventId) {
+      const existing = await this.prisma.clockRecord.findUnique({
+        where: { clientEventId: dto.clientEventId },
+      });
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new ForbiddenException('Clock event does not belong to you');
+        }
+        return existing;
+      }
+    }
+
     const assignment = await this.prisma.shiftAssignment.findUnique({
       where: { id: dto.shiftAssignmentId },
       include: {
@@ -1563,22 +1596,20 @@ export class WorkforceService {
       throw new BadRequestException('Already clocked in for this shift');
     }
 
-    // Time window check: can clock in from 30 min before shift start until shift end
-    const now = new Date();
-    const shiftDate = new Date(assignment.shift.date);
-    const { startMin, endMin, overnight } = shiftTimeRange(
+    // Use the device capture time for offline-synced events; reject future
+    // timestamps (clock skew) beyond a small tolerance.
+    const serverNow = new Date();
+    const now = resolveCapturedAt(dto.capturedAt, serverNow);
+    const { startMin, endMin } = shiftTimeRange(
       assignment.shift.shiftPattern.startTime,
       assignment.shift.shiftPattern.endTime,
     );
 
-    const shiftStart = new Date(shiftDate);
-    shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
-
-    const shiftEnd = new Date(shiftDate);
-    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
-
-    const windowStart = new Date(shiftStart);
-    windowStart.setMinutes(windowStart.getMinutes() - 30);
+    // Shift HH:mm are wall-clock times in the org timezone (handles GMT/BST).
+    const tz = await this.getOrgTimezone(tenantId);
+    const shiftStart = zonedShiftInstant(assignment.shift.date, startMin, tz);
+    const shiftEnd = zonedShiftInstant(assignment.shift.date, endMin, tz);
+    const windowStart = new Date(shiftStart.getTime() - 30 * 60_000);
 
     if (now < windowStart) {
       throw new BadRequestException(
@@ -1615,6 +1646,7 @@ export class WorkforceService {
         clockInLatitude: dto.latitude,
         clockInLongitude: dto.longitude,
         clockInDistance: distance,
+        clientEventId: dto.clientEventId,
         userId,
         tenantId,
         shiftAssignmentId: dto.shiftAssignmentId,
@@ -1631,6 +1663,20 @@ export class WorkforceService {
   }
 
   async clockOut(dto: ClockOutDto, userId: string, tenantId: string) {
+    // Idempotent replay: an offline-queued clock-out retried with the same key
+    // returns the already-clocked-out record instead of erroring.
+    if (dto.clientEventId) {
+      const existing = await this.prisma.clockRecord.findUnique({
+        where: { clockOutClientEventId: dto.clientEventId },
+      });
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new ForbiddenException('Clock event does not belong to you');
+        }
+        return existing;
+      }
+    }
+
     const assignment = await this.prisma.shiftAssignment.findUnique({
       where: { id: dto.shiftAssignmentId },
       include: { clockRecord: true, shift: true },
@@ -1651,9 +1697,10 @@ export class WorkforceService {
       where: { id: assignment.clockRecord.id },
       data: {
         status: ClockRecordStatus.CLOCKED_OUT,
-        clockOutAt: new Date(),
+        clockOutAt: resolveCapturedAt(dto.capturedAt, new Date()),
         clockOutLatitude: dto.latitude,
         clockOutLongitude: dto.longitude,
+        clockOutClientEventId: dto.clientEventId,
         notes: dto.notes,
       },
     });
@@ -1667,23 +1714,29 @@ export class WorkforceService {
     return clockRecord;
   }
 
+  /** Resolve the organisation's IANA timezone (falls back to the app default). */
+  private async getOrgTimezone(tenantId: string): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    return org?.timezone || APP_TIMEZONE;
+  }
+
   private async lazyAutoClockOut(
     record: { id: string; status: ClockRecordStatus; clockInAt: Date },
     shift: {
       date: Date;
       shiftPattern: { startTime: string; endTime: string; breakMinutes: number };
     },
+    timeZone: string,
   ) {
     if (record.status !== ClockRecordStatus.CLOCKED_IN) return null;
 
-    const shiftDate = new Date(shift.date);
     const { endMin } = shiftTimeRange(shift.shiftPattern.startTime, shift.shiftPattern.endTime);
+    const shiftEnd = zonedShiftInstant(shift.date, endMin, timeZone);
 
-    const shiftEnd = new Date(shiftDate);
-    shiftEnd.setMinutes(shiftEnd.getMinutes() + endMin);
-
-    const autoClockOutThreshold = new Date(shiftEnd);
-    autoClockOutThreshold.setHours(autoClockOutThreshold.getHours() + 1);
+    const autoClockOutThreshold = new Date(shiftEnd.getTime() + 60 * 60_000);
 
     if (new Date() > autoClockOutThreshold) {
       return this.prisma.clockRecord.update({
@@ -1737,14 +1790,12 @@ export class WorkforceService {
       this.prisma.clockRecord.count({ where }),
     ]);
 
-    // Compute flags
+    // Compute flags (all records share this tenant's timezone).
+    const tz = tenantId ? await this.getOrgTimezone(tenantId) : APP_TIMEZONE;
     const items = records.map((record) => {
       const pattern = record.shiftAssignment.shift.shiftPattern;
-      const shiftDate = new Date(record.shiftAssignment.shift.date);
       const { startMin } = shiftTimeRange(pattern.startTime, pattern.endTime);
-
-      const shiftStart = new Date(shiftDate);
-      shiftStart.setMinutes(shiftStart.getMinutes() + startMin);
+      const shiftStart = zonedShiftInstant(record.shiftAssignment.shift.date, startMin, tz);
 
       const lateMinutes = Math.max(
         0,

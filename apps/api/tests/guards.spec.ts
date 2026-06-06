@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { TenantGuard } from '../src/common/guards/tenant.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { SubscriptionGuard } from '../src/common/guards/subscription.guard';
+import { ClinicalAccessGuard } from '../src/common/guards/clinical-access.guard';
 
 // ── Helpers ──────────────────────────────────────────
 
@@ -381,4 +382,46 @@ describe('SubscriptionGuard', () => {
       where: { organizationId: 'tenant-42' },
     });
   });
+});
+
+// ── ClinicalAccessGuard ──────────────────────────────
+
+describe('ClinicalAccessGuard', () => {
+  let guard: ClinicalAccessGuard;
+  let reflector: Reflector;
+
+  beforeEach(() => {
+    reflector = { getAllAndOverride: jest.fn() } as unknown as Reflector;
+    guard = new ClinicalAccessGuard(reflector);
+  });
+
+  it('allows any request on a non-clinical handler (no @ClinicalData marker)', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(undefined);
+    const ctx = createMockContext({ user: { id: 'sa', globalRole: 'SUPER_ADMIN' } });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  it('blocks SUPER_ADMIN on a clinical handler', () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(true);
+    const ctx = createMockContext({
+      user: { id: 'sa', globalRole: 'SUPER_ADMIN' },
+      tenantId: 'tenant-1',
+      method: 'GET',
+      url: '/api/patients/123',
+    });
+
+    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(ctx)).toThrow('do not have access to patient clinical data');
+  });
+
+  it.each(['ADMIN', 'TENANT_ADMIN', 'CLINICIAN', 'NURSE', 'CARER'])(
+    'allows %s on a clinical handler',
+    (role) => {
+      (reflector.getAllAndOverride as jest.Mock).mockReturnValue(true);
+      const ctx = createMockContext({ user: { id: 'u', globalRole: role } });
+
+      expect(guard.canActivate(ctx)).toBe(true);
+    },
+  );
 });

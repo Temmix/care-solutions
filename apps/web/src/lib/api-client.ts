@@ -133,6 +133,35 @@ class ApiClient {
     return this.request<T>(path);
   }
 
+  /** GET a non-JSON response (e.g. text/csv) as raw text, with auth + 401 refresh. */
+  async getText(path: string): Promise<string> {
+    const doFetch = (): Promise<Response> =>
+      fetch(`${API_BASE}${path}`, { headers: this.buildHeaders() });
+
+    let response = await doFetch();
+    if (response.status === 401) {
+      const refreshed = await this.refreshOnce();
+      if (refreshed) {
+        response = await doFetch();
+      } else {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        this.onLogout?.();
+        throw new Error('Session expired. Please log in again.');
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        response.status === 403
+          ? 'You do not have permission to perform this action.'
+          : 'Export failed. Please try again.',
+      );
+    }
+
+    return response.text();
+  }
+
   post<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>(path, {
       method: 'POST',
