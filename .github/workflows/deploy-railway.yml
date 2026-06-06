@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
 
+# Serialise production deploys. Two quick merges to main otherwise race on the
+# same Railway services and can finish out of order, leaving the older build
+# live. Queue runs instead of letting them overlap.
+concurrency:
+  group: deploy-railway-production
+  cancel-in-progress: false
+
 env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 

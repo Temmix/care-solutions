@@ -54,6 +54,7 @@ import { DischargePlanPage } from './features/patient-flow/DischargePlanPage';
 import { SwapMarketplacePage } from './features/workforce/SwapMarketplacePage';
 import { ClockPage } from './features/workforce/ClockPage';
 import { TimesheetPage } from './features/workforce/TimesheetPage';
+import { ShiftReportsPage } from './features/reports/ShiftReportsPage';
 import { ComplianceDashboardPage } from './features/workforce/ComplianceDashboardPage';
 import { ChcListPage } from './features/chc/ChcListPage';
 import { ChcCreatePage } from './features/chc/ChcCreatePage';
@@ -254,6 +255,14 @@ export function App(): React.ReactElement {
               element={
                 <ModuleGuard moduleCode="ROSTER">
                   <TimesheetPage />
+                </ModuleGuard>
+              }
+            />
+            <Route
+              path="shift-reports"
+              element={
+                <ModuleGuard moduleCode="ROSTER">
+                  <ShiftReportsPage />
                 </ModuleGuard>
               }
             />
