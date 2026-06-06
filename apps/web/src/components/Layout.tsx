@@ -288,15 +288,29 @@ const navItems = [
       </svg>
     ),
   },
-  // Clock In/Out + Timesheets temporarily hidden from sidebar pending
-  // product decisions. Routes still mounted in App.tsx so the pages remain
-  // accessible by direct URL — unhide by uncommenting the two nav entries.
-  // {
-  //   to: '/app/clock',
-  //   label: 'Clock In/Out',
-  //   moduleCode: 'ROSTER',
-  //   icon: (...),
-  // },
+  {
+    to: '/app/clock',
+    label: 'Clock In/Out',
+    moduleCode: 'ROSTER',
+    icon: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+    ),
+  },
+  // Timesheets stays hidden from the sidebar pending a product decision. Its
+  // route is still mounted in App.tsx, so it's reachable by direct URL — unhide
+  // by uncommenting this entry.
   // {
   //   to: '/app/timesheets',
   //   label: 'Timesheets',
