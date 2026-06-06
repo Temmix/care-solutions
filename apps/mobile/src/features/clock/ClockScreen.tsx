@@ -72,6 +72,15 @@ export default function ClockScreen() {
     }
   };
 
+  // Clocking out ends the shift and can't be undone, so confirm first to guard
+  // against an accidental tap.
+  const confirmClockOut = (view: AssignmentView) => {
+    Alert.alert('Clock out?', 'This ends your shift. You can’t clock back in afterwards.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clock Out', style: 'destructive', onPress: () => void onClockOut(view) },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -173,7 +182,7 @@ export default function ClockScreen() {
             {state === 'clocked_in' && (
               <Pressable
                 style={[styles.button, styles.clockOut]}
-                onPress={() => onClockOut(view)}
+                onPress={() => confirmClockOut(view)}
                 disabled={busy}
               >
                 <Text style={styles.buttonText}>{busy ? 'Working…' : 'Clock Out'}</Text>
