@@ -60,7 +60,7 @@ export function ReportModal({
                     className="w-full text-left py-3 cursor-pointer hover:bg-slate-50 px-2 -mx-2 rounded-lg"
                   >
                     <div className="text-sm font-medium text-slate-900">{p.name}</div>
-                    {p.bed && <div className="text-xs text-slate-500">Bed {p.bed}</div>}
+                    {p.bed && <div className="text-xs text-slate-500">{p.bed}</div>}
                   </button>
                 ))}
               </div>
@@ -78,7 +78,7 @@ export function ReportModal({
           <div className="p-5">
             <h2 className="text-base font-semibold text-slate-900 mb-4">
               Report · {patient.name}
-              {patient.bed ? ` (Bed ${patient.bed})` : ''}
+              {patient.bed ? ` (${patient.bed})` : ''}
             </h2>
 
             <ErrorAlert message={error} className="mb-4" />

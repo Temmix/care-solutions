@@ -151,7 +151,7 @@ export function ShiftReportsPage(): React.ReactElement {
                           {r.bed && (
                             <span className="text-xs text-slate-400 font-normal">
                               {' '}
-                              · Bed {r.bed.identifier}
+                              · {r.bed.identifier}
                             </span>
                           )}
                         </td>

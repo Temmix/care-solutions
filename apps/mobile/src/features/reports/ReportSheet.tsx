@@ -110,7 +110,7 @@ export function ReportSheet({
                 {patients.map((p) => (
                   <Pressable key={p.patientId} style={styles.option} onPress={() => setPatient(p)}>
                     <Text style={styles.optionName}>{p.name}</Text>
-                    {p.bed && <Text style={styles.optionMeta}>Bed {p.bed}</Text>}
+                    {p.bed && <Text style={styles.optionMeta}>{p.bed}</Text>}
                   </Pressable>
                 ))}
               </ScrollView>
@@ -127,7 +127,7 @@ export function ReportSheet({
             >
               <Text style={styles.title}>
                 Report · {patient.name}
-                {patient.bed ? ` (Bed ${patient.bed})` : ''}
+                {patient.bed ? ` (${patient.bed})` : ''}
               </Text>
 
               <Text style={styles.label}>Category</Text>
