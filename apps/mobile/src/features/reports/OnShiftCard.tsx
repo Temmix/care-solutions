@@ -30,7 +30,13 @@ function ReportRow({ report }: { report: ShiftReport }) {
           {categoryLabel(report.category)} · {fmtClock(report.recordedAt)}
         </Text>
       </View>
-      <Text style={styles.reportContent} numberOfLines={expanded ? undefined : 2}>
+      <Text
+        // Remount on toggle: iOS caches the truncated layout and won't re-expand
+        // when numberOfLines alone changes.
+        key={expanded ? 'expanded' : 'collapsed'}
+        style={styles.reportContent}
+        numberOfLines={expanded ? undefined : 2}
+      >
         {report.content}
       </Text>
       {!expanded && report.content.length > 80 && (
