@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { colors, spacing } from '../../theme';
 import type { ShiftContextPatient, ShiftReportCategory, ShiftReportPriority } from '../../types';
@@ -48,6 +50,26 @@ export function ReportSheet({
   const [priority, setPriority] = useState<ShiftReportPriority>('NORMAL');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const formScroll = useRef<ScrollView>(null);
+  const notesY = useRef(0);
+
+  // Keyboard avoidance differs by platform inside a Modal:
+  //  - iOS: KeyboardAvoidingView / JS offsets are unreliable in a transparent
+  //    Modal, so the ScrollView uses the native `automaticallyAdjustKeyboardInsets`.
+  //  - Android: that native prop is a no-op, so we measure the keyboard and lift
+  //    the sheet ourselves.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const reset = () => {
     setPatient(null);
@@ -77,11 +99,11 @@ export function ReportSheet({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, keyboardHeight > 0 ? { marginBottom: keyboardHeight } : null]}>
           {!patient ? (
             <>
               <Text style={styles.title}>Who is this report about?</Text>
-              <ScrollView style={{ maxHeight: 420 }}>
+              <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
                 {patients.length === 0 && (
                   <Text style={styles.empty}>No patients at your location.</Text>
                 )}
@@ -97,7 +119,12 @@ export function ReportSheet({
               </Pressable>
             </>
           ) : (
-            <ScrollView>
+            <ScrollView
+              ref={formScroll}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+              contentContainerStyle={styles.formBody}
+            >
               <Text style={styles.title}>
                 Report · {patient.name}
                 {patient.bed ? ` (Bed ${patient.bed})` : ''}
@@ -141,6 +168,21 @@ export function ReportSheet({
                 placeholder="What happened during the shift…"
                 placeholderTextColor={colors.muted}
                 multiline
+                onLayout={(e) => {
+                  notesY.current = e.nativeEvent.layout.y;
+                }}
+                onFocus={() =>
+                  // Bring the notes field (not the buttons below it) to the top of
+                  // the visible area so it stays in view while typing.
+                  setTimeout(
+                    () =>
+                      formScroll.current?.scrollTo({
+                        y: Math.max(0, notesY.current - 8),
+                        animated: true,
+                      }),
+                    100,
+                  )
+                }
               />
 
               <View style={styles.actions}>
@@ -180,6 +222,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     maxHeight: '88%',
   },
+  formBody: { paddingBottom: spacing.lg },
   title: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   empty: { color: colors.muted, paddingVertical: spacing.md },
   option: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -205,7 +248,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     fontSize: 15,
     color: colors.text,
-    minHeight: 96,
+    minHeight: 140,
     textAlignVertical: 'top',
     marginTop: spacing.xs,
   },
