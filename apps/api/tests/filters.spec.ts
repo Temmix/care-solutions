@@ -43,7 +43,7 @@ describe('GlobalExceptionFilter', () => {
     );
   });
 
-  it('should handle HttpException with object response', () => {
+  it('should flatten an object response to its readable message', () => {
     const exception = new HttpException(
       { message: 'Validation failed', errors: ['field required'] },
       HttpStatus.BAD_REQUEST,
@@ -54,7 +54,41 @@ describe('GlobalExceptionFilter', () => {
     expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
     const jsonArg = mockResponse.json.mock.calls[0][0];
     expect(jsonArg.statusCode).toBe(HttpStatus.BAD_REQUEST);
+    // message is the inner string, not the whole object — so the client can read it
+    expect(jsonArg.message).toBe('Validation failed');
     expect(jsonArg.timestamp).toBeDefined();
+  });
+
+  it('should surface a string[] message (class-validator) for the client to join', () => {
+    const exception = new HttpException(
+      {
+        statusCode: 400,
+        message: ['name must be a string', 'age must be a number'],
+        error: 'Bad Request',
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    filter.catch(exception, mockHost);
+
+    expect(mockResponse.json.mock.calls[0][0].message).toEqual([
+      'name must be a string',
+      'age must be a number',
+    ]);
+  });
+
+  it('should flatten a nested 403 (RolesGuard) to its message string', () => {
+    // Reproduces the bug: a Forbidden from @Roles previously left the whole
+    // { statusCode, message, error } object as `message`, which the web client
+    // could not read and showed as a generic error.
+    const exception = new HttpException(
+      { statusCode: 403, message: 'Forbidden resource', error: 'Forbidden' },
+      HttpStatus.FORBIDDEN,
+    );
+
+    filter.catch(exception, mockHost);
+
+    expect(mockResponse.json.mock.calls[0][0].message).toBe('Forbidden resource');
   });
 
   it('should handle non-HttpException as 500 Internal Server Error', () => {

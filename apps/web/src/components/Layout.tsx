@@ -313,6 +313,7 @@ const navItems = [
     to: '/app/clock',
     label: 'Clock In/Out',
     moduleCode: 'ROSTER',
+    workerOnly: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -786,6 +787,10 @@ export function Layout(): React.ReactElement {
             if (item.superAdminOnly && !isSuperAdmin) return null;
             if (item.platformOnly && !isPlatformAdmin) return null;
             if (item.adminOnly && !isPlatformAdmin && user?.role !== 'ADMIN') return null;
+            // Worker-only items (e.g. Clock In/Out) call care-staff endpoints,
+            // so hide them from admins who'd only hit a 403.
+            if (item.workerOnly && !['CLINICIAN', 'NURSE', 'CARER'].includes(user?.role ?? ''))
+              return null;
             if (item.moduleCode && !isModuleEnabled(item.moduleCode)) return null;
             const active = isActive(item.to);
             return (
