@@ -25,8 +25,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    // Nest's getResponse() is either a string or an object like
+    // { statusCode, message, error }. Surface the readable message (string or
+    // string[]) so clients can display it directly instead of receiving a
+    // nested object they can't parse (which previously masked 403/validation
+    // errors as a generic "Something went wrong").
+    const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
+    const message: string | string[] =
+      typeof exceptionResponse === 'string'
+        ? exceptionResponse
+        : ((exceptionResponse as { message?: string | string[] }).message ??
+          'Internal server error');
 
     const user = request.user as { id?: string } | undefined;
     const tenantId = (request as unknown as Record<string, unknown>).tenantId as string | undefined;
@@ -57,7 +67,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
-      message: typeof message === 'string' ? message : (message as Record<string, unknown>),
+      message,
       timestamp: new Date().toISOString(),
     });
   }
