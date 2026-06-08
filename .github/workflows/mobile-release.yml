@@ -1,0 +1,72 @@
+name: Mobile Release (EAS)
+
+# Build the Expo app on EAS and (optionally) submit it to the App Store /
+# Play Store. Manual trigger only — pick the platform, profile, and whether to
+# submit. Store credentials live on EAS (uploaded once via `eas credentials`),
+# so the only GitHub secret needed is EXPO_TOKEN (an EAS robot/access token).
+#
+# Prereqs before the first real run:
+#   - app.json has a real EAS projectId (Phase 0 — PR #112)
+#   - EXPO_TOKEN repo secret set
+#   - iOS: App Store Connect API key uploaded to EAS; app record created
+#   - Android: Google service account key uploaded to EAS; first AAB uploaded
+#     manually once (Play requirement)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        type: choice
+        options: [all, ios, android]
+        default: all
+      profile:
+        description: 'EAS build profile'
+        type: choice
+        options: [production, preview]
+        default: production
+      submit:
+        description: 'Submit to the stores after the build completes'
+        type: boolean
+        default: false
+
+# One release run at a time.
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS build
+    runs-on: ubuntu-latest
+    # Gate submissions behind a protected environment (add required reviewers in
+    # repo settings → Environments → mobile-release) so a store push needs approval.
+    environment: ${{ inputs.submit && 'mobile-release' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: EAS build${{ inputs.submit && ' + submit' || '' }}
+        working-directory: apps/mobile
+        run: |
+          eas build \
+            --platform ${{ inputs.platform }} \
+            --profile ${{ inputs.profile }} \
+            --non-interactive \
+            --no-wait \
+            ${{ inputs.submit && '--auto-submit' || '' }}
