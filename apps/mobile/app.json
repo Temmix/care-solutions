@@ -35,8 +35,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "eee31631-8a3f-487a-9bb9-5d7dabbba506"
       }
-    }
+    },
+    "owner": "temmix"
   }
 }
