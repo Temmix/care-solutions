@@ -46,6 +46,13 @@ context.md
 # Code Graph
 .codegraph
 
+# Mobile store credentials — never commit (kept on EAS / GitHub secrets)
+**/google-service-account*.json
+**/*.p8
+AuthKey_*.p8
+**/*.keystore
+**/*.jks
+
 aws-secrets.md
 
 # Database dumps

@@ -14,7 +14,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.clinvara.com/api"
+        "EXPO_PUBLIC_API_URL": "https://clinvara-staging-api-testing.up.railway.app/api"
       }
     },
     "production": {
@@ -25,6 +25,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal"
+      },
+      "ios": {}
+    }
   }
 }
