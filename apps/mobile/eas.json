@@ -1,33 +1,43 @@
 {
   "cli": {
     "version": ">= 5.0.0",
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "APP_VARIANT": "development",
         "EXPO_PUBLIC_API_URL": "http://localhost:3000/api"
       }
     },
-    "preview": {
+    "staging": {
       "distribution": "internal",
+      "autoIncrement": true,
       "env": {
+        "APP_VARIANT": "staging",
         "EXPO_PUBLIC_API_URL": "https://clinvara-staging-api-testing.up.railway.app/api"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.clinvara.com/api"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-PROD-RAILWAY-API/api"
       }
     }
   },
   "submit": {
-    "production": {
+    "staging": {
       "android": {
         "track": "internal"
+      },
+      "ios": {}
+    },
+    "production": {
+      "android": {
+        "track": "production"
       },
       "ios": {}
     }

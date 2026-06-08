@@ -21,10 +21,10 @@ on:
         options: [all, ios, android]
         default: all
       profile:
-        description: 'EAS build profile'
+        description: 'EAS build profile (staging = staging app/API, production = prod app/API)'
         type: choice
-        options: [production, preview]
-        default: production
+        options: [production, staging]
+        default: staging
       submit:
         description: 'Submit to the stores after the build completes'
         type: boolean
